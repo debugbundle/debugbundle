@@ -391,6 +391,8 @@ describe("web app - auth routes", () => {
 
     render(<App initialEntries={["/dashboard"]} />);
 
+    await screen.findByRole("dialog", { name: "Welcome to DebugBundle" });
+    await user.keyboard("{Escape}");
     expect(await screen.findByRole("heading", { name: /incidents today/i })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /owen@example.com/i }));
@@ -512,22 +514,22 @@ describe("web app - auth routes", () => {
 
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<App initialEntries={["/member-tokens"]} />);
+    render(<App initialEntries={["/access-tokens"]} />);
 
-    expect(await screen.findByRole("heading", { name: /member tokens/i })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /access tokens/i })).toBeInTheDocument();
     expect(
       screen.getByText(/complete email sign-in again to verify this address/i)
     ).toBeInTheDocument();
-    expect(await screen.findByText(/no member tokens yet/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no access tokens yet/i)).toBeInTheDocument();
 
-    const createButtons = screen.getAllByRole("button", { name: /create member token/i });
+    const createButtons = screen.getAllByRole("button", { name: /create access token/i });
     expect(createButtons.length).toBeGreaterThan(0);
     createButtons.forEach((button) => {
       expect(button).toBeDisabled();
     });
   });
 
-  it("creates a member token for verified sessions and reveals the plaintext once", async () => {
+  it("creates an access token for verified sessions and reveals the plaintext once", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
@@ -551,7 +553,7 @@ describe("web app - auth routes", () => {
           scope: {
             mode: "organization",
             organization_id: "11111111-1111-4111-8111-111111111111",
-            permissions: ["project:read"]
+            permissions: ["project:read", "project:write", "project:admin"]
           },
           expires_at: expect.any(String)
         });
@@ -569,14 +571,14 @@ describe("web app - auth routes", () => {
 
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<App initialEntries={["/member-tokens"]} />);
+    render(<App initialEntries={["/access-tokens"]} />);
 
-    expect(await screen.findByRole("heading", { name: /member tokens/i })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /access tokens/i })).toBeInTheDocument();
     expect(await screen.findByText(/local mcp/i)).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /create member token/i }));
+    await user.click(screen.getByRole("button", { name: /create access token/i }));
     await user.type(await screen.findByLabelText(/token label/i), "CI automation");
-    await user.click(screen.getByRole("radio", { name: /current organisation/i }));
+    expect(screen.getByRole("radio", { name: /current workspace/i })).toBeChecked();
     await user.click(screen.getByRole("button", { name: /^create token$/i }));
 
     const revealRegion = await screen.findByRole("region", { name: /new token secret/i });
@@ -876,7 +878,7 @@ describe("web app - auth routes", () => {
     expect(await screen.findByText(/cached profile avatar active/i)).toBeInTheDocument();
   });
 
-  it("signs out from the authenticated shell and revokes member tokens", async () => {
+  it("signs out from the authenticated shell and revokes access tokens", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
@@ -902,9 +904,9 @@ describe("web app - auth routes", () => {
 
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<App initialEntries={["/member-tokens"]} />);
+    render(<App initialEntries={["/access-tokens"]} />);
 
-    expect(await screen.findByRole("heading", { name: /member tokens/i })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /access tokens/i })).toBeInTheDocument();
     await user.click(await screen.findByRole("button", { name: /^revoke$/i }));
     await user.click(await screen.findByRole("button", { name: /revoke token/i }));
     await waitFor(() => {

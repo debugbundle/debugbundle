@@ -238,6 +238,6 @@ Hosted cloud service costs must stay within an explicitly approved lean baseline
 ## 15. Token Scope Separation
 
 - **Project Tokens**: SDK write-only, project-scoped. Cannot read bundles or manage accounts.
-- **Member Tokens**: CLI/API/MCP read/manage, member-identity-scoped.
+- **Access Tokens** (formerly Member Tokens): CLI/API/MCP read/manage within token scope and the issuing user's current permissions. Existing member-token identifiers remain compatible; see `contracts/member-token-scopes.md`.
 
 These token classes must never be conflated.

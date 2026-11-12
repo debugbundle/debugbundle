@@ -1,7 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 
 import { ProjectNameWithAccessIndicator } from "./project-name-with-access-indicator.js";
-import { useHeaderActions } from "./header-actions-context.js";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -25,7 +24,7 @@ const routeTitles: Record<string, string> = {
   "/analytics/workspace/bundles": "Analytics",
   "/projects": "Projects",
   "/billing": "Billing",
-  "/member-tokens": "Member Tokens",
+  "/access-tokens": "Access tokens",
   "/settings": "Settings",
   "/settings/people": "People",
   "/settings/referrals": "Referrals"
@@ -86,7 +85,6 @@ export function SiteHeader(): JSX.Element {
       : null;
   const isProjectRoute = /^\/projects\/[^/]+/.test(location.pathname);
   const { activeProject } = useProjectRoute();
-  const { action } = useHeaderActions();
 
   return (
     <header className="flex h-(--header-height) shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
@@ -160,9 +158,6 @@ export function SiteHeader(): JSX.Element {
           <h1 className="m-0 text-base font-medium leading-none">{resolveTitle(pathname)}</h1>
         )}
       </div>
-      {action?.pathname === location.pathname ? (
-        <div className="ml-auto flex shrink-0 items-center px-4">{action.content}</div>
-      ) : null}
     </header>
   );
 }

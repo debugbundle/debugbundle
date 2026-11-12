@@ -98,6 +98,15 @@ async function openAnalyticsSettings(): Promise<void> {
 }
 
 describe("web app - project analytics settings", () => {
+  it("opens analytics settings directly from the setup guide link", async () => {
+    installFetchMock({ plan: "free", accessMode: "manage", analyticsAvailable: true });
+    render(<App initialEntries={["/projects/proj_123/settings#analytics-settings"]} />);
+    expect(await screen.findByRole("switch", { name: /capture semantic actions/i })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Product analytics" })).toHaveAttribute(
+      "aria-expanded",
+      "true"
+    );
+  });
   it("lets Team owners update capture and controlled custom-dimension settings", async () => {
     const user = userEvent.setup();
     const onPatch = vi.fn((init: RequestInit) => {

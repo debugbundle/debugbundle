@@ -36,7 +36,7 @@ verification, resume and cancellation. Existing identities, credentials and
 restricted scopes remain compatible. Merge apply requires a qualified compatible
 core 1.21.0 runtime and remains disabled by default.
 
-Connected `doctor` diagnostics check API health and saved member authentication with a one-incident probe restricted to `cloud_project_id`. Missing or blank connected project scope fails before any request. Incident contents are discarded and are not included in the report. Local-only diagnostics make no cloud request.
+Connected `doctor` diagnostics check API health and saved access-token authentication with a one-incident probe restricted to `cloud_project_id`. Missing or blank connected project scope fails before any request. Incident contents are discarded and are not included in the report. Local-only diagnostics make no cloud request.
 
 Connected-workspace incident lists use the saved connection's `cloud_project_id`
 unless `projectId` is explicitly supplied. This also applies to `source: "cloud"`
@@ -51,7 +51,7 @@ MCP server for runtime error reporting, crash reporting, incident response, endp
 
 Connected incident lists now retain their selected cloud project across all pages,
 including explicit cloud reads. Invalid connected scope fails before the list
-request. Tool names, schemas, member authentication and local evidence selection
+request. Tool names, schemas, access-token authentication and local evidence selection
 remain compatible. The coordinated OpenClaw plugin repairs native ESM loading and
 adds installed-host/runtime checks; marketplace security acceptance stays separate.
 
@@ -106,7 +106,7 @@ Use `npx -y @debugbundle/mcp` in clients that require noninteractive package exe
 | VS Code / GitHub MCP Registry | `com.debugbundle/mcp`                                                      | official registry metadata                           |
 | OpenClaw / ClawHub            | DebugBundle skill plus MCP config                                          | use the published skill for workflow guidance        |
 | CI/headless agents            | `DEBUGBUNDLE_MEMBER_TOKEN`                                                 | never use a project token                            |
-| Self-hosted DebugBundle       | `DEBUGBUNDLE_API_URL` plus member auth                                     | points the server at your API base URL               |
+| Self-hosted DebugBundle       | `DEBUGBUNDLE_API_URL` plus access-token authentication                     | points the server at your API base URL               |
 
 This package is the supported public local stdio path. The separate OpenAI Plugin
 uses an OAuth-protected read-only remote endpoint at
@@ -115,7 +115,7 @@ does not alter this package's catalog or authentication.
 
 ## Local authentication profile
 
-MCP 1.9.0 adds `npx @debugbundle/mcp --local-auth`. This opt-in profile removes `bearerToken` from tool schemas, rejects per-call credentials and unknown fields, and uses only the server's startup CLI/environment member authentication. Hosted tools that require a member token fail with `mcp_tool_error:auth_state_missing` before an API request when auth is absent; run `debugbundle login` on that host or configure the server environment and restart the connection. Local-only retrieval remains available without a token. The default invocation preserves the legacy schemas and explicit per-tool token precedence.
+MCP 1.9.0 adds `npx @debugbundle/mcp --local-auth`. This opt-in profile removes `bearerToken` from tool schemas, rejects per-call credentials and unknown fields, and uses only the server's startup CLI/environment access-token authentication. Hosted tools that require an access token fail with `mcp_tool_error:auth_state_missing` before an API request when auth is absent; run `debugbundle login` on that host or configure the server environment and restart the connection. Local-only retrieval remains available without a token. The default invocation preserves the legacy schemas and explicit per-tool token precedence.
 
 ## Codex
 
@@ -154,7 +154,7 @@ The plugin package lives at `apps/mcp/claude-code/debugbundle` and bundles a Cla
 | Mode                       | Use                                     | Notes                                                             |
 | -------------------------- | --------------------------------------- | ----------------------------------------------------------------- |
 | CLI auth state             | Local developer machines                | Reuses `~/.debugbundle/auth.json` when available.                 |
-| `DEBUGBUNDLE_MEMBER_TOKEN` | Headless or marketplace-managed clients | Member tokens are for CLI/API/MCP read and management operations. |
+| `DEBUGBUNDLE_MEMBER_TOKEN` | Headless or marketplace-managed clients | Access tokens are for CLI/API/MCP read and management operations. |
 | Per-tool `bearerToken`     | Explicit advanced automation            | Overrides default auth for that call only.                        |
 | Project token              | SDK ingestion only                      | Do not use project tokens for MCP retrieval or management.        |
 
@@ -194,7 +194,7 @@ For analytics questions, use direct aggregate tools first and generate an Analyt
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | Node.js launch failure     | Use Node.js 22.x through 26.x. Configure the client to use a supported `node` or `npx` runtime.                     |
 | Missing local auth         | Run `debugbundle login`, or set `DEBUGBUNDLE_MEMBER_TOKEN` for headless and managed clients.                        |
-| Invalid token              | Use a `dbundle_mem_` member token. Project tokens are SDK ingestion-only credentials.                               |
+| Invalid token              | Use a `dbundle_mem_` access token. Project tokens are SDK ingestion-only credentials.                               |
 | Wrong API host             | Leave `DEBUGBUNDLE_API_URL` unset for DebugBundle Cloud; set it only for self-hosted or non-default API hosts.      |
 | Local repo not initialized | Run `debugbundle setup` before local-only diagnostics, local bundle analysis, or generated project-skill workflows. |
 
@@ -214,7 +214,7 @@ For analytics questions, use direct aggregate tools first and generate an Analyt
 - Source repository: https://github.com/debugbundle/debugbundle/tree/main/apps/mcp
 - License: Apache-2.0.
 - The server uses stdio transport and local process credentials. It does not include hidden hosted management auth.
-- Public examples must use placeholders only; never paste real member tokens, project tokens, webhook secrets, or customer configuration into marketplace listings.
+- Public examples must use placeholders only; never paste real access tokens, project tokens, webhook secrets, or customer configuration into marketplace listings.
 
 ## License
 

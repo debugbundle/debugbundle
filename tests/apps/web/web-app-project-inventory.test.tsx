@@ -35,14 +35,22 @@ describe("project inventory", () => {
         });
       }
 
-      if (url.endsWith("/v1/incidents?limit=20&status=active") && init?.method === undefined) {
+      if (
+        new URL(url, "http://localhost").pathname === "/v1/incidents" &&
+        new URL(url, "http://localhost").searchParams.get("status") === "active" &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           incidents: [anomalyIncident],
           next_cursor: null
         });
       }
 
-      if (url.endsWith("/v1/incidents?limit=20") && init?.method === undefined) {
+      if (
+        new URL(url, "http://localhost").pathname === "/v1/incidents" &&
+        !new URL(url, "http://localhost").searchParams.has("status") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           incidents: [
             createIncident(),

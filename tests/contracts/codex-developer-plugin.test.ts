@@ -44,12 +44,12 @@ describe("Codex developer plugin distribution", () => {
     expect(manifest.userConfig).toBeUndefined();
     expect(manifest.interface.capabilities).toContain("Write");
     expect(manifest.interface.defaultPrompt.length).toBeLessThanOrEqual(3);
-    // The install catalog pins the latest MCP version that passed registry smoke.
+    // The release catalog pins one exact reviewed MCP version.
     expect(mcp).toEqual({
       mcpServers: {
         debugbundle: {
           command: "npx",
-          args: ["-y", "@debugbundle/mcp@1.23.0", "--local-auth"]
+          args: ["-y", "@debugbundle/mcp@1.24.0", "--local-auth"]
         }
       }
     });

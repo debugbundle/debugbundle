@@ -4,10 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { PageHeader } from "../components/system/page-header.js";
-import { useHeaderActions } from "../components/system/header-actions-context.js";
 import { ProjectNameWithAccessIndicator } from "../components/system/project-name-with-access-indicator.js";
 import { ResourceListState } from "../components/system/resource-list-state.js";
 import { TableRefreshButton } from "../components/system/table-refresh-button.js";
+import { useWorkspaceHealthAlert } from "../components/system/workspace-health-alert-context.js";
 import { Button } from "../components/ui/button.js";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.js";
 import {
@@ -41,6 +41,7 @@ import { computeAvailabilityUptimePercentage } from "../lib/health-status-metric
 const STATUS_HISTORY_DAYS = 30;
 
 export function HealthStatusPage(): JSX.Element {
+  const refreshHealthAlert = useWorkspaceHealthAlert()?.refresh;
   const [projects, setProjects] = useState<HealthStatusProjectSummary[] | null>(null);
   const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
   const [refreshCount, setRefreshCount] = useState(0);
@@ -50,24 +51,10 @@ export function HealthStatusPage(): JSX.Element {
     [refreshCount]
   );
   const isLoading = projects === null;
-  const { setAction: setHeaderAction } = useHeaderActions();
-
-  useEffect(() => {
-    setHeaderAction({
-      pathname: "/health-status",
-      content: (
-        <TableRefreshButton
-          isLoading={isLoading}
-          onRefresh={() => setRefreshCount((current) => current + 1)}
-        />
-      )
-    });
-
-    return () => setHeaderAction(null);
-  }, [isLoading, setHeaderAction]);
 
   useEffect(() => {
     let canceled = false;
+    refreshHealthAlert?.();
 
     void (async () => {
       setLoadErrorMessage(null);
@@ -93,13 +80,22 @@ export function HealthStatusPage(): JSX.Element {
     return () => {
       canceled = true;
     };
-  }, [dayRange]);
+  }, [dayRange, refreshHealthAlert]);
 
   const summary = useMemo(() => buildWorkspaceSummary(projects ?? []), [projects]);
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader description="Current health and uptime from recorded checks in the last 30 days. Each block represents a day; days without verified results are excluded from uptime." />
+      <PageHeader
+        description="Current health and uptime from recorded checks in the last 30 days."
+        actions={
+          <TableRefreshButton
+            size="default"
+            isLoading={isLoading}
+            onRefresh={() => setRefreshCount((current) => current + 1)}
+          />
+        }
+      />
 
       {loadErrorMessage === null ? null : (
         <Notice tone="warning" title="Could not refresh health status">

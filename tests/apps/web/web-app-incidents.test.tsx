@@ -327,9 +327,14 @@ describe("web app — incidents", () => {
     expect(screen.getByText(/checkout api/i)).toBeInTheDocument();
     expect(screen.queryByText(project.project_id)).toBeNull();
     expect(screen.queryByText(incident.service_id)).toBeNull();
-    // Workspace switching adds its account inventory, not project/service name lookups.
+    // The shell reads workspace/setup inventories independently of incident name rendering.
     expect(
-      fetchMock.mock.calls.filter(([input]) => !requestUrl(input).endsWith("/v1/organizations"))
+      fetchMock.mock.calls.filter(
+        ([input]) =>
+          !["/v1/organizations", "/v1/projects", "/v1/member/tokens"].includes(
+            new URL(requestUrl(input), "http://localhost").pathname
+          )
+      )
     ).toHaveLength(2);
   });
 

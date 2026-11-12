@@ -179,9 +179,14 @@ describe("web app — health status", () => {
         expect(screen.getAllByText("57.50%")).toHaveLength(3);
       }
 
-      const refreshButton = within(screen.getByRole("banner")).getByRole("button", {
+      const refreshButton = screen.getByRole("button", {
         name: "Refresh"
       });
+      expect(refreshButton.closest('[data-slot="page-header"]')).not.toBeNull();
+      expect(refreshButton).toHaveAttribute("data-size", "default");
+      expect(
+        within(screen.getByRole("banner")).queryByRole("button", { name: "Refresh" })
+      ).toBeNull();
       const projectListRequests = () =>
         fetchMock.mock.calls.filter(([input]) => requestUrl(input).endsWith("/v1/projects")).length;
       const requestsBeforeRefresh = projectListRequests();

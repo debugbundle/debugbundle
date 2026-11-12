@@ -133,7 +133,8 @@ describe("mcp stdio server", () => {
         tools: expect.arrayContaining([
           expect.objectContaining({
             name: "doctor",
-            description: "Run DebugBundle environment diagnostics. Connected mode checks API health and saved member authentication with one incident request restricted to the connected project; incident contents are not returned.",
+            description:
+              "Run DebugBundle environment diagnostics. Connected mode checks API health and saved access-token authentication with one incident request restricted to the connected project; incident contents are not returned.",
             inputSchema: expect.objectContaining({
               type: "object"
             })

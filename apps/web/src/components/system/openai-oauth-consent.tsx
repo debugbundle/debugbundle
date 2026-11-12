@@ -44,7 +44,7 @@ const SCOPE_COPY: Record<OpenAiProductScope, { label: string; description: strin
     description: "Sanitized check targets, status, latency, and recent outcomes."
   },
   "debugbundle:reports:read": {
-    label: "Read saved Smart Reports",
+    label: "Read saved reports",
     description:
       "Existing report facts, recorded resolutions, analysis and priorities, only when you can read every included project. No report generation or email."
   }

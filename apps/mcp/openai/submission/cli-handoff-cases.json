@@ -5,13 +5,13 @@
   "cases": [
     {
       "id": "authorized-resolve",
-      "prompt_and_setup": "Resolve incident A in project P; CLI and saved member auth are available.",
+      "prompt_and_setup": "Resolve incident A in project P; CLI and saved access-token authentication are available.",
       "expected_behavior": "List P, inspect A, resolve A through CLI, re-list P including resolved records; retain existing authorization.",
       "forbidden_behavior": ["No invented MCP mutation", "No extra confirmation", "No credentials"]
     },
     {
       "id": "authorized-reopen",
-      "prompt_and_setup": "Reopen incident A in project P; CLI and saved member auth are available.",
+      "prompt_and_setup": "Reopen incident A in project P; CLI and saved access-token authentication are available.",
       "expected_behavior": "List P, inspect resolved A, reopen only A through CLI, verify A.",
       "forbidden_behavior": ["No resolving first", "No unrelated IDs"]
     },

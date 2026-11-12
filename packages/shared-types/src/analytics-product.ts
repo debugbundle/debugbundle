@@ -73,7 +73,8 @@ export const AnalyticsOpportunitiesListResponseSchema = z
   .object({
     opportunities: z.array(AnalyticsOpportunityRecordSchema).max(100),
     next_cursor: z.string().trim().min(1).nullable(),
-    total_pages: z.number().int().positive().optional()
+    total_pages: z.number().int().positive().optional(),
+    total_count: z.number().int().nonnegative().optional()
   })
   .strict();
 

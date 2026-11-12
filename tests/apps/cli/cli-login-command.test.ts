@@ -4,7 +4,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import { loginCommand, persistCliAuthState } from "../../../apps/cli/src/login-command.js";
 
-const loginGolden = readFileSync(new URL("../../fixtures/cli-login.golden.txt", import.meta.url), "utf8");
+const loginGolden = readFileSync(
+  new URL("../../fixtures/cli-login.golden.txt", import.meta.url),
+  "utf8"
+);
 
 describe("cli login command", () => {
   it("persists auth state and renders human output", async () => {
@@ -54,7 +57,7 @@ describe("cli login command", () => {
     });
   });
 
-  it("maps invalid member token input to validation exit code", async () => {
+  it("maps invalid access token input to validation exit code", async () => {
     const result = await loginCommand(
       {
         authFilePath: "/tmp/auth.json",
@@ -66,7 +69,7 @@ describe("cli login command", () => {
     );
 
     expect(result.exitCode).toBe(4);
-    expect(result.output).toBe("Invalid member token.");
+    expect(result.output).toBe("Invalid access token.");
   });
 
   it("prompts for an auth flow when login is run without an explicit mode", async () => {
@@ -82,19 +85,20 @@ describe("cli login command", () => {
         readGitHubAccessToken: vi.fn().mockResolvedValue("gho_123"),
         fetchImpl: vi.fn().mockResolvedValue({
           status: 200,
-          text: async () => JSON.stringify({
-            token: {
-              token_id: "tok_123",
-              user_id: "usr_123",
-              organization_id: "org_123",
-              label: "GitHub bootstrap",
-              created_at: "2026-03-16T00:00:00.000Z",
-              last_used_at: null,
-              revoked_at: null,
-              expires_at: null,
-              plaintext: "dbundle_mem_secret_token"
-            }
-          })
+          text: async () =>
+            JSON.stringify({
+              token: {
+                token_id: "tok_123",
+                user_id: "usr_123",
+                organization_id: "org_123",
+                label: "GitHub bootstrap",
+                created_at: "2026-03-16T00:00:00.000Z",
+                last_used_at: null,
+                revoked_at: null,
+                expires_at: null,
+                plaintext: "dbundle_mem_secret_token"
+              }
+            })
         } as Response),
         writeAuthState
       }
@@ -110,7 +114,7 @@ describe("cli login command", () => {
     });
   });
 
-  it("accepts a prompted member token when login is run interactively", async () => {
+  it("accepts a prompted access token when login is run interactively", async () => {
     const result = await loginCommand(
       {},
       {
@@ -155,7 +159,7 @@ describe("cli login command", () => {
 
     expect(result).toEqual({
       exitCode: 4,
-      output: "Provide either a member token or one of --github, --github-cli, or --github-device."
+      output: "Provide either an access token or one of --github, --github-cli, or --github-device."
     });
   });
 
@@ -174,19 +178,20 @@ describe("cli login command", () => {
         readGitHubAccessToken: vi.fn().mockResolvedValue("gho_123"),
         fetchImpl: vi.fn().mockResolvedValue({
           status: 200,
-          text: async () => JSON.stringify({
-            token: {
-              token_id: "tok_123",
-              user_id: "usr_123",
-              organization_id: "org_123",
-              label: "GitHub bootstrap",
-              created_at: "2026-03-16T00:00:00.000Z",
-              last_used_at: null,
-              revoked_at: null,
-              expires_at: null,
-              plaintext: "dbundle_mem_secret_token"
-            }
-          })
+          text: async () =>
+            JSON.stringify({
+              token: {
+                token_id: "tok_123",
+                user_id: "usr_123",
+                organization_id: "org_123",
+                label: "GitHub bootstrap",
+                created_at: "2026-03-16T00:00:00.000Z",
+                last_used_at: null,
+                revoked_at: null,
+                expires_at: null,
+                plaintext: "dbundle_mem_secret_token"
+              }
+            })
         } as Response)
       }
     );
@@ -207,36 +212,39 @@ describe("cli login command", () => {
       .fn()
       .mockResolvedValueOnce({
         status: 200,
-        text: async () => JSON.stringify({
-          request_id: "11111111-1111-1111-1111-111111111111",
-          user_code: "ABCD-EFGH",
-          verification_uri: "https://github.com/login/device",
-          interval_seconds: 7,
-          expires_at: "2026-03-16T00:15:00.000Z"
-        })
+        text: async () =>
+          JSON.stringify({
+            request_id: "11111111-1111-1111-1111-111111111111",
+            user_code: "ABCD-EFGH",
+            verification_uri: "https://github.com/login/device",
+            interval_seconds: 7,
+            expires_at: "2026-03-16T00:15:00.000Z"
+          })
       } as Response)
       .mockResolvedValueOnce({
         status: 200,
-        text: async () => JSON.stringify({
-          status: "approved",
-          expires_at: "2026-03-16T00:15:00.000Z"
-        })
+        text: async () =>
+          JSON.stringify({
+            status: "approved",
+            expires_at: "2026-03-16T00:15:00.000Z"
+          })
       } as Response)
       .mockResolvedValueOnce({
         status: 200,
-        text: async () => JSON.stringify({
-          token: {
-            token_id: "tok_123",
-            user_id: "usr_123",
-            organization_id: "org_123",
-            label: "GitHub bootstrap",
-            created_at: "2026-03-16T00:00:00.000Z",
-            last_used_at: null,
-            revoked_at: null,
-            expires_at: null,
-            plaintext: "dbundle_mem_secret_token"
-          }
-        })
+        text: async () =>
+          JSON.stringify({
+            token: {
+              token_id: "tok_123",
+              user_id: "usr_123",
+              organization_id: "org_123",
+              label: "GitHub bootstrap",
+              created_at: "2026-03-16T00:00:00.000Z",
+              last_used_at: null,
+              revoked_at: null,
+              expires_at: null,
+              plaintext: "dbundle_mem_secret_token"
+            }
+          })
       } as Response);
     const reportProgress = vi.fn();
 
@@ -263,8 +271,12 @@ describe("cli login command", () => {
       },
       auth_file_path: "/tmp/auth.json"
     });
-    expect(reportProgress).toHaveBeenCalledWith("GitHub CLI is not authenticated. Falling back to device flow.");
-    expect(reportProgress).toHaveBeenCalledWith("Open https://github.com/login/device and enter code ABCD-EFGH.");
+    expect(reportProgress).toHaveBeenCalledWith(
+      "GitHub CLI is not authenticated. Falling back to device flow."
+    );
+    expect(reportProgress).toHaveBeenCalledWith(
+      "Open https://github.com/login/device and enter code ABCD-EFGH."
+    );
   });
 
   it("supports explicit GitHub device mode", async () => {
@@ -272,36 +284,39 @@ describe("cli login command", () => {
       .fn()
       .mockResolvedValueOnce({
         status: 200,
-        text: async () => JSON.stringify({
-          request_id: "11111111-1111-1111-1111-111111111111",
-          user_code: "ABCD-EFGH",
-          verification_uri: "https://github.com/login/device",
-          interval_seconds: 7,
-          expires_at: "2026-03-16T00:15:00.000Z"
-        })
+        text: async () =>
+          JSON.stringify({
+            request_id: "11111111-1111-1111-1111-111111111111",
+            user_code: "ABCD-EFGH",
+            verification_uri: "https://github.com/login/device",
+            interval_seconds: 7,
+            expires_at: "2026-03-16T00:15:00.000Z"
+          })
       } as Response)
       .mockResolvedValueOnce({
         status: 200,
-        text: async () => JSON.stringify({
-          status: "approved",
-          expires_at: "2026-03-16T00:15:00.000Z"
-        })
+        text: async () =>
+          JSON.stringify({
+            status: "approved",
+            expires_at: "2026-03-16T00:15:00.000Z"
+          })
       } as Response)
       .mockResolvedValueOnce({
         status: 200,
-        text: async () => JSON.stringify({
-          token: {
-            token_id: "tok_123",
-            user_id: "usr_123",
-            organization_id: "org_123",
-            label: "Custom bootstrap",
-            created_at: "2026-03-16T00:00:00.000Z",
-            last_used_at: null,
-            revoked_at: null,
-            expires_at: null,
-            plaintext: "dbundle_mem_secret_token"
-          }
-        })
+        text: async () =>
+          JSON.stringify({
+            token: {
+              token_id: "tok_123",
+              user_id: "usr_123",
+              organization_id: "org_123",
+              label: "Custom bootstrap",
+              created_at: "2026-03-16T00:00:00.000Z",
+              last_used_at: null,
+              revoked_at: null,
+              expires_at: null,
+              plaintext: "dbundle_mem_secret_token"
+            }
+          })
       } as Response);
 
     const result = await loginCommand(
@@ -348,7 +363,7 @@ describe("cli login command", () => {
     });
   });
 
-  it("rejects mixing a member token with GitHub login", async () => {
+  it("rejects mixing an access token with GitHub login", async () => {
     const result = await loginCommand({
       bearerToken: "dbundle_mem_secret_token",
       github: true
@@ -356,16 +371,16 @@ describe("cli login command", () => {
 
     expect(result).toEqual({
       exitCode: 4,
-      output: "Use either a member token or a GitHub login mode, not both."
+      output: "Use either an access token or a GitHub login mode, not both."
     });
   });
 
-  it("requires either a member token or a GitHub login mode", async () => {
+  it("requires either an access token or a GitHub login mode", async () => {
     const result = await loginCommand({});
 
     expect(result).toEqual({
       exitCode: 4,
-      output: "Provide either a member token or one of --github, --github-cli, or --github-device."
+      output: "Provide either an access token or one of --github, --github-cli, or --github-device."
     });
   });
 
@@ -411,13 +426,14 @@ describe("cli login command", () => {
       .fn()
       .mockResolvedValueOnce({
         status: 200,
-        text: async () => JSON.stringify({
-          request_id: "11111111-1111-1111-1111-111111111111",
-          user_code: "ABCD-EFGH",
-          verification_uri: "https://github.com/login/device",
-          interval_seconds: 7,
-          expires_at: "2026-03-16T00:15:00.000Z"
-        })
+        text: async () =>
+          JSON.stringify({
+            request_id: "11111111-1111-1111-1111-111111111111",
+            user_code: "ABCD-EFGH",
+            verification_uri: "https://github.com/login/device",
+            interval_seconds: 7,
+            expires_at: "2026-03-16T00:15:00.000Z"
+          })
       } as Response)
       .mockResolvedValueOnce({
         status: 200,
@@ -441,15 +457,63 @@ describe("cli login command", () => {
   });
 
   it.each([
-    [503, "auth_not_configured", "GitHub login is not configured on this DebugBundle API.", "githubCli", 1],
-    [400, "github_email_unavailable", "GitHub did not provide a verified primary email address.", "githubCli", 1],
+    [
+      503,
+      "auth_not_configured",
+      "GitHub login is not configured on this DebugBundle API.",
+      "githubCli",
+      1
+    ],
+    [
+      400,
+      "github_email_unavailable",
+      "GitHub did not provide a verified primary email address.",
+      "githubCli",
+      1
+    ],
     [403, "account_suspended", "This DebugBundle account is suspended.", "githubCli", 4],
-    [429, "rate_limited", "GitHub login was rate limited. Please wait and try again.", "githubCli", 1],
-    [404, "github_device_request_not_found", "GitHub device authorization request was not found.", "githubDevice", 1],
-    [409, "github_device_auth_pending", "GitHub device authorization has not completed yet.", "githubDevice", 4],
-    [409, "github_device_auth_expired", "GitHub device authorization expired before it could be claimed.", "githubDevice", 4],
-    [409, "github_device_auth_claimed", "GitHub device authorization was already claimed.", "githubDevice", 4],
-    [409, "github_device_auth_rejected", "GitHub device authorization was rejected.", "githubDevice", 4]
+    [
+      429,
+      "rate_limited",
+      "GitHub login was rate limited. Please wait and try again.",
+      "githubCli",
+      1
+    ],
+    [
+      404,
+      "github_device_request_not_found",
+      "GitHub device authorization request was not found.",
+      "githubDevice",
+      1
+    ],
+    [
+      409,
+      "github_device_auth_pending",
+      "GitHub device authorization has not completed yet.",
+      "githubDevice",
+      4
+    ],
+    [
+      409,
+      "github_device_auth_expired",
+      "GitHub device authorization expired before it could be claimed.",
+      "githubDevice",
+      4
+    ],
+    [
+      409,
+      "github_device_auth_claimed",
+      "GitHub device authorization was already claimed.",
+      "githubDevice",
+      4
+    ],
+    [
+      409,
+      "github_device_auth_rejected",
+      "GitHub device authorization was rejected.",
+      "githubDevice",
+      4
+    ]
   ])(
     "maps API error %s/%s to the expected login message",
     async (status, error, expectedOutput, mode, expectedExitCode) => {
@@ -463,20 +527,22 @@ describe("cli login command", () => {
               .fn()
               .mockResolvedValueOnce({
                 status: 200,
-                text: async () => JSON.stringify({
-                  request_id: "11111111-1111-1111-1111-111111111111",
-                  user_code: "ABCD-EFGH",
-                  verification_uri: "https://github.com/login/device",
-                  interval_seconds: 7,
-                  expires_at: "2026-03-16T00:15:00.000Z"
-                })
+                text: async () =>
+                  JSON.stringify({
+                    request_id: "11111111-1111-1111-1111-111111111111",
+                    user_code: "ABCD-EFGH",
+                    verification_uri: "https://github.com/login/device",
+                    interval_seconds: 7,
+                    expires_at: "2026-03-16T00:15:00.000Z"
+                  })
               } as Response)
               .mockResolvedValueOnce({
                 status: 200,
-                text: async () => JSON.stringify({
-                  status: "approved",
-                  expires_at: "2026-03-16T00:15:00.000Z"
-                })
+                text: async () =>
+                  JSON.stringify({
+                    status: "approved",
+                    expires_at: "2026-03-16T00:15:00.000Z"
+                  })
               } as Response)
               .mockResolvedValueOnce({
                 status,

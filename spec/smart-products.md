@@ -24,6 +24,12 @@ there is no new dashboard navigation or custom interaction system.
 
 ## Report products: FR-BUS-05/06 extension
 
+Public terminology uses **Reports** for the paid-plan category and **Smart Reports**
+for Business AI analysis. Landing cards, pricing, report guides, setup prompts and
+dashboard copy must distinguish these products. Pricing shows Smart Reports as a
+Business-only row under Reports. Existing routes, tool names, capability fields
+and schema identifiers remain unchanged.
+
 | Plan     | Content / cadences                                     | Runs per anchored month | Definitions | Projects / recipients |
 | -------- | ------------------------------------------------------ | ----------------------: | ----------: | --------------------: |
 | Free     | None                                                   |                       0 |           0 |                 0 / 0 |
@@ -108,6 +114,14 @@ actual initiating credential; never substitute an Owner identity at execution.
 Respect per-project automatic-improvement opt-outs, trial deadlines, current
 management authority and every saved origin before work. Retained reads require
 current access to the complete saved scope, including after downgrade.
+
+When the saved review inventory is empty and reviews are disabled, eligible workspace
+Owners see **Enable weekly review** in the standard empty state. It opens the same
+settings dialog as the toolbar action; project selection and evidence consent are
+still required before an enabled schedule is saved. Successful settings persistence
+shows the shared saved toast; validation failures, failed writes and late completions
+after leaving/changing context do not show success. Members, unavailable plans and
+unknown settings never show an enable action.
 
 Disabling the schedule preserves history. Removing consent/projects or narrowing
 privacy deletes affected derived content. Project transfer/deletion and analytics

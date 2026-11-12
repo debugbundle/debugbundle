@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "debugbundle",
   "displayName": "DebugBundle",
-  "version": "1.23.0",
+  "version": "1.24.0",
   "description": "Production debugging bundles for AI agents. Connect Claude Code to DebugBundle incidents, deterministic bundles, reproductions, health checks, probes, alerts, webhooks, projects, and verification workflows.",
   "author": {
     "name": "DebugBundle",
@@ -37,8 +37,8 @@
   "userConfig": {
     "member_token": {
       "type": "string",
-      "title": "DebugBundle member token",
-      "description": "Optional. Use a DebugBundle member token for Claude Code MCP read and management tools. Leave blank to use local DebugBundle CLI auth state.",
+      "title": "DebugBundle access token",
+      "description": "Optional. Use a DebugBundle access token for Claude Code MCP read and management tools. Leave blank to use local DebugBundle CLI auth state.",
       "sensitive": true,
       "default": ""
     },

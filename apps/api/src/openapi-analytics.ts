@@ -105,6 +105,7 @@ const AnalyticsOpportunitiesQuerySchema = z
     from: z.string().datetime().optional(),
     to: z.string().datetime().optional(),
     include_total: z.enum(["true", "false"]).optional(),
+    include_total_count: z.enum(["true", "false"]).optional(),
     cursor: z.string().optional(),
     limit: z.number().int().min(1).max(100).optional()
   })

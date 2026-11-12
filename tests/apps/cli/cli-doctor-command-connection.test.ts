@@ -93,7 +93,7 @@ describe("cli-doctor connection", () => {
     );
   });
 
-  it("validates connected API reachability and member-token auth for self-hosted base URLs", async () => {
+  it("validates connected API reachability and access-token auth for self-hosted base URLs", async () => {
     const rootDirectory = await createDoctorFixtureRepository();
 
     await setupCommand(
@@ -172,7 +172,7 @@ describe("cli-doctor connection", () => {
           name: "connected-api",
           status: "ok",
           message:
-            "Connected API https://selfhost.debugbundle.test is reachable and member-token auth succeeded."
+            "Connected API https://selfhost.debugbundle.test is reachable and access-token auth succeeded."
         }
       ])
     );
@@ -395,7 +395,7 @@ describe("cli-doctor connection", () => {
           name: "connected-api",
           status: "warning",
           message:
-            "Connected API https://selfhost.debugbundle.test is reachable, but member-token auth could not be verified without auth state."
+            "Connected API https://selfhost.debugbundle.test is reachable, but access-token auth could not be verified without auth state."
         }
       ])
     });
@@ -465,7 +465,7 @@ describe("cli-doctor connection", () => {
           name: "connected-api",
           status: "warning",
           message:
-            "Connected API https://api.debugbundle.com is reachable and member-token auth succeeded, but connection config expects https://selfhost.debugbundle.test."
+            "Connected API https://api.debugbundle.com is reachable and access-token auth succeeded, but connection config expects https://selfhost.debugbundle.test."
         }
       ])
     });

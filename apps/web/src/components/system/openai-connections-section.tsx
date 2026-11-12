@@ -30,7 +30,7 @@ const SCOPE_NAMES: Record<OpenAiProductScope, string> = {
   "debugbundle:artifacts:read": "Artifacts",
   "debugbundle:improvements:read": "Improvements",
   "debugbundle:analytics:read": "Analytics",
-  "debugbundle:reports:read": "Saved Smart Reports",
+  "debugbundle:reports:read": "Saved reports",
   "debugbundle:health:read": "Health"
 };
 

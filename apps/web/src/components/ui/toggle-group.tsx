@@ -5,7 +5,7 @@ import { type VariantProps } from "class-variance-authority";
 import { cn } from "../../lib/utils.js";
 import { ToggleGroup as ToggleGroupPrimitive } from "radix-ui";
 
-import { toggleVariants } from "./toggle.js";
+import { toggleVariants, ToggleSelectionIndicator } from "./toggle.js";
 
 const ToggleGroupContext = React.createContext<
   VariantProps<typeof toggleVariants> & {
@@ -41,7 +41,7 @@ function ToggleGroup({
       data-orientation={orientation}
       style={{ "--gap": spacing } as React.CSSProperties}
       className={cn(
-        "group/toggle-group flex w-fit flex-row items-center gap-[--spacing(var(--gap))] rounded-lg data-[size=sm]:rounded-[min(var(--radius-md),10px)] data-vertical:flex-col data-vertical:items-stretch",
+        "group/toggle-group flex w-fit max-w-full flex-row flex-wrap items-center gap-[--spacing(var(--gap))] rounded-lg data-[size=sm]:rounded-[min(var(--radius-md),10px)] data-vertical:flex-col data-vertical:flex-nowrap data-vertical:items-stretch",
         className
       )}
       {...props}
@@ -78,6 +78,7 @@ function ToggleGroupItem({
       )}
       {...props}
     >
+      <ToggleSelectionIndicator />
       {children}
     </ToggleGroupPrimitive.Item>
   );

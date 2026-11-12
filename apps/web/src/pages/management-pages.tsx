@@ -1,10 +1,10 @@
+import { inventoryTitle } from "../lib/inventory-title.js";
 import { PendingButton } from "../components/system/pending-button.js";
 import { usePendingAction } from "../lib/use-pending-action.js";
 import { FolderIcon, KeyRoundIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { CreateProjectDialog } from "../components/system/create-project-dialog.js";
-import { useHeaderActions } from "../components/system/header-actions-context.js";
 import { PageHeader } from "../components/system/page-header.js";
 import { ProjectAgentCredentialsCard } from "../components/system/project-agent-credentials-card.js";
 import { PlaintextTokenReveal } from "../components/system/plaintext-token-reveal.js";
@@ -82,21 +82,6 @@ export function ProjectsPage(): JSX.Element {
     direction: "asc"
   });
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const { setAction: setHeaderAction } = useHeaderActions();
-
-  useEffect(() => {
-    setHeaderAction({
-      pathname: "/projects",
-      content: (
-        <Button type="button" size="sm" onClick={() => setIsCreateOpen(true)}>
-          <PlusIcon data-icon="inline-start" />
-          Create project
-        </Button>
-      )
-    });
-
-    return () => setHeaderAction(null);
-  }, [setHeaderAction]);
 
   useEffect(() => {
     void (async () => {
@@ -117,7 +102,15 @@ export function ProjectsPage(): JSX.Element {
 
   return (
     <div className="space-y-8">
-      <PageHeader description="Create and manage projects in this workspace." />
+      <PageHeader
+        description="Create and manage projects in this workspace."
+        actions={
+          <Button type="button" onClick={() => setIsCreateOpen(true)}>
+            <PlusIcon data-icon="inline-start" />
+            Create project
+          </Button>
+        }
+      />
       <CreateProjectDialog
         open={isCreateOpen}
         onOpenChange={setIsCreateOpen}
@@ -128,7 +121,7 @@ export function ProjectsPage(): JSX.Element {
 
       <Card>
         <CardHeader>
-          <CardTitle>Project inventory</CardTitle>
+          <CardTitle>{inventoryTitle("Project inventory", projects?.length ?? null)}</CardTitle>
         </CardHeader>
         <CardContent>
           <ResourceListState

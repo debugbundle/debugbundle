@@ -10,6 +10,10 @@ import {
   IMPROVEMENT_REVIEW_MIGRATION,
   improvementReviewSchemaAvailable
 } from "./improvement-review-schema.js";
+import {
+  IMPROVEMENT_REVIEW_PLANNING_MIGRATION,
+  improvementReviewPlanningSchemaAvailable
+} from "./improvement-review-planning-schema.js";
 import { REPORT_PRODUCT_MIGRATION, reportProductSchemaAvailable } from "./report-product-schema.js";
 import {
   REPORT_TRIAL_COLLECTION_MIGRATION,
@@ -155,7 +159,8 @@ export const STORAGE_SCHEMA_MIGRATIONS: readonly StorageSchemaMigration[] = [
   REPORT_MODEL_DIAGNOSTIC_MIGRATION,
   REPORT_IDENTITY_MIGRATION,
   REPORT_PRODUCT_MIGRATION,
-  IMPROVEMENT_REVIEW_MIGRATION
+  IMPROVEMENT_REVIEW_MIGRATION,
+  IMPROVEMENT_REVIEW_PLANNING_MIGRATION
 ].sort((left, right) => left.id.localeCompare(right.id));
 
 function validateStorageSchemaMigrations(migrations: readonly StorageSchemaMigration[]): void {
@@ -241,11 +246,13 @@ async function reconcileMigrationLedgerInTransaction(
   const reportIdentityReady = await reportIdentitySchemaAvailable(db);
   const reportProductReady = await reportProductSchemaAvailable(db);
   const improvementReviewReady = await improvementReviewSchemaAvailable(db);
+  const reviewPlanningReady = await improvementReviewPlanningSchemaAvailable(db);
   const verifiedBaseline = STORAGE_SCHEMA_MIGRATIONS.filter(
     (migration) =>
       (migration.id !== REPORT_IDENTITY_MIGRATION.id || reportIdentityReady) &&
       (migration.id !== REPORT_PRODUCT_MIGRATION.id || reportProductReady) &&
       (migration.id !== IMPROVEMENT_REVIEW_MIGRATION.id || improvementReviewReady) &&
+      (migration.id !== IMPROVEMENT_REVIEW_PLANNING_MIGRATION.id || reviewPlanningReady) &&
       (migration.id !== BUSINESS_BILLING_MIGRATION.id || businessReady) &&
       (migration.id !== MEMBER_TOKEN_POLICY_MIGRATION.id || tokenPolicyReady) &&
       (migration.id !== ORGANIZATION_ACCESS_MIGRATION.id || orgAccessReady) &&
@@ -465,6 +472,8 @@ export async function assertStorageSchemaMigrationsApplied(db: Queryable): Promi
     throw new Error("report_product_schema_incomplete");
   if (!(await improvementReviewSchemaAvailable(db)))
     throw new Error("improvement_review_schema_incomplete");
+  if (!(await improvementReviewPlanningSchemaAvailable(db)))
+    throw new Error("improvement_review_planning_schema_incomplete");
   if (!(await referralBenefitSchemaAvailable(db)))
     throw new Error("referral_benefit_schema_incomplete");
   if (!(await reportHealthSchemaAvailable(db))) throw new Error("report_health_schema_incomplete");

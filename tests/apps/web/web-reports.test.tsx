@@ -154,6 +154,14 @@ it("puts report history before compact saved reports and distinguishes usable fa
   render(<App initialEntries={["/reports"]} />);
   const history = await screen.findByRole("region", { name: "Report history" });
   const definitions = screen.getByRole("region", { name: "Saved reports" });
+  const table = within(history).getByRole("table");
+  expect(table).not.toHaveClass("max-sm:block");
+  expect(table.closest('[data-slot="table-container"]')).toHaveClass("overflow-x-auto");
+  expect(within(table).getAllByRole("columnheader")).toHaveLength(4);
+  const savedActions = within(definitions)
+    .getByRole("link", { name: "Edit Monthly review settings" })
+    .closest('[data-slot="title-badge-row-actions"]');
+  expect(savedActions).toHaveClass("basis-full", "justify-start");
   expect(
     history.compareDocumentPosition(definitions) & Node.DOCUMENT_POSITION_FOLLOWING
   ).toBeTruthy();
@@ -301,12 +309,14 @@ it("loads a saved report's explicit scope and version, preserving a rejected edi
   expect(name).toHaveValue("Updated review");
 });
 
-it("keeps report creation in the shared header and links child breadcrumbs back to Reports", async () => {
+it("keeps report creation beside the page description and links child breadcrumbs back to Reports", async () => {
   const { definition } = setup();
   const user = userEvent.setup();
   render(<App initialEntries={["/reports"]} />);
   const create = await screen.findByRole("link", { name: "Create report" });
-  expect(create.closest("header")).not.toBeNull();
+  expect(create.closest("header")).toBeNull();
+  expect(create.closest('[data-slot="page-header"]')).toHaveTextContent("Review completed periods");
+  expect(create).toHaveAttribute("data-size", "default");
   await user.click(create);
   await screen.findByLabelText("Report name");
   let breadcrumb = screen.getByRole("navigation", { name: "breadcrumb" });
@@ -769,7 +779,7 @@ it.each(["free"] as const)(
     calls.list.mockResolvedValue([]);
     calls.history.mockResolvedValue({ runs: [], next_cursor: null });
     render(<App initialEntries={["/reports"]} />);
-    expect(await screen.findByText("Upgrade to unlock Smart Reports")).toBeVisible();
+    expect(await screen.findByText("Upgrade to unlock reports")).toBeVisible();
     expect(screen.getByRole("link", { name: "Open billing" })).toHaveAttribute("href", "/billing");
     await waitFor(() => expect(calls.history).toHaveBeenCalled());
     expect(screen.queryByText("No report definitions")).not.toBeInTheDocument();
@@ -789,7 +799,7 @@ it.each(["free"] as const)(
 it("keeps authorised saved definitions and report history visible below the upgrade callout", async () => {
   setup("free");
   render(<App initialEntries={["/reports"]} />);
-  expect(await screen.findByText("Upgrade to unlock Smart Reports")).toBeVisible();
+  expect(await screen.findByText("Upgrade to unlock reports")).toBeVisible();
   expect(await screen.findByRole("link", { name: "Open Monthly review" })).toBeVisible();
   expect(screen.getByRole("region", { name: "Report history" })).toBeVisible();
   expect(screen.queryByRole("button", { name: "Generate report" })).not.toBeInTheDocument();
@@ -799,7 +809,7 @@ it("keeps genuine archive failures retryable alongside the upgrade callout", asy
   setup("free");
   calls.history.mockRejectedValueOnce(new Error("Archive service offline"));
   render(<App initialEntries={["/reports"]} />);
-  expect(await screen.findByText("Upgrade to unlock Smart Reports")).toBeVisible();
+  expect(await screen.findByText("Upgrade to unlock reports")).toBeVisible();
   expect(await screen.findByText("Archive service offline")).toBeVisible();
   await userEvent.click(screen.getByRole("button", { name: "Retry" }));
   expect(await screen.findByRole("link", { name: "Open Monthly review" })).toBeVisible();
@@ -812,7 +822,12 @@ it.each(["solo", "team"] as const)(
     calls.list.mockResolvedValue([]);
     calls.history.mockResolvedValue({ runs: [], next_cursor: null });
     render(<App initialEntries={["/reports"]} />);
-    expect(await screen.findByRole("link", { name: "Create report" })).toBeVisible();
-    expect(screen.queryByText("Upgrade to unlock Smart Reports")).not.toBeInTheDocument();
+    const actions = await screen.findAllByRole("link", { name: "Create report" });
+    expect(actions).toHaveLength(2);
+    for (const action of actions) {
+      expect(action).toBeVisible();
+      expect(action).toHaveAttribute("href", "/reports/definitions/new");
+    }
+    expect(screen.queryByText("Upgrade to unlock reports")).not.toBeInTheDocument();
   }
 );

@@ -73,7 +73,7 @@ export function evidenceOperations(): OperationSpec[] {
       responses: {
         "200": { description: "Incident list.", schema: incidentListResponse },
         "400": { description: "Invalid query parameters.", schema: apiError },
-        "401": { description: "Member token is invalid.", schema: apiError }
+        "401": { description: "Access token is invalid.", schema: apiError }
       }
     },
 
@@ -91,7 +91,7 @@ export function evidenceOperations(): OperationSpec[] {
           schema: bulkIncidentResponse
         },
         "400": { description: "Invalid request body.", schema: apiError },
-        "401": { description: "Member token is invalid.", schema: apiError },
+        "401": { description: "Access token is invalid.", schema: apiError },
         "404": { description: "One or more incidents were not found.", schema: apiError },
         "500": { description: "Incident resolution is unavailable.", schema: apiError }
       }
@@ -111,7 +111,7 @@ export function evidenceOperations(): OperationSpec[] {
           schema: bulkIncidentResponse
         },
         "400": { description: "Invalid request body.", schema: apiError },
-        "401": { description: "Member token is invalid.", schema: apiError },
+        "401": { description: "Access token is invalid.", schema: apiError },
         "404": { description: "One or more incidents were not found.", schema: apiError },
         "500": { description: "Incident reopen is unavailable.", schema: apiError }
       }
@@ -128,7 +128,7 @@ export function evidenceOperations(): OperationSpec[] {
       responses: {
         "200": { description: "Incident details.", schema: incidentResponse },
         "400": { description: "Invalid incident id.", schema: apiError },
-        "401": { description: "Member token is invalid.", schema: apiError },
+        "401": { description: "Access token is invalid.", schema: apiError },
         "404": { description: "Incident was not found.", schema: apiError }
       }
     },
@@ -144,7 +144,7 @@ export function evidenceOperations(): OperationSpec[] {
       responses: {
         "200": { description: "Resolved incident details.", schema: incidentResponse },
         "400": { description: "Invalid incident id.", schema: apiError },
-        "401": { description: "Member token is invalid.", schema: apiError },
+        "401": { description: "Access token is invalid.", schema: apiError },
         "404": { description: "Incident was not found.", schema: apiError },
         "500": { description: "Incident resolution is unavailable.", schema: apiError }
       }
@@ -161,7 +161,7 @@ export function evidenceOperations(): OperationSpec[] {
       responses: {
         "200": { description: "Reopened incident details.", schema: incidentResponse },
         "400": { description: "Invalid incident id.", schema: apiError },
-        "401": { description: "Member token is invalid.", schema: apiError },
+        "401": { description: "Access token is invalid.", schema: apiError },
         "404": { description: "Incident was not found.", schema: apiError },
         "500": { description: "Incident reopen is unavailable.", schema: apiError }
       }
@@ -181,7 +181,7 @@ export function evidenceOperations(): OperationSpec[] {
           schema: { oneOf: [bundleResponse, bundlePending, bundleFailed] }
         },
         "400": { description: "Invalid incident id.", schema: apiError },
-        "401": { description: "Member token is invalid.", schema: apiError },
+        "401": { description: "Access token is invalid.", schema: apiError },
         "404": { description: "Incident was not found.", schema: apiError }
       }
     },
@@ -200,7 +200,7 @@ export function evidenceOperations(): OperationSpec[] {
           schema: reproductionResponse
         },
         "400": { description: "Invalid incident id.", schema: apiError },
-        "401": { description: "Member token is invalid.", schema: apiError },
+        "401": { description: "Access token is invalid.", schema: apiError },
         "404": { description: "Incident or reproduction artifact was not found.", schema: apiError }
       }
     },
@@ -216,7 +216,7 @@ export function evidenceOperations(): OperationSpec[] {
       responses: {
         "200": { description: "Improvement opportunity list.", schema: improvementListResponse },
         "400": { description: "Invalid query parameters.", schema: apiError },
-        "401": { description: "Member token is invalid.", schema: apiError },
+        "401": { description: "Access token is invalid.", schema: apiError },
         "404": { description: "Improvement management is unavailable.", schema: apiError }
       }
     },
@@ -232,7 +232,7 @@ export function evidenceOperations(): OperationSpec[] {
       responses: {
         "200": { description: "Improvement opportunity details.", schema: improvementResponse },
         "400": { description: "Invalid improvement id.", schema: apiError },
-        "401": { description: "Member token is invalid.", schema: apiError },
+        "401": { description: "Access token is invalid.", schema: apiError },
         "404": { description: "Improvement opportunity was not found.", schema: apiError }
       }
     },
@@ -248,7 +248,7 @@ export function evidenceOperations(): OperationSpec[] {
       responses: {
         "200": { description: "Resolved improvement opportunity.", schema: improvementResponse },
         "400": { description: "Invalid improvement id.", schema: apiError },
-        "401": { description: "Member token is invalid.", schema: apiError },
+        "401": { description: "Access token is invalid.", schema: apiError },
         "404": {
           description: "Improvement opportunity was not found or resolution is unavailable.",
           schema: apiError
@@ -267,7 +267,7 @@ export function evidenceOperations(): OperationSpec[] {
       responses: {
         "200": { description: "Reopened improvement opportunity.", schema: improvementResponse },
         "400": { description: "Invalid improvement id.", schema: apiError },
-        "401": { description: "Member token is invalid.", schema: apiError },
+        "401": { description: "Access token is invalid.", schema: apiError },
         "404": {
           description: "Improvement opportunity was not found or reopen is unavailable.",
           schema: apiError
@@ -287,7 +287,7 @@ export function evidenceOperations(): OperationSpec[] {
       responses: {
         "200": { description: "Snoozed improvement opportunity.", schema: improvementResponse },
         "400": { description: "Invalid improvement id or snooze timestamp.", schema: apiError },
-        "401": { description: "Member token is invalid.", schema: apiError },
+        "401": { description: "Access token is invalid.", schema: apiError },
         "404": {
           description: "Improvement opportunity was not found or snooze is unavailable.",
           schema: apiError
@@ -328,7 +328,7 @@ export function evidenceOperations(): OperationSpec[] {
       responses: {
         "200": { description: "Incident logs.", schema: logsResponse },
         "400": { description: "Invalid query parameters.", schema: apiError },
-        "401": { description: "Member token is invalid.", schema: apiError }
+        "401": { description: "Access token is invalid.", schema: apiError }
       }
     },
 
@@ -343,7 +343,7 @@ export function evidenceOperations(): OperationSpec[] {
       responses: {
         "200": { description: "Project services.", schema: servicesResponse },
         "400": { description: "Invalid query parameters.", schema: apiError },
-        "401": { description: "Member token is invalid.", schema: apiError },
+        "401": { description: "Access token is invalid.", schema: apiError },
         "404": { description: "Project was not found.", schema: apiError },
         "500": { description: "Service retrieval is unavailable.", schema: apiError }
       }

@@ -1,6 +1,7 @@
 import { SELFHOST_PROJECT_ACTOR_ROLE_STATEMENT } from "./selfhost-organization-access-schema.js";
 import { REPORT_IDENTITY_BOOTSTRAP } from "./report-identity-schema.js";
 import { IMPROVEMENT_REVIEW_BOOTSTRAP } from "./improvement-review-schema.js";
+import { IMPROVEMENT_REVIEW_PLANNING_COLUMNS } from "./improvement-review-planning-schema.js";
 import {
   REPORT_PRODUCT_MODE_COLUMN,
   REPORT_PRODUCT_GUARD,
@@ -115,6 +116,11 @@ export const STORAGE_BOOTSTRAP_STATEMENTS = [
   ...REFERRAL_BENEFIT_BOOTSTRAP,
   ...REPORT_TRIAL_COLLECTION_BOOTSTRAP,
   REPORT_PRODUCT_GUARD,
-  ...IMPROVEMENT_REVIEW_BOOTSTRAP,
+  ...IMPROVEMENT_REVIEW_BOOTSTRAP.map((statement) =>
+    statement.replace(
+      "CREATE TABLE improvement_reviews (",
+      `CREATE TABLE improvement_reviews (${IMPROVEMENT_REVIEW_PLANNING_COLUMNS},`
+    )
+  ),
   SELFHOST_PROJECT_ACTOR_ROLE_STATEMENT
 ] as const;

@@ -11,11 +11,16 @@ import {
   SirenIcon
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
+import { useId } from "react";
 
 import type { SessionRecord } from "../../lib/api.js";
 import { BrandLockup } from "./brand-lockup.js";
 import { NavUser } from "./nav-user.js";
+import { SidebarSetupProgress } from "./sidebar-setup-progress.js";
+import { useDashboardSetup } from "./dashboard-setup-context.js";
 import { OrganizationSwitcher } from "./organization-switcher.js";
+import { useWorkspaceHealthAlert } from "./workspace-health-alert-context.js";
+import { Badge } from "../ui/badge.js";
 import {
   Sidebar,
   SidebarContent,
@@ -24,6 +29,7 @@ import {
   SidebarGroupContent,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar
@@ -38,8 +44,9 @@ const navMain = [
   { to: "/analytics/workspace", label: "Analytics", icon: BarChart3Icon },
   { to: "/reports", label: "Reports", icon: FileTextIcon },
   { to: "/billing", label: "Billing", icon: CreditCardIcon },
-  { to: "/member-tokens", label: "Member tokens", icon: KeySquareIcon }
+  { to: "/access-tokens", label: "Access tokens", icon: KeySquareIcon }
 ] as const;
+const healthAlertLabel = "A health check is currently down";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   session: SessionRecord;
@@ -49,6 +56,9 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 export function AppSidebar({ session, onSignOut, ...props }: AppSidebarProps): JSX.Element {
   const location = useLocation();
   const { isMobile, setOpenMobile } = useSidebar();
+  const setup = useDashboardSetup();
+  const healthAlert = useWorkspaceHealthAlert();
+  const healthAlertId = useId();
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -81,10 +91,22 @@ export function AppSidebar({ session, onSignOut, ...props }: AppSidebarProps): J
                     isActive={
                       location.pathname === item.to || location.pathname.startsWith(item.to + "/")
                     }
-                    tooltip={item.label}
+                    tooltip={
+                      item.to === "/health-status" && healthAlert?.down
+                        ? "Health Status — a health check is currently down"
+                        : item.label
+                    }
+                    className={
+                      item.to === "/health-status" && healthAlert?.down ? "pr-10" : undefined
+                    }
                   >
                     <NavLink
                       to={item.to}
+                      aria-describedby={
+                        item.to === "/health-status" && healthAlert?.down
+                          ? healthAlertId
+                          : undefined
+                      }
                       onClick={() => {
                         if (isMobile) {
                           setOpenMobile(false);
@@ -95,6 +117,18 @@ export function AppSidebar({ session, onSignOut, ...props }: AppSidebarProps): J
                       <span>{item.label}</span>
                     </NavLink>
                   </SidebarMenuButton>
+                  {item.to === "/health-status" && healthAlert?.down === true ? (
+                    <SidebarMenuBadge
+                      id={healthAlertId}
+                      role="status"
+                      aria-label={healthAlertLabel}
+                    >
+                      <span className="sr-only">{healthAlertLabel}</span>
+                      <Badge variant="destructive" className="size-5 p-0" aria-hidden="true">
+                        !
+                      </Badge>
+                    </SidebarMenuBadge>
+                  ) : null}
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
@@ -102,12 +136,14 @@ export function AppSidebar({ session, onSignOut, ...props }: AppSidebarProps): J
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter>
+      <SidebarFooter className="gap-4">
+        <SidebarSetupProgress />
         <NavUser
           email={session.email}
           role={session.role}
           avatarUrl={session.avatar_url}
           onSignOut={onSignOut}
+          onOpenSetup={setup?.openGuide}
           canManagePeople={
             hasBusinessEntitlement(session.organization_plan, session.self_hosted) &&
             (session.role === "owner" || session.role === "admin")

@@ -179,7 +179,10 @@ export function registerImprovementRoutes(
       next_cursor: nextCursor,
       ...(totalCount === undefined
         ? {}
-        : { total_pages: Math.max(1, Math.ceil(totalCount / parsedQuery.data.limit)) })
+        : {
+            total_pages: Math.max(1, Math.ceil(totalCount / parsedQuery.data.limit)),
+            ...(parsedQuery.data.include_total_count === "true" ? { total_count: totalCount } : {})
+          })
     });
   });
 

@@ -5,6 +5,10 @@ import {
   REVIEW_PROFILE_VERSION
 } from "../../../packages/smart-improvements/src/model-client.js";
 import { configureImprovementReviews } from "../../../packages/smart-improvements/src/runtime-config.js";
+import { reviewPlanningFixture } from "../../helpers/improvement-reviews.js";
+import qualifiedFixtures from "../../../evals/smart-improvements/qualification-fixtures-20261111.json" with { type: "json" };
+import qualifiedResults from "../../../evals/smart-improvements/qualification-20261111.json" with { type: "json" };
+import { ReviewFactsSchema } from "../../../packages/smart-improvements/src/review-contract.js";
 import { reviewFactsFixture } from "../../helpers/improvement-reviews.js";
 import { reportTestUsage } from "../../helpers/report-runs.js";
 const guidance = {
@@ -19,6 +23,113 @@ const guidance = {
   ]
 };
 const response = (value: unknown): Response => new Response(JSON.stringify(value));
+it("preserves the exact qualified v1 request bytes and the no-data refusal", () => {
+  for (const fixture of qualifiedFixtures) {
+    const facts = ReviewFactsSchema.parse(fixture.facts);
+    if (facts.sources.length === 0) {
+      expect(() => buildReviewModelRequest(facts)).toThrow("review_no_model_evidence");
+      continue;
+    }
+    const saved = qualifiedResults.cases.find((c) => c.id === fixture.id);
+    expect(saved).toBeDefined();
+    expect(buildReviewModelRequest(facts).request_hash).toBe(saved!.request_sha256);
+  }
+});
+it("requires qualification of the changed prompt through the existing AI quality gate", () => {
+  const env = {
+    SMART_IMPROVEMENTS_ENABLED: "true",
+    SMART_IMPROVEMENTS_AI_ENABLED: "true",
+    SMART_IMPROVEMENTS_AI_API_KEY: "sk-synthetic-evaluation"
+  };
+  expect(
+    configureImprovementReviews({
+      ...env,
+      SMART_IMPROVEMENTS_AI_QUALIFIED_PROFILE: "weekly-review-terra-v1"
+    }).model
+  ).toBeNull();
+  expect(
+    configureImprovementReviews({
+      ...env,
+      SMART_IMPROVEMENTS_AI_QUALIFIED_PROFILE: REVIEW_PROFILE_VERSION
+    }).model
+  ).not.toBeNull();
+});
+it("projects safe configuration and binds guidance to deterministic plans within one attempt", async () => {
+  const artifact = reviewPlanningFixture();
+  const request = buildReviewModelRequest(artifact.facts, artifact.context);
+  expect(request.body).not.toContain(artifact.facts.project_id);
+  expect(request.body).not.toContain(artifact.facts.sources[0]!.source_id!);
+  expect(request.body).toContain("server plans");
+  const fetch = vi
+    .fn<typeof globalThis.fetch>()
+    .mockResolvedValueOnce(response({ object: "response.input_tokens", input_tokens: 100 }))
+    .mockResolvedValueOnce(response(envelope()));
+  const prepared = await createReviewModelClient({
+    apiKey: "sk-synthetic-evaluation",
+    fetch
+  }).prepare({ facts: artifact.facts, context: artifact.context, identities: [] });
+  expect((await prepared.run(async () => {})).state).toBe("succeeded");
+  expect(fetch).toHaveBeenCalledTimes(2);
+});
+it("requests symptom-specific comparisons and distinct monitor checks only for planned guidance", () => {
+  const artifact = reviewPlanningFixture();
+  const request = JSON.parse(buildReviewModelRequest(artifact.facts, artifact.context).body) as {
+    input: Array<{ content: Array<{ text: string }> }>;
+  };
+  const instructions = request.input[0]!.content[0]!.text;
+  for (const constraint of [
+    "with and without",
+    "previously successful",
+    "observation windows",
+    "omit a redundant investigation",
+    "do not invent"
+  ])
+    expect(instructions).toContain(constraint);
+});
+it("falls back after repeated monitor prose without buying another response", async () => {
+  const artifact = reviewPlanningFixture();
+  artifact.facts.sources[0]!.kind = "health";
+  artifact.facts.sources[0]!.status = "failing";
+  artifact.facts.sources.push({ ...artifact.facts.sources[0]!, ref: "e2" });
+  artifact.context.signals.push({ ...artifact.context.signals[0]!, source_ref: "e2" });
+  const repeated = {
+    version: 1,
+    investigations: ["e1", "e2"].map((ref) => ({
+      title: "Inspect the failing monitor",
+      hypothesis: null,
+      checks: ["Inspect the retained failure and current recovery evidence."],
+      evidence_refs: [ref]
+    }))
+  };
+  const fetch = vi
+    .fn<typeof globalThis.fetch>()
+    .mockResolvedValueOnce(response({ object: "response.input_tokens", input_tokens: 100 }))
+    .mockResolvedValueOnce(
+      response(
+        envelope({
+          output: [
+            {
+              type: "message",
+              role: "assistant",
+              status: "completed",
+              content: [{ type: "output_text", text: JSON.stringify(repeated), annotations: [] }]
+            }
+          ]
+        })
+      )
+    );
+  const attempt = await createReviewModelClient({
+    apiKey: "sk-synthetic-evaluation",
+    fetch
+  }).prepare({
+    facts: artifact.facts,
+    context: artifact.context,
+    identities: []
+  });
+  expect(await attempt.run(async () => {})).toMatchObject({ state: "rejected", guidance: null });
+  await expect(attempt.run(async () => {})).rejects.toThrow("review_attempt_already_used");
+  expect(fetch).toHaveBeenCalledTimes(2);
+});
 it("gives the model explicit linked evidence and a bounded investigation and verification rubric", () => {
   const facts = reviewFactsFixture();
   facts.sources.push({

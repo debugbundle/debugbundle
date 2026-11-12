@@ -22,7 +22,7 @@ The public marketing/docs/blog site is separate from this core self-host topolog
 Local/self-host auth behavior must match hosted behavior:
 
 - SPA uses first-party cookie-backed sessions
-- CLI and MCP use member-token auth through the API
+- CLI and MCP use access-token auth through the API
 - SDK ingestion uses project tokens only
 
 Local convenience must not introduce a different auth model than hosted deployment.
@@ -160,11 +160,11 @@ Typical failure reasons now surface explicitly in container logs, for example:
 
 That smoke flow proves the core hosted-parity path end to end:
 
-- dev-only GitHub bootstrap to a write-once member token inside the isolated smoke environment
-- project creation and project-token minting through the member-authenticated management API
+- dev-only GitHub bootstrap to a write-once access token inside the isolated smoke environment
+- project creation and project-token minting through the access-token-authenticated management API
 - `POST /v1/events` ingestion with the minted project token
 - worker-owned incident creation and bundle generation
-- member-authenticated incident and bundle retrieval
+- access-token-authenticated incident and bundle retrieval
 - three realistic browser analytics sessions spanning desktop/mobile, browser, OS, language, route, action, funnel, conversion, and journey-marker signals
 - asynchronous analytics rollups, device breakdowns, funnel visibility, and retained representative journey metadata
 - on-demand `analytics_bundle.v1` generation and retrieval
@@ -339,10 +339,18 @@ an installed schema. These are additive changes; no destructive cleanup deploy.
 Existing report switches/budget remain independent. Optional weekly reviews use
 `SMART_IMPROVEMENTS_ENABLED=false` by default. New AI additionally requires
 `SMART_IMPROVEMENTS_AI_ENABLED`, dedicated `SMART_IMPROVEMENTS_AI_API_KEY`, and
-`SMART_IMPROVEMENTS_AI_QUALIFIED_PROFILE=weekly-review-terra-v1` after separately
+`SMART_IMPROVEMENTS_AI_QUALIFIED_PROFILE=weekly-review-guidance` after separately
 authorised provider qualification. No qualified result ships with this candidate.
 Missing AI configuration produces factual evidence without provider requests;
 maintenance/archive/privacy checks continue with generation disabled. The review
 pool is independent of reports (bounded self-host profile: 50 attempts / USD 1.50
 per anchored month, maximum USD 0.025 per attempt). Owner scope and consent still
 apply. See [Smart Products](../../spec/smart-products.md) for lifecycle and limits.
+
+Weekly review planning adds only a bounded `review_context` snapshot through
+`202611110001_add_improvement_review_planning`. Migrate before API/worker startup.
+The saved export remains compatible; `/plan` provides richer checks. No additional
+enablement flags or staged rollout are required. Qualify the changed prompt before
+setting the existing `SMART_IMPROVEMENTS_AI_QUALIFIED_PROFILE` to
+`weekly-review-guidance`. Consent, schedule and the independent budget are unchanged.
+See [the planning contract](../../contracts/improvement-review-planning.md).

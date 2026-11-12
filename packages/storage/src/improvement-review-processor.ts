@@ -10,6 +10,7 @@ import {
 } from "../../smart-reports/src/model-cost.js";
 import type { ReviewModelClient } from "../../smart-improvements/src/model-client.js";
 import type { Queryable } from "./types.js";
+import { reviewContext } from "./improvement-review-planning.js";
 
 /** Runs in the existing serial report lane. A paid intent always wins over a
  * generic job retry: recovery reuses validated output or publishes safe facts. */
@@ -45,6 +46,8 @@ export async function processNextImprovementReview(input: {
     await execution.bind(claim);
     const row = await execution.facts(claim),
       facts = ReviewFactsSchema.parse(row["facts"]);
+    const context = reviewContext(row),
+      model = input.model;
     if (facts.sources.length === 0) {
       await execution.publish(claim, {
         status:
@@ -80,7 +83,7 @@ export async function processNextImprovementReview(input: {
       await execution.publish(claim, { status: "no_change", reason: null });
       return { processed: true };
     }
-    if (!input.model) {
+    if (!model) {
       await execution.publish(claim, { status: "factual_only", reason: "model_unavailable" });
       return { processed: true };
     }
@@ -97,7 +100,7 @@ export async function processNextImprovementReview(input: {
     ];
     let prepared: Awaited<ReturnType<ReviewModelClient["prepare"]>>;
     try {
-      prepared = await input.model.prepare({ facts, identities });
+      prepared = await model.prepare({ facts, identities, ...(context ? { context } : {}) });
     } catch {
       await execution.publish(claim, { status: "factual_only", reason: "model_unavailable" });
       return { processed: true };

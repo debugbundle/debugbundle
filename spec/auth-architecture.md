@@ -1,7 +1,7 @@
 # Auth Architecture — SPA, API, CLI, MCP
 
 Version: v1.1
-Last updated: 2026-08-30
+Last updated: 2026-11-11
 
 ---
 
@@ -25,19 +25,21 @@ This document resolves the architectural question of how interactive browser aut
 
 DebugBundle uses a **first-party auth system** owned by the API and shared domain services.
 
-The system uses **three distinct auth artifacts**:
+The system uses the following **distinct auth artifacts**:
 
 1. **User sessions** for the web app
-2. **Member tokens** for CLI, local stdio MCP, API automation, and agents
+2. **Access tokens** for CLI, local stdio MCP, API automation, and agents
 3. **Project tokens** for SDK ingestion only
 4. **OAuth grants and access tokens** for the official OpenAI-hosted MCP resource only
 
 These artifacts belong to one shared auth domain, but they are intentionally not interchangeable.
 
+The public name **Access tokens** replaces **Member tokens**. Existing `dbundle_mem_` credentials, member-token identifiers, commands, API paths and storage remain unchanged; see [Access token scopes](../contracts/member-token-scopes.md). References to OAuth credentials explicitly say **OAuth access tokens** to distinguish the hosted resource.
+
 ### 2.1 Why This Model
 
 - Browser sessions are the safest fit for an interactive SPA.
-- Member tokens are the safest fit for terminals, CI, containers, and agent workflows.
+- Access tokens are the safest fit for terminals, CI, containers, and agent workflows.
 - Project tokens keep ingestion isolated from account and retrieval operations.
 - The web app remains a thin interactive surface, while API, CLI, and MCP continue to share the same account and authorization model.
 - This preserves interface parity without forcing browser-specific auth patterns onto non-browser clients.
@@ -62,7 +64,7 @@ No interface may implement its own:
 ### 3.2 Token Scope Separation
 
 - **Project tokens** authenticate SDK ingestion only.
-- **Member tokens** authenticate CLI, MCP, and member-authorized API operations.
+- **Access tokens** authenticate CLI, MCP, and member-authorized API operations.
 - **User sessions** authenticate interactive browser usage only.
 
 No credential type may silently inherit another credential type's scope.
@@ -71,7 +73,7 @@ No credential type may silently inherit another credential type's scope.
 
 The SPA must use cookie-backed sessions.
 
-The web app must **not** persist member tokens, refresh tokens, or equivalent long-lived bearer credentials in browser storage.
+The web app must **not** persist access tokens, refresh tokens, or equivalent long-lived bearer credentials in browser storage.
 
 ### 3.3a Cross-Origin Deployment Rule
 
@@ -86,15 +88,15 @@ Required when the SPA starts making API requests:
 
 ### 3.4 Token Storage Rule
 
-All project tokens and member tokens must be stored hashed at rest. Plaintext is returned exactly once at creation time.
+All project tokens and `dbundle_mem_` access tokens must be stored hashed at rest. Plaintext is returned exactly once at creation time. OAuth provider artifacts use their separate encrypted storage path.
 
 ### 3.5 Verification Rule
 
-Email verification is required before first member-token creation.
+Email verification is required before first access-token creation.
 
 For first-party browser auth, redeeming a valid email sign-in code is the verification step: it creates the session and marks the account email as verified.
 
-After a verified member token exists, the bearer may continue through API, CLI, and MCP flows without repeated human verification gates.
+After a verified access token exists, the bearer may continue through API, CLI, and MCP flows without repeated human verification gates.
 
 ---
 
@@ -115,16 +117,16 @@ The web app authenticates with a first-party session cookie.
 The session is used for interactive browser actions such as:
 
 - viewing account state
-- creating the first member token
+- creating the first access token
 - creating project tokens for projects where the signed-in user has owner/admin project access
 - managing billing
 - managing project sharing
 
 ### 4.2 CLI
 
-The CLI authenticates with a **member token** created in the web app or via the API.
+The CLI authenticates with an **access token** created in the web app or via the API.
 
-`debugbundle login` stores local auth state and all later CLI read/manage operations reuse that stored member token when calling the API.
+`debugbundle login` stores local auth state and all later CLI read/manage operations reuse that stored access token when calling the API.
 
 ### 4.3 MCP
 
@@ -132,7 +134,7 @@ The local stdio MCP server does not have a separate auth model.
 
 It reuses the same local auth state already established by the CLI so agents do not need an additional login flow.
 
-The official OpenAI-hosted MCP resource is separate: it accepts only OAuth access tokens issued for `https://mcp.debugbundle.com`. It never accepts a member token, project token, CLI auth file, or token inside a tool argument. This additive principal does not alter local stdio MCP or custom member-token clients.
+The official OpenAI-hosted MCP resource is separate: it accepts only OAuth access tokens issued for `https://mcp.debugbundle.com`. It never accepts a `dbundle_mem_` access token, project token, CLI auth file, or token inside a tool argument. This additive principal does not alter local stdio MCP or custom access-token clients.
 
 ### 4.4 SDK Ingestion
 
@@ -165,10 +167,12 @@ Storage model:
 
 Rules:
 
-- browser never receives reusable member-token plaintext as part of standard login
+- browser never receives reusable access-token plaintext as part of standard login
 - browser session is the source of interactive auth, not local storage state
 
-### 5.2 Member Token
+<a id="52-member-token"></a>
+
+### 5.2 Access Token
 
 Purpose:
 
@@ -184,7 +188,7 @@ Properties:
 
 Rules:
 
-- valid for retrieval and management operations
+- valid for retrieval and management operations within token scope and current user permissions
 - invalid for ingestion
 - suitable for local files, CI secrets, and agent workflows
 
@@ -217,8 +221,8 @@ Rules:
 2. API creates account, member identity, and initial organization/project state as required.
 3. User verifies email.
 4. User logs into the SPA.
-5. SPA, using the session, creates the first member token.
-6. User runs CLI login with that member token.
+5. SPA, using the session, creates the first access token.
+6. User runs CLI login with that access token.
 7. MCP reuses the same local auth state.
 8. CLI or web app creates project tokens for SDK installation.
 
@@ -228,7 +232,7 @@ This is the primary bootstrap flow for V1.
 
 1. User or agent runs `debugbundle login`.
 2. If an explicit auth mode or token was provided, the CLI uses it directly.
-3. If no auth mode was provided and the session is interactive, the CLI prompts for GitHub auto mode, explicit GitHub device flow, or manual member-token entry.
+3. If no auth mode was provided and the session is interactive, the CLI prompts for GitHub auto mode, explicit GitHub device flow, or manual access-token entry.
 4. `debugbundle login` stores local auth state.
 5. CLI commands call the API with that token.
 6. The API resolves member identity, organization access, and role permissions.
@@ -239,21 +243,21 @@ This is the primary bootstrap flow for V1.
 2. DebugBundle starts a GitHub device authorization through the API and returns a verification URL plus short user code.
 3. User approves the DebugBundle OAuth app in any browser.
 4. CLI polls DebugBundle until approval completes.
-5. DebugBundle links or creates the user account, issues a normal member token, and returns it once.
-6. CLI stores the member token in local auth state.
+5. DebugBundle links or creates the user account, issues a normal access token, and returns it once.
+6. CLI stores the access token in local auth state.
 
 ### 6.2b GitHub CLI Bootstrap Flow
 
 1. User or agent runs `debugbundle login --github-cli` or the auto mode `debugbundle login --github`.
 2. CLI reads an existing `gh auth token` from the local machine when available.
 3. CLI sends that GitHub access token to DebugBundle.
-4. DebugBundle verifies the GitHub identity, links or creates the user account, and issues a normal member token.
-5. CLI stores the member token in local auth state.
+4. DebugBundle verifies the GitHub identity, links or creates the user account, and issues a normal access token.
+5. CLI stores the access token in local auth state.
 
 ### 6.2c Connect-Time Auth Recovery
 
 1. User or agent runs `debugbundle connect`.
-2. If local member auth is already present, connect proceeds normally.
+2. If local access-token authentication is already present, connect proceeds normally.
 3. If auth is missing and the terminal is interactive, `connect` invokes the same `debugbundle login` bootstrap flow first.
 4. After successful login, `connect` resumes project selection/creation and project-token issuance.
 5. In non-interactive or `--json` mode, `connect` does not prompt and instead returns actionable auth guidance.
@@ -292,7 +296,7 @@ The system recognizes these principal types:
 
 - anonymous browser visitor
 - authenticated browser session user
-- authenticated member-token bearer
+- authenticated access-token bearer
 - authenticated project-token bearer
 - authenticated OpenAI OAuth grant bearer
 
@@ -318,11 +322,11 @@ Unverified users may:
 
 Unverified users may not:
 
-- create member tokens
+- create access tokens
 - enable billing
 - invite collaborators
 
-The first member token is the trust transition point from human bootstrap to agent-capable operations.
+The first access token is the trust transition point from human bootstrap to agent-capable operations.
 
 ### 7.4 Role Model
 
@@ -338,7 +342,7 @@ Role semantics:
 - **Admin**: can manage collaborators, capture policy, and shared integrations/configuration, but cannot delete the project or take over billing
 - **Member**: can access project data and create allowed project-scoped automation resources, but cannot manage collaborators, edit capture policy, manage shared integrations, or mutate automation resources created by other collaborators
 
-Role checks must be enforced identically for session-authenticated and member-token-authenticated requests.
+Role checks must be enforced identically for session-authenticated and access-token-authenticated requests.
 
 ---
 
@@ -353,7 +357,7 @@ Expected ownership areas:
 - credential hashing and generation
 - password verification
 - session issuance and revocation
-- member-token issuance and revocation
+- access-token issuance and revocation
 - project-token issuance and revocation
 - verification-token issuance and consumption
 - password-reset-token issuance and consumption
@@ -428,7 +432,7 @@ The auth system should persist at minimum:
 - organization memberships
 - email auth challenges
 - sessions
-- member tokens
+- access tokens
 - project tokens
 - auth audit records
 
@@ -453,7 +457,7 @@ The API should expose first-party browser-auth endpoints for:
 - current session / current user
 - GitHub auth start/callback endpoints when OAuth is enabled
 
-These endpoints are for the SPA and should operate through session cookies rather than member tokens.
+These endpoints are for the SPA and should operate through session cookies rather than access tokens.
 Provider-controlled browser redirect callbacks validate every consumed or security-relevant query field and strip unknown query parameters before route logic runs. This applies consistently to GitHub sign-in, GitHub App setup, and Slack OAuth redirects; it does not relax signed webhook verification.
 The GitHub callback accepts the provider's RFC 9207 `iss` parameter only when it exactly matches `https://github.com/login/oauth`; callbacks without `iss` remain valid for backwards compatibility with older GitHub authorization responses, and unrelated provider extensions are ignored.
 
@@ -461,7 +465,7 @@ The GitHub callback accepts the provider's RFC 9207 `iss` parameter only when it
 
 The API should expose member-authorized endpoints for:
 
-- member token CRUD
+- access token CRUD
 - project token CRUD
 - incidents, bundles, reproduction, logs
 - alerts
@@ -473,11 +477,11 @@ The API should expose member-authorized endpoints for:
 These endpoints must accept:
 
 - browser session auth for interactive web usage
-- member-token auth for CLI, MCP, and automation
+- access-token authentication for CLI, MCP, and automation
 
 After principal resolution, both auth paths must execute the same authorization and domain logic.
 
-The official OpenAI MCP adapter resolves its OAuth principal separately, then calls dedicated read-only domain readers. An OAuth scope is only an outer capability bound: every reader must still verify the backing grant, user, organization, account status, and current project membership. OpenAI access tokens are never accepted by the normal member-token or project-token authenticators.
+The official OpenAI MCP adapter resolves its OAuth principal separately, then calls dedicated read-only domain readers. An OAuth scope is only an outer capability bound: every reader must still verify the backing grant, user, organization, account status, and current project membership. OpenAI access tokens are never accepted by the normal access-token or project-token authenticators.
 
 ### 10.3 Project-Authorized Endpoints
 
@@ -521,7 +525,7 @@ Sensitive auth actions include:
 
 - email change
 - session revocation
-- member-token creation or revocation
+- access-token creation or revocation
 - project-token creation or revocation
 - billing access changes
 - member invitation or role change
@@ -538,13 +542,13 @@ Sensitive auth actions include:
 - server-side opaque session cookies for the SPA
 - Postgres as canonical auth store
 - optional Redis use only where justified for session or rate-limit behavior
-- member tokens for CLI and MCP
+- access tokens for CLI and MCP
 - project tokens for SDK ingestion
 
 ### 13.2 Why This Fits DebugBundle
 
 - It keeps maximum product ownership and control.
-- It matches the repo's existing member-token and project-token contracts.
+- It matches the repo's existing access-token and project-token contracts.
 - It preserves the agent-first CLI/MCP workflow.
 - It avoids leaking browser-specific auth assumptions into automation interfaces.
 - It fits the new hosted shape with a separate database instance.
@@ -560,7 +564,7 @@ V1 does not require:
 - Google sign-in
 - SSO / SAML
 - browser storage of reusable bearer auth
-- collapsing member tokens and project tokens into a single credential model
+- collapsing access tokens and project tokens into a single credential model
 
 These may be added later without changing the V1 security model.
 
@@ -573,8 +577,8 @@ The former hosted multi-tenant MCP non-goal is superseded only for the approved 
 This architecture must preserve and satisfy:
 
 - token isolation
-- verification gating before first member-token creation
-- member-token full access after verification
+- verification gating before first access-token creation
+- access-token permissions bounded by token scope and current user access, with legacy permissions preserved
 - role-based restrictions
 - API / CLI / MCP parity for member-authorized operations
 - local MCP reuse of CLI-established auth state

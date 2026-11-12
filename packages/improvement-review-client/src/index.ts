@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { ReviewPlanDocumentSchema } from "../../smart-improvements/src/review-planning-contract.js";
+import { ReportApiError } from "../../report-client/src/http.js";
 import {
   createReportRequest,
   reportPayload,
@@ -28,6 +30,10 @@ export interface ImprovementReviewApi {
   get(scope: ReportScope & { reviewId: string }): Promise<z.infer<typeof ReviewRecordSchema>>;
   bundle(scope: ReportScope & { reviewId: string }): Promise<{
     bundle: z.infer<typeof ReviewArtifactSchema> | null;
+    status: z.infer<typeof ReviewStatusSchema>;
+  }>;
+  plan(scope: ReportScope & { reviewId: string }): Promise<{
+    bundle: z.infer<typeof ReviewPlanDocumentSchema> | null;
     status: z.infer<typeof ReviewStatusSchema>;
   }>;
 }
@@ -101,6 +107,33 @@ export function createImprovementReviewApi(client: ReportHttpClient): Improvemen
         `${base(scope)}/${reportResourceId(scope.reviewId)}/bundle`,
         z.object({ bundle: ReviewArtifactSchema.nullable(), status: ReviewStatusSchema }).strict()
       );
+    },
+    async plan(scope: ReportScope & { reviewId: string }) {
+      try {
+        return await request(
+          scope,
+          "GET",
+          `${base(scope)}/${reportResourceId(scope.reviewId)}/plan`,
+          z
+            .object({ bundle: ReviewPlanDocumentSchema.nullable(), status: ReviewStatusSchema })
+            .strict()
+        );
+      } catch (error) {
+        if (!(error instanceof ReportApiError) || error.status !== 404) throw error;
+        // Older servers still support the saved export during rollout/rollback.
+        const result = await request(
+          scope,
+          "GET",
+          `${base(scope)}/${reportResourceId(scope.reviewId)}/bundle`,
+          z.object({ bundle: ReviewArtifactSchema.nullable(), status: ReviewStatusSchema }).strict()
+        );
+        return {
+          ...result,
+          bundle: result.bundle
+            ? ReviewPlanDocumentSchema.parse({ ...result.bundle, context: null, plans: [] })
+            : null
+        };
+      }
     }
   };
 }

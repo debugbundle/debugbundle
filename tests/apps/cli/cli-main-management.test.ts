@@ -452,7 +452,7 @@ describe("cli main management routing", () => {
     expect(verifyCloudMissingProject.output).toContain("Missing required option --project-id.");
     expect(smokeMissingProject.output).toContain("Missing required option --project-id.");
     expect(loginMissingToken.output).toContain(
-      "Provide either a member token or one of --github, --github-cli, or --github-device."
+      "Provide either an access token or one of --github, --github-cli, or --github-device."
     );
     expect(tokenProjectMissingLabel.output).toContain("Missing required option --label.");
     expect(tokenMemberMissingLabel.output).toContain("Missing required option --label.");

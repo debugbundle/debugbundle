@@ -57,7 +57,7 @@ export function projectMergeOperations(): OperationSpec[] {
                 : component("ProjectMergeOperation", ProjectMergeOperationSchema)
         },
         "400": { description: "Invalid request or selector.", schema: error },
-        "401": { description: "Member authentication required.", schema: error },
+        "401": { description: "Browser session or access token required.", schema: error },
         "404": { description: "Operation unavailable to this current owner.", schema: error },
         "409": {
           description:

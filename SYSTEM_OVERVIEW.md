@@ -1,3 +1,49 @@
+Dashboard health navigation: a red `!` badge at the right of Health Status reflects
+any accessible enabled, unpaused check's recorded current failure. A protected-shell
+provider reads existing APIs with bounded concurrency, refreshes every minute while
+visible/on return and with Health Status refresh, and fences account/workspace
+switches. Recovery or unavailable current data hides it; no probes or writes occur.
+
+Dashboard polish: Access tokens uses `/access-tokens` without a legacy alias.
+Page actions live in the description row through PageHeader, using default-size
+buttons. Inventory titles retain exact, filtered first-page totals across cursor
+navigation. Existing count services expose opt-in metadata; no schema migration is
+needed. Disabled weekly reviews offer an Owner-only empty-state settings action,
+preserving explicit project/provider consent and default-off behaviour.
+
+The local guidance follow-up passed its final bounded synthetic qualification:
+all eighteen paid cases and two no-request abstentions, including concrete monitor
+recovery comparisons and duplicate-prose rejection. Exact evidence is in
+`evals/smart-improvements/guidance-qualification-final-20261111.json`. This is ready
+for Owner review; no production activation or deployment occurred.
+The final deep audit also closes cross-rule delivery detection, reordered duplicate
+checks and linked-group ordering; 213 affected regression tests pass. The qualified
+requests remain byte-identical and no additional provider calls were made.
+
+Local weekly-guidance follow-up adds bounded configuration and numeric analytics
+context, deterministic next checks and verification. The saved bundle/export shape
+is unchanged; an additive plan read exposes richer guidance through API, CLI, MCP
+and the existing UI. One nullable context column uses a forward migration. The
+existing consent, schedule, AI quality gate and separate budget remain. No new
+format switches, SDK collection or staged rollout are required.
+
+Public naming uses Reports for paid-plan reporting and Smart Reports for Business
+AI analysis. Solo/Team remain factual. Existing report URLs, schemas, capability
+fields and tool names retain their compatible identifiers.
+
+User-facing member-token labels now read Access tokens. Credentials remain bound
+to their issuing user's authority; prefixes, API/CLI/MCP names, configuration keys
+and storage contracts stay compatible. OAuth credentials remain separate.
+
+The local dashboard welcome adds a first empty-dashboard modal and a compact
+setup reminder above the account menu. A reusable guide offers credential-free
+agent instructions and observes existing setup data without performing mutations.
+Optional analytics observes saved settings in manageable workspace projects and links
+to the existing settings card; no capture is enabled automatically. Display
+preferences are per user/workspace in this browser; account-menu access
+remains after dismissal/completion. CLI and auth contracts are unchanged. See
+`spec/dashboard-welcome.md` for eligibility, persistence and verification boundaries.
+
 Smart Products backend and app released in core 1.25.0:
 [spec/smart-products.md](spec/smart-products.md) records the restricted-identity
 guard, zero-AI Solo/Team factual reports, explicitly consented weekly improvement
@@ -25,11 +71,16 @@ Workspace Improvements reuses Analytics-style line tabs: the existing
 `/improvements` inventory is Opportunities and `/improvements/reviews` opens
 Weekly reviews. Shared settings/consent and archive access remain unchanged.
 
-Released public-site support chat: the shared `site/app/layout.tsx` loads the
-Owner-provided Crisp widget after hydration across marketing, docs and blog pages.
-It preserves a single loader/session during navigation and adds no app integration
-or identity forwarding. The public privacy page discloses the separate provider.
-This is live in site 1.9.0.
+Public-site support chat was released with automatic loading in site 1.9.0. The
+local follow-up replaces that bootstrap with a shared first-party button: only an
+explicit click loads Crisp, with bounded loading feedback, retry and email recovery.
+The compact "Chat" launcher and Contact's inline chat action share that controller.
+Bounded provider-state reconciliation clears both controls if an opened event is missed.
+It preserves a single loader/session during client navigation and adds no app
+integration or identity forwarding. The privacy page describes this lifecycle.
+The homepage alone also preloads its existing hero background at high priority.
+These follow-up changes are local; hosted Lighthouse/provider acceptance remains
+separate. See FR-DOC-13 and AC-DOC-18.
 
 Dashboard empty resource lists and data panels reuse `ResourceEmptyState` with
 the existing Empty primitives, scoped help and permitted actions. The former

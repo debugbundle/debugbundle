@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ReviewPlanDocumentSchema } from "../../../packages/smart-improvements/src/review-planning-contract.js";
 import {
   ReviewSettingsSchema,
   ReviewSettingsCommandSchema,
@@ -24,7 +25,7 @@ const failures = {
   "409": { description: "Settings version or workspace changed.", schema: apiError },
   "429": { description: "Request rate limit reached.", schema: apiError },
   "503": {
-    description: "New automatic review enablement is disabled by the operator.",
+    description: "New automatic reviews are temporarily unavailable.",
     schema: apiError
   },
   "500": { description: "Operation failed safely.", schema: apiError }
@@ -32,6 +33,28 @@ const failures = {
 export function improvementReviewOperations(): OperationSpec[] {
   const metadata = { tags: ["Improvements"], security: anyMemberAuth };
   return [
+    {
+      ...metadata,
+      method: "get",
+      path: `${base}/{reviewId}/plan`,
+      operationId: "getImprovementReviewPlan",
+      summary:
+        "Read saved weekly guidance and supported configuration checks without generating work",
+      params: identity,
+      responses: {
+        ...failures,
+        "200": {
+          description:
+            "Private/no-store evidence-linked investigation, noise, flow and verification plan. Existing exports remain unchanged; older archives have no configuration snapshot.",
+          schema: component(
+            "ImprovementReviewPlanResponse",
+            z
+              .object({ bundle: ReviewPlanDocumentSchema.nullable(), status: ReviewStatusSchema })
+              .strict()
+          )
+        }
+      }
+    },
     {
       ...metadata,
       method: "get",

@@ -21,7 +21,7 @@ import {
 
 const failures = {
   "400": { description: "Invalid code, terms version or input.", schema: apiError },
-  "401": { description: "Member authentication required.", schema: apiError },
+  "401": { description: "Browser session or access token required.", schema: apiError },
   "403": {
     description:
       "Verified identity or current Owner authority required; restricted tokens cannot access personal finances.",

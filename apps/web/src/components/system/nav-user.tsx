@@ -5,6 +5,7 @@ import {
   CreditCardIcon,
   GiftIcon,
   LogOutIcon,
+  ListChecksIcon,
   MoonIcon,
   SunIcon,
   UserIcon,
@@ -32,6 +33,7 @@ interface NavUserProps {
   avatarUrl?: string | null;
   onSignOut: () => Promise<void>;
   canManagePeople?: boolean;
+  onOpenSetup?: (() => void) | undefined;
 }
 
 export function NavUser({
@@ -39,7 +41,8 @@ export function NavUser({
   role,
   avatarUrl = null,
   onSignOut,
-  canManagePeople = false
+  canManagePeople = false,
+  onOpenSetup
 }: NavUserProps): JSX.Element {
   const [open, setOpen] = useState(false);
   const { isMobile, setOpenMobile } = useSidebar();
@@ -108,6 +111,15 @@ export function NavUser({
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
+              {onOpenSetup ? (
+                <DropdownMenuItem
+                  className="py-2"
+                  onSelect={() => runAfterOverlayClose(onOpenSetup)}
+                >
+                  <ListChecksIcon />
+                  Setup guide
+                </DropdownMenuItem>
+              ) : null}
               <DropdownMenuItem
                 className="py-2"
                 onSelect={() => {

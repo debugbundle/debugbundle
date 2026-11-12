@@ -203,10 +203,10 @@ export function ProjectSettingsPage(): JSX.Element {
                 </Button>
               </CardAction>
               <CardTitle>Project details</CardTitle>
-              <CardDescription>
+              {/* <CardDescription>
                 Current project identity and editable environment defaults used across setup
                 guidance and project metadata.
-              </CardDescription>
+              </CardDescription> */}
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid gap-4 sm:grid-cols-2">

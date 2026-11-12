@@ -11,11 +11,13 @@ Status: Approved with notes — see Section 13
 This document is the required Phase 11 design-system proposal for the DebugBundle web app.
 
 It exists to satisfy the UI execution gate defined in:
+
 - `/AGENTS.md`
 - `/rules/architectural-constraints.md`
 - `/spec/implementation-roadmap.md`
 
 It covers the required approval inputs:
+
 - design tokens
 - primitives
 - component inventory
@@ -34,26 +36,32 @@ The web app and all DebugBundle surfaces share the brand direction defined in th
 Key brand rules that carry into the design system:
 
 **Voice and tone:**
+
 - direct, developer-focused, technical but clear
 - confident but not marketing-heavy
 - no marketing buzzwords; prefer clear technical explanations
 
 **Product vocabulary (use consistently):**
+
 - bundle, debug bundle, incident, reproduction, verification, agent workflow
 
 **Product vocabulary (avoid heavy usage of):**
+
 - monitoring, observability, analytics, dashboard
 
 **Brand feel:**
+
 - technical, developer-native, pragmatic, automation-friendly, AI-ready
 - avoid: enterprise-heavy, dashboard-centric, marketing-driven
 
 **Product positioning:**
+
 - DebugBundle is production debugging infrastructure, not an observability or monitoring platform
 - the core value proposition is "stop investigating logs — receive debugging bundles"
 - the UI should reinforce context-over-dashboards, artifacts-over-raw-logs, resolution-over-monitoring
 
 **Marketing surface alignment:**
+
 - The public site at `debugbundle.com` (static Next.js + Fumadocs) should follow the same brand voice but with more room for hero sections, value propositions, long-form docs, and calls to action
 - The signed-in app at `app.debugbundle.com` should be the calm operational surface — not a marketing surface
 - Copy in the app should stay functional and direct; save persuasive messaging for the marketing site and blog
@@ -64,12 +72,14 @@ Key brand rules that carry into the design system:
 ## 2. Source Constraints
 
 This proposal is intentionally shaped by the current source-of-truth:
+
 - `/spec/tech-stack.md`: React + Vite, Tailwind, shadcn/ui, dark/light mode required from day one
 - `/spec/routes.md`: minimal app, not a dashboard-heavy product
 - `/spec/auth-architecture.md`: cookie-backed SPA sessions, member/project token management, owner/member role separation
 - the local status tracker: first approved surfaces should focus on auth and account-management flows
 
 Hard constraints:
+
 - The web app is not the product core; API, CLI, and MCP remain primary interfaces.
 - The UI must use the default shadcn/ui new-york style with neutral base tokens as the source of truth for primitives.
 - Core shadcn primitives should remain copy/paste-close to upstream defaults. App-specific styling belongs in composition and domain components, not in restyled forks of stock primitives.
@@ -89,6 +99,7 @@ Hard constraints:
 The web app should feel like a precise operator console rather than a marketing-heavy SaaS dashboard.
 
 Desired qualities:
+
 - calm
 - technical
 - credible
@@ -105,6 +116,7 @@ The proposed visual direction is:
 **Default Shadcn Operator Surface**
 
 Meaning:
+
 - stock shadcn new-york spacing, radii, borders, and component structure
 - neutral base palette from the default shadcn token set
 - direct product copy with minimal decorative framing
@@ -112,6 +124,7 @@ Meaning:
 - explicit empty, pending, warning, and destructive states
 
 This avoids two failure modes:
+
 - custom “house style” drift that diverges from approved shadcn blocks and primitives
 - visually noisy observability-dashboard styling that does not match the current product scope
 
@@ -136,6 +149,7 @@ These tokens define the baseline visual language. The default shadcn new-york ne
 Use semantic roles, not raw page-local colors.
 
 Core roles:
+
 - `bg.canvas`: app/page background
 - `bg.surface`: primary card/panel background
 - `bg.subtle`: quieter grouped sections
@@ -150,12 +164,14 @@ Core roles:
 - `focus.ring`: shared focus outline color
 
 Status roles:
+
 - `status.info`
 - `status.success`
 - `status.warning`
 - `status.danger`
 
 Token/secret roles:
+
 - `code.bg`
 - `code.border`
 - `code.fg`
@@ -163,10 +179,12 @@ Token/secret roles:
 ### 4.2 Proposed Palette Character
 
 Source of truth:
+
 - default shadcn/ui new-york neutral tokens for `background`, `foreground`, `card`, `popover`, `primary`, `secondary`, `muted`, `accent`, `border`, `input`, and `ring`
 - additive domain tokens only for `success`, `warning`, and `info`
 
 Light theme:
+
 - canvas: default neutral background
 - surfaces: default shadcn card/popover surfaces
 - foreground: default shadcn neutral foreground
@@ -177,6 +195,7 @@ Light theme:
 - danger: restrained red, not neon
 
 Dark theme:
+
 - canvas: default shadcn neutral dark background
 - surfaces: default shadcn neutral dark card/popover surfaces
 - foreground: default shadcn neutral dark foreground
@@ -185,6 +204,7 @@ Dark theme:
 - status colors: slightly muted to avoid glowing dashboard aesthetics
 
 Rationale:
+
 - neutral enough for operator tooling
 - matches upstream shadcn blocks and examples directly
 - keeps the product visually consistent with the approved component source
@@ -192,15 +212,18 @@ Rationale:
 ### 4.3 Typography
 
 Use two-font system:
+
 - UI sans: `Instrument Sans` or `Manrope`
 - mono: `JetBrains Mono`
 
 Proposal:
+
 - headings and navigation: UI sans, medium to semibold
 - body and form labels: UI sans
 - tokens, code snippets, IDs, webhook signatures, CLI examples: mono
 
 Type scale:
+
 - `text.hero`: marketing-only, limited use
 - `text.h1`: page titles
 - `text.h2`: section headers
@@ -210,6 +233,7 @@ Type scale:
 - `text.mono`: tokens, IDs, inline technical values
 
 Rules:
+
 - avoid oversized headings inside the signed-in app
 - prefer strong weight contrast over large size jumps
 - use mono only for technical artifacts, never for long body copy
@@ -219,6 +243,7 @@ Rules:
 Adopt a compact but breathable spacing scale.
 
 Roles:
+
 - `space.1`: 4
 - `space.2`: 8
 - `space.3`: 12
@@ -230,6 +255,7 @@ Roles:
 - `space.12`: 48
 
 Rules:
+
 - forms use tighter vertical rhythm than marketing pages
 - cards should prefer internal consistency over large padding
 - dense management screens should use section spacing to create hierarchy instead of oversized containers
@@ -237,11 +263,13 @@ Rules:
 ### 4.5 Radius
 
 Proposed radius system:
+
 - `radius.sm`: inputs, small badges, inline pills
 - `radius.md`: buttons, cards, table containers
 - `radius.lg`: dialogs, hero panels
 
 Direction:
+
 - slightly rounded, not pill-heavy
 - avoid extreme rounding that makes the app feel consumer-social
 
@@ -250,6 +278,7 @@ Direction:
 Primary depth model should be border-first, shadow-second.
 
 Rules:
+
 - rely on contrast and border layering before large shadows
 - use soft elevation only for dialogs, popovers, dropdowns, and command surfaces
 - default cards in app shell should usually not float dramatically
@@ -259,6 +288,7 @@ Rules:
 Motion should be sparse and informative.
 
 Allowed motion:
+
 - panel/dialog enter and exit
 - theme transition
 - toast entry
@@ -266,11 +296,13 @@ Allowed motion:
 - subtle loading skeleton shimmer
 
 Avoid:
+
 - decorative floating animation
 - exaggerated spring motion for routine controls
 - delayed stagger effects on dense management pages
 
 Motion timing direction:
+
 - fast for inline UI responses
 - medium for overlays
 - disabled or reduced under `prefers-reduced-motion`
@@ -284,6 +316,7 @@ All primitives should be default shadcn-based and wrapped only where DebugBundle
 ### 5.1 Foundation Primitives
 
 Required:
+
 - Button
 - Input
 - Textarea
@@ -311,6 +344,7 @@ Required:
 ### 5.2 Layout Primitives
 
 Required:
+
 - App Shell
 - Sidebar Nav
 - Top Bar
@@ -326,6 +360,7 @@ Required:
 ### 5.3 Data Display Primitives
 
 Required:
+
 - Data Table
 - Key/Value List
 - Definition Row
@@ -338,6 +373,7 @@ Required:
 ### 5.4 Feedback Primitives
 
 Required:
+
 - Inline Validation Message
 - Banner / Notice
 - Success Confirmation Block
@@ -349,6 +385,7 @@ Required:
 ### 5.5 Auth And Setup Primitives
 
 Required:
+
 - Auth Card
 - OAuth Button Row
 - Password Field
@@ -441,6 +478,7 @@ These templates keep page construction consistent and prevent ad-hoc page compos
 ### 7.1 Public Auth Template
 
 Used for:
+
 - `/login`
 - `/signup`
 - `/forgot-password`
@@ -448,6 +486,7 @@ Used for:
 - `/verify-email`
 
 Structure:
+
 - simple centered layout
 - narrow content width
 - one primary card
@@ -457,6 +496,7 @@ Structure:
 ### 7.2 Signed-In Management Template
 
 Used for:
+
 - billing
 - projects
 - tokens
@@ -466,6 +506,7 @@ Used for:
 - alerts
 
 Structure:
+
 - persistent app shell
 - page header with title, context, primary action
 - one main content lane
@@ -474,6 +515,7 @@ Structure:
 ### 7.3 List + Dialog Template
 
 Used for:
+
 - project lists
 - token lists
 - member lists
@@ -482,6 +524,7 @@ Used for:
 - alert lists
 
 Structure:
+
 - header with primary action
 - filter/search row only when needed
 - table/list container
@@ -491,12 +534,14 @@ Structure:
 ### 7.4 Destructive Settings Template
 
 Used for:
+
 - revoke token
 - delete project
 - remove member
 - cancel invite
 
 Structure:
+
 - warning-toned section
 - explicit irreversible copy
 - typed confirmation only for high-risk actions
@@ -633,6 +678,7 @@ Mandatory rules:
 12. **Toast notifications** always use the shared toast/Sonner surface. No page may create local notification patterns.
 
 Enforcement approach:
+
 - Code review must reject any page-local reimplementation of a shared pattern.
 - If a shared component does not yet support a needed variant, extend the shared component — do not create a page-local workaround.
 - The shadcn skills reference (`.agents/skills/shadcn/`) defines how to add, customize, and compose shadcn components correctly.
@@ -680,6 +726,7 @@ Enforcement approach:
 If this proposal is approved, the first UI implementation slice should stay narrow.
 
 Recommended first slice:
+
 - `/login`
 - `/signup`
 - `/verify-email`
@@ -687,15 +734,17 @@ Recommended first slice:
 - `/reset-password`
 - minimal `/dashboard` signed-in home
 - `/settings`
-- `/member-tokens`
+- `/access-tokens`
 
 Rationale:
+
 - aligns with already-shipped backend auth/session capabilities
 - exercises the homepage redirect rule from signed-in `/` to `/dashboard`
 - exercises the auth template, app shell, forms, token reveal, and verification gate patterns
 - avoids prematurely committing to heavier project/billing/incident layouts before the foundation is proven
 
 Second slice after that:
+
 - `/projects`
 - `/projects/:projectId/tokens`
 - `/projects/:projectId/members`
@@ -724,6 +773,7 @@ This is not code yet, but the proposal assumes the following implementation shap
 ### 12.3 Block Usage
 
 Use official shadcn blocks where they genuinely accelerate consistent implementation, especially for:
+
 - auth page structure
 - sidebar/app shell structure
 - settings and management layouts
@@ -733,6 +783,7 @@ Do not adopt blocks wholesale if they introduce visual drift or unnecessary dash
 ### 12.4 shadcn Skills Reference
 
 The repository includes installed shadcn agent skills at `.agents/skills/shadcn/`. These skills define:
+
 - how to add new shadcn components (`cli.md`)
 - customization patterns (`customization.md`)
 - component rules and conventions (`rules/`)
@@ -783,3 +834,23 @@ These are the parts most likely to need user adjustment before implementation:
 This proposal is approved as the baseline design system for Phase 11. The next step is to implement the first narrow auth/account-management slice against it.
 
 If adjustments are needed during implementation, this file should be updated first and only then used as the implementation reference.
+
+### Dashboard page actions and inventory totals
+
+The shell header contains navigation and the current page title. Page actions live
+in the shared PageHeader description row, aligned right and vertically centred on
+desktop, with responsive wrapping below the description on narrow screens. Primary
+actions and the page Refresh use the shared default button size, matching Access
+tokens. Table-level controls retain their compact size.
+
+Incident inventory, Improvement inventory, Project inventory and Analytics
+opportunities append the exact available total as `(x)` in the title. Paginated
+inventories use the first-page authorised total for the active filters, retain it
+across cursor navigation and update it on refresh/filter changes. Unknown/loading
+and failed totals are not shown as zero; complete empty results show `(0)`.
+
+Report history retains table semantics and visible column headers at phone widths,
+using the shared horizontal-scroll table container. Saved-report actions occupy a
+left-aligned row below the title on phones, and next delivery has its own line;
+desktop action alignment is retained. Shared toggles show the check only when
+selected; unselected choices have normal padding with no blank icon space.

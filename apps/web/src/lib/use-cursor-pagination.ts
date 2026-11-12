@@ -6,12 +6,14 @@ export interface CursorPageResult<TItem> {
   items: TItem[];
   nextCursor: string | null;
   totalPages?: number | undefined;
+  totalCount?: number | undefined;
 }
 
 interface CachedCursorPage<TItem> {
   items: TItem[];
   nextCursor: string | null;
   totalPages?: number | undefined;
+  totalCount?: number | undefined;
 }
 
 const EMPTY_PAGE: CachedCursorPage<never> = {
@@ -28,6 +30,7 @@ export function useCursorPagination<TItem>(
   hasError: boolean;
   page: number;
   totalPages: number;
+  totalCount: number | null;
   hasNextPage: boolean;
   goToNextPage: () => Promise<void>;
   goToPreviousPage: () => void;
@@ -191,6 +194,9 @@ export function useCursorPagination<TItem>(
     items: currentPage?.items ?? null,
     isLoading,
     hasError,
+    totalCount: hasError
+      ? null
+      : (pages[0]?.totalCount ?? (pages[0]?.nextCursor === null ? pages[0].items.length : null)),
     page: pageIndex + 1,
     totalPages: Math.max(
       pageIndex + 1,

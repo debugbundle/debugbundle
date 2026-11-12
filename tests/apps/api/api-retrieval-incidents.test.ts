@@ -17,6 +17,14 @@ describe("api-retrieval incidents", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json().total_pages).toBe(3);
+    expect(response.json()).not.toHaveProperty("total_count");
+    const counted = await app.inject({
+      method: "GET",
+      url: "/v1/incidents?limit=10&include_total_count=true",
+      headers: { authorization: "Bearer dbundle_mem_test" }
+    });
+    expect(counted.statusCode).toBe(200);
+    expect(counted.json().total_count).toBe(21);
     expect(countIncidentsForOrganization).toHaveBeenCalledWith(
       expect.objectContaining({ limit: 10 })
     );

@@ -4,13 +4,15 @@ import { describe, expect, it, vi } from "vitest";
 import type { ApiDependencies } from "../../../apps/api/src/api-types.js";
 import { createApiServer } from "../../../apps/api/src/server.js";
 
-function createDependencies(overrides: {
-  memberAuth?: ApiDependencies["memberAuth"];
-  projectManagement?: ApiDependencies["projectManagement"];
-  improvementManagement?: ApiDependencies["improvementManagement"];
-  improvementBundleRegeneration?: ApiDependencies["improvementBundleRegeneration"];
-  objectStoreReader?: ApiDependencies["objectStoreReader"];
-} = {}): ReturnType<typeof createApiServer> {
+function createDependencies(
+  overrides: {
+    memberAuth?: ApiDependencies["memberAuth"];
+    projectManagement?: ApiDependencies["projectManagement"];
+    improvementManagement?: ApiDependencies["improvementManagement"];
+    improvementBundleRegeneration?: ApiDependencies["improvementBundleRegeneration"];
+    objectStoreReader?: ApiDependencies["objectStoreReader"];
+  } = {}
+): ReturnType<typeof createApiServer> {
   return createApiServer({
     ingestionPersistence: { persistAndEnqueue: vi.fn() },
     ingestionMetadata: { resolveProjectByTokenHash: vi.fn() },
@@ -62,7 +64,9 @@ function createDependencies(overrides: {
   });
 }
 
-function createImprovementRecord(overrides: Partial<Record<string, unknown>> = {}): Record<string, unknown> {
+function createImprovementRecord(
+  overrides: Partial<Record<string, unknown>> = {}
+): Record<string, unknown> {
   return {
     improvement_id: "imp_123",
     project_id: "00000000-0000-0000-0000-000000000001",
@@ -117,6 +121,14 @@ describe("improvement routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json().total_pages).toBe(3);
+    expect(response.json()).not.toHaveProperty("total_count");
+    const counted = await app.inject({
+      method: "GET",
+      url: "/v1/improvements?limit=10&include_total_count=true",
+      headers: { authorization: "Bearer dbundle_mem_test_token" }
+    });
+    expect(counted.statusCode).toBe(200);
+    expect(counted.json().total_count).toBe(21);
     expect(countImprovementsForOrganization).toHaveBeenCalledWith(
       expect.objectContaining({ limit: 10 })
     );
@@ -271,14 +283,18 @@ describe("improvement routes", () => {
     });
     for (const url of ["/v1/improvements", "/v1/improvements/imp_123"]) {
       const response = await app.inject({
-        method: "GET", url, headers: { authorization: "Bearer dbundle_mem_test_token" }
+        method: "GET",
+        url,
+        headers: { authorization: "Bearer dbundle_mem_test_token" }
       });
       expect(response.statusCode).toBe(200);
       expect(response.body).not.toContain("abcdef123456");
       expect(response.body).not.toContain("canary-private-value");
-      expect(response.json()).toMatchObject(url.endsWith("imp_123")
-        ? { improvement: { title: "Authorization: [REDACTED]", evidence: { status: 503 } } }
-        : { improvements: [{ title: "Authorization: [REDACTED]", evidence: { status: 503 } }] });
+      expect(response.json()).toMatchObject(
+        url.endsWith("imp_123")
+          ? { improvement: { title: "Authorization: [REDACTED]", evidence: { status: 503 } } }
+          : { improvements: [{ title: "Authorization: [REDACTED]", evidence: { status: 503 } }] }
+      );
     }
   });
 
@@ -679,7 +695,11 @@ describe("improvement routes", () => {
 
   it("returns the hosted improvement bundle artifact", async () => {
     const improvement = createImprovementRecord();
-    const bundle = { bundle_version: 1, bundle_type: "improvement", summary: { title: "warning hotspot" } };
+    const bundle = {
+      bundle_version: 1,
+      bundle_type: "improvement",
+      summary: { title: "warning hotspot" }
+    };
     const app = createDependencies({
       improvementManagement: {
         listImprovementsForOrganization: vi.fn(),
@@ -711,11 +731,18 @@ describe("improvement routes", () => {
         reopenImprovementForOrganization: vi.fn()
       },
       objectStoreReader: {
-        getObject: vi.fn().mockResolvedValue(gzipSync(Buffer.from(JSON.stringify({
-          bundle_version: 1,
-          bundle_type: "improvement",
-          summary: { title: "Authorization: Bearer abcdef123456", status: 503 }
-        }), "utf8")))
+        getObject: vi.fn().mockResolvedValue(
+          gzipSync(
+            Buffer.from(
+              JSON.stringify({
+                bundle_version: 1,
+                bundle_type: "improvement",
+                summary: { title: "Authorization: Bearer abcdef123456", status: 503 }
+              }),
+              "utf8"
+            )
+          )
+        )
       }
     });
 
@@ -736,7 +763,9 @@ describe("improvement routes", () => {
     const app = createDependencies({
       improvementManagement: {
         listImprovementsForOrganization: vi.fn(),
-        getImprovementForOrganization: vi.fn().mockResolvedValue(createImprovementRecord({ project_id: "proj_other" })),
+        getImprovementForOrganization: vi
+          .fn()
+          .mockResolvedValue(createImprovementRecord({ project_id: "proj_other" })),
         resolveImprovementForOrganization: vi.fn(),
         reopenImprovementForOrganization: vi.fn()
       }

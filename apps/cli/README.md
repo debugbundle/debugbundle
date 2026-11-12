@@ -29,7 +29,7 @@ then explicitly rebuild from its retained event files using
 capture preset. This rebuild regenerates local incident/artifact state; it does
 not change cloud records or the retained event files.
 
-Connected `doctor` diagnostics check API health and saved member authentication with a one-incident probe restricted to `cloud_project_id`. Missing or blank connected project scope fails before any request. Incident contents are discarded and are not included in the report. Local-only diagnostics make no cloud request.
+Connected `doctor` diagnostics check API health and saved access-token authentication with a one-incident probe restricted to `cloud_project_id`. Missing or blank connected project scope fails before any request. Incident contents are discarded and are not included in the report. Local-only diagnostics make no cloud request.
 
 In a connected workspace, `debugbundle incidents` and `--source cloud` default
 their cloud requests to the connection's `cloud_project_id`. `--project-id <id>`
@@ -104,7 +104,7 @@ Portable plugin skills complement the project's profile and workflows. Setup doe
 
 ## Configuration
 
-The CLI reads local project configuration from `.debugbundle/` and can use member-token authentication for connected cloud operations. Use `debugbundle connect` to configure cloud access, or pass `--auth-file` to commands that support explicit auth state.
+The CLI reads local project configuration from `.debugbundle/` and can use access-token authentication for connected cloud operations. Use `debugbundle connect` to configure cloud access, or pass `--auth-file` to commands that support explicit auth state.
 
 ## Public status pages
 
@@ -120,7 +120,7 @@ debugbundle health status preview --project-id <id> --json
 Settings contain `title`, `enabled` and explicit `projects` entries with `project_id`
 and `check_ids`. Save with `enabled: false` to unpublish while retaining the URL.
 Only selected names and aggregate availability are public; endpoint URLs and
-diagnostics stay private. New checks remain private. Use member authentication
+diagnostics stay private. New checks remain private. Use access-token authentication
 and publish only on the owner's instruction. See the
 [status-page guide](https://debugbundle.com/docs/availability-checks/).
 
@@ -139,7 +139,7 @@ and `analytics flows archive --project <project-id> --key onboarding`. See the
 [flow contract](https://debugbundle.com/docs/api/analytics/#public-acquisition-and-activation-flows)
 for definitions, capture, full UTC day report windows, and partial coverage.
 
-Analytics commands require connected member authentication and a project with AnalyticsBundle enabled. They query aggregate rollups or request an asynchronous analysis artifact; they do not read raw analytics events.
+Analytics commands require connected access-token authentication and a project with AnalyticsBundle enabled. They query aggregate rollups or request an asynchronous analysis artifact; they do not read raw analytics events.
 
 ```sh
 debugbundle analytics filter-options --project <project-id> --last 7d --json

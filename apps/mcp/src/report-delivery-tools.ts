@@ -13,7 +13,7 @@ export const REPORT_DELIVERY_MCP_TOOL_CATALOG = [
     group: "reports" as const,
     inputSchema: identity,
     description:
-      "Read safe per-recipient Smart Report email states under current whole-scope access. Accepted means provider acceptance, not inbox delivery. Uncertain sends are held and never automatically repeated. This read does not send mail, retry work, expose provider receipts or call AI.",
+      "Read safe per-recipient report email states under current whole-scope access. Accepted means provider acceptance, not inbox delivery. Uncertain sends are held and never automatically repeated. This read does not send mail, retry work, expose provider receipts or call AI.",
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,

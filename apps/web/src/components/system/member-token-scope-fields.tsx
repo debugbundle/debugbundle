@@ -30,20 +30,32 @@ export function MemberTokenScopeFields({
           value={value.mode}
           disabled={disabled}
           onValueChange={(mode) => {
-            if (mode === "projects")
+            if (mode === "projects") {
+              const permissions = value.permissions.filter(
+                (permission) => permission !== "organization:admin"
+              );
               onChange({
                 mode,
                 project_ids: [],
-                permissions: value.permissions.filter(
-                  (permission) => permission !== "organization:admin"
-                )
+                permissions: permissions.length ? permissions : ["project:read"]
               });
-            if (mode === "organization")
-              onChange({ mode, organization_id: organizationId, permissions: value.permissions });
+            }
+            if (mode === "organization") {
+              const permissions = value.permissions.filter(
+                (permission) =>
+                  canAdministerOrganization ||
+                  (permission !== "project:admin" && permission !== "organization:admin")
+              );
+              onChange({
+                mode,
+                organization_id: organizationId,
+                permissions: permissions.length ? permissions : ["project:read"]
+              });
+            }
           }}
         >
+          <ToggleGroupItem value="organization">Current workspace</ToggleGroupItem>
           <ToggleGroupItem value="projects">Selected projects</ToggleGroupItem>
-          <ToggleGroupItem value="organization">Current organisation</ToggleGroupItem>
         </ToggleGroup>
         {value.mode === "projects" ? (
           <MultiSelect
@@ -58,8 +70,7 @@ export function MemberTokenScopeFields({
           />
         ) : (
           <FieldDescription>
-            Includes current and future projects in this organisation, limited by your live access.
-            It never includes another organisation.
+            Includes current and future projects in this workspace that you have access to.
           </FieldDescription>
         )}
       </Field>
@@ -82,15 +93,26 @@ export function MemberTokenScopeFields({
         >
           <ToggleGroupItem value="project:read">Read</ToggleGroupItem>
           <ToggleGroupItem value="project:write">Write</ToggleGroupItem>
-          <ToggleGroupItem value="project:admin">Project settings</ToggleGroupItem>
+          <ToggleGroupItem
+            value="project:admin"
+            disabled={value.mode === "organization" && !canAdministerOrganization}
+          >
+            Project settings
+          </ToggleGroupItem>
           {value.mode === "organization" && canAdministerOrganization ? (
             <ToggleGroupItem value="organization:admin">People management</ToggleGroupItem>
           ) : null}
         </ToggleGroup>
         <FieldDescription>
-          Read is selected by default. Add only the operations this automation needs. Your current
-          permissions are rechecked on every request.
+          Read, Write and Project settings are enabled by default where your role allows. Turn off
+          operations this automation does not need. Your permissions are rechecked on every request.
         </FieldDescription>
+        {value.mode === "organization" && !canAdministerOrganization ? (
+          <FieldDescription>
+            Workspace-wide Project settings require an Owner or Admin role. Use Selected projects
+            for projects you administer.
+          </FieldDescription>
+        ) : null}
       </Field>
     </>
   );

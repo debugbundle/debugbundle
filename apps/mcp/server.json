@@ -8,20 +8,20 @@
     "source": "github",
     "subfolder": "apps/mcp"
   },
-  "version": "1.23.0",
+  "version": "1.24.0",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@debugbundle/mcp",
-      "version": "1.23.0",
+      "version": "1.24.0",
       "transport": {
         "type": "stdio"
       },
       "environmentVariables": [
         {
           "name": "DEBUGBUNDLE_MEMBER_TOKEN",
-          "description": "Optional DebugBundle member token used by hosted API and MCP management tools when CLI auth state is unavailable.",
+          "description": "Optional DebugBundle access token used by hosted API and MCP management tools when CLI auth state is unavailable.",
           "format": "string",
           "isRequired": false,
           "isSecret": true

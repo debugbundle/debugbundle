@@ -40,7 +40,7 @@ export const MCP_TOOL_CATALOG_FOUNDATION = [
     name: "doctor",
     group: "setup",
     description:
-      "Run DebugBundle environment diagnostics. Connected mode checks API health and saved member authentication with one incident request restricted to the connected project; incident contents are not returned.",
+      "Run DebugBundle environment diagnostics. Connected mode checks API health and saved access-token authentication with one incident request restricted to the connected project; incident contents are not returned.",
     inputSchema: z.object({
       authFilePath: z.string().optional(),
       privacy: z.boolean().optional()
@@ -78,7 +78,7 @@ export const MCP_TOOL_CATALOG_FOUNDATION = [
     name: "verify_app_event",
     group: "setup",
     description:
-      "Wait for a real SDK-driven hosted app incident and verify its bundle using service, traceId, or requestId. Read-only proof; does not create synthetic events. Requires local member authentication.",
+      "Wait for a real SDK-driven hosted app incident and verify its bundle using service, traceId, or requestId. Read-only proof; does not create synthetic events. Requires local access-token authentication.",
     inputSchema: z
       .object({
         projectId: z.string().min(1),
@@ -432,7 +432,7 @@ export const MCP_TOOL_CATALOG_FOUNDATION = [
   {
     name: "list_member_tokens",
     group: "tokens",
-    description: "List member tokens for the authenticated member.",
+    description: "List access tokens for the authenticated user.",
     inputSchema: z.object({
       bearerToken: z.string(),
       limit: z.number().optional(),
@@ -443,7 +443,7 @@ export const MCP_TOOL_CATALOG_FOUNDATION = [
     name: "create_member_token",
     group: "tokens",
     description:
-      "Create a member token. New restricted scope requires verified interactive issuance; restricted credentials cannot mint credentials.",
+      "Create an access token. New restricted scope requires verified interactive issuance; restricted credentials cannot mint credentials.",
     inputSchema: z.object({
       bearerToken: z.string(),
       label: z.string(),
@@ -454,7 +454,7 @@ export const MCP_TOOL_CATALOG_FOUNDATION = [
   {
     name: "revoke_member_token",
     group: "tokens",
-    description: "Revoke a member token.",
+    description: "Revoke an access token.",
     inputSchema: z.object({
       bearerToken: z.string(),
       tokenId: z.string()

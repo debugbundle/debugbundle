@@ -13,6 +13,7 @@ export const BUSINESS_SERVICE_TEST_FILES = [
   "tests/integration/referral-ledger.integration.test.ts",
   "tests/integration/referral-reconciliation.integration.test.ts",
   "tests/integration/improvement-review.integration.test.ts",
+  "tests/integration/improvement-review-planning.integration.test.ts",
   "tests/integration/improvement-review-facts.integration.test.ts",
   "tests/integration/improvement-review-scheduler.integration.test.ts",
   "tests/integration/report-entitlements.integration.test.ts",

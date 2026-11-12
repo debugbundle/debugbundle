@@ -18,7 +18,7 @@ const failures = {
     description: "Invalid command, completed period, identity or cursor.",
     schema: apiError
   },
-  "401": { description: "Member authentication required.", schema: apiError },
+  "401": { description: "Browser session or access token required.", schema: apiError },
   "403": {
     description: "Current actor, credential, whole-scope role or entitlement is insufficient.",
     schema: apiError

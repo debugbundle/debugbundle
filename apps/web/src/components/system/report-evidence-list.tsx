@@ -1,3 +1,4 @@
+import { MetadataSeparator } from "./metadata-separator.js";
 import type {
   ReportModelEvidence,
   ReportModelFacts
@@ -20,7 +21,8 @@ export function ReportEvidenceList({
               {item.severity}
             </Badge>
             <span className="text-xs text-muted-foreground">
-              {projects.find((project) => project.ref === item.project_ref)?.name} ·{" "}
+              {projects.find((project) => project.ref === item.project_ref)?.name}
+              <MetadataSeparator />
               {item.status.replaceAll("_", " ")}
             </span>
           </div>
@@ -46,7 +48,7 @@ export function ReportReferences({ values }: { values: string[] }): JSX.Element 
     <span className="text-xs text-muted-foreground">
       {values.map((value, index) => (
         <span key={value}>
-          {index ? " · " : " "}
+          {index ? <MetadataSeparator /> : " "}
           <a
             className="underline underline-offset-4"
             href={`#ref-${value}`}

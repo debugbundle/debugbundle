@@ -8,6 +8,37 @@ import {
 const project = "11111111-1111-4111-8111-111111111111";
 const org = "22222222-2222-4222-8222-222222222222";
 describe("interactive member scope policy", () => {
+  it("accepts the dashboard's owner/admin workspace defaults before the first project and rejects member elevation", async () => {
+    const resolve = vi.fn();
+    const declaration = {
+      mode: "organization" as const,
+      organization_id: org,
+      permissions: ["project:read", "project:write", "project:admin"] as (
+        | "project:read"
+        | "project:write"
+        | "project:admin"
+      )[]
+    };
+    for (const role of ["owner", "admin"] as const) {
+      expect(
+        await buildMemberTokenPolicy({
+          declaration,
+          organization_id: org,
+          organization_role: role,
+          resolve_project: resolve
+        })
+      ).toEqual({ version: 1, ...declaration });
+    }
+    expect(
+      await buildMemberTokenPolicy({
+        declaration,
+        organization_id: org,
+        organization_role: "member",
+        resolve_project: resolve
+      })
+    ).toBeNull();
+    expect(resolve).not.toHaveBeenCalled();
+  });
   it("uses only server-resolved origins and rejects elevated project permissions", async () => {
     const resolve = vi
       .fn()

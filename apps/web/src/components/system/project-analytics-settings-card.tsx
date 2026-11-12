@@ -1,6 +1,7 @@
 import { PendingButton } from "./pending-button.js";
 import { RotateCcwIcon } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 
 import { getTierCapabilities } from "../../../../../packages/shared-types/src/index.js";
 import {
@@ -146,6 +147,11 @@ export function ProjectAnalyticsSettingsCard(
   props: ProjectAnalyticsSettingsCardProps
 ): JSX.Element {
   const { projectId, organizationPlan, canEdit } = props;
+  const { hash } = useLocation();
+  const [open, setOpen] = useState(hash === "#analytics-settings");
+  useEffect(() => {
+    if (hash === "#analytics-settings") setOpen(true);
+  }, [hash]);
   const [draft, setDraft] = useState<AnalyticsSettingsDraft | null>(null);
   const [baseline, setBaseline] = useState<AnalyticsSettingsDraft | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -229,6 +235,9 @@ export function ProjectAnalyticsSettingsCard(
 
   return (
     <CollapsibleCard
+      id="analytics-settings"
+      open={open}
+      onOpenChange={setOpen}
       title="Product analytics"
       description="Configure opt-in browser usage capture, privacy, and bounded retention."
       contentClassName="flex flex-col gap-6"

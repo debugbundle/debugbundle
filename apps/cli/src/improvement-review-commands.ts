@@ -20,7 +20,7 @@ import {
 import type { CliCommandResult } from "./token-commands.js";
 type Input = { organizationId: string; authFilePath?: string; json?: boolean } & (
   | { action: "list"; projectId?: string; limit?: number; cursor?: string }
-  | { action: "get" | "bundle"; reviewId: string }
+  | { action: "get" | "bundle" | "plan"; reviewId: string }
   | { action: "settings" | "allowance" }
   | { action: "configure"; command: z.input<typeof ReviewSettingsCommandSchema> }
 );
@@ -51,8 +51,8 @@ export async function improvementReviewsWithAuthCommand(
           })
         : input.action === "get"
           ? { review: await api.get({ ...scope, reviewId: input.reviewId }) }
-          : input.action === "bundle"
-            ? await api.bundle({ ...scope, reviewId: input.reviewId })
+          : input.action === "bundle" || input.action === "plan"
+            ? await api[input.action]({ ...scope, reviewId: input.reviewId })
             : input.action === "settings"
               ? { settings: await api.settings(scope) }
               : input.action === "allowance"
@@ -80,7 +80,7 @@ export async function handleImprovementReviewCommand(
 ): Promise<CliCommandResult> {
   const action = requirePositional(parsed, 2, "action"),
     organizationId = requirePositional(parsed, 3, "organization-id");
-  if (!["list", "get", "bundle", "settings", "configure", "allowance"].includes(action))
+  if (!["list", "get", "bundle", "plan", "settings", "configure", "allowance"].includes(action))
     throw new CliInputError("Unknown improvements reviews action.");
   expectNoUnknownOptions(parsed, [
     "auth-file",
@@ -91,7 +91,7 @@ export async function handleImprovementReviewCommand(
         ? ["settings-json"]
         : [])
   ]);
-  ensureNoExtraPositionals(parsed, action === "get" || action === "bundle" ? 5 : 4);
+  ensureNoExtraPositionals(parsed, ["get", "bundle", "plan"].includes(action) ? 5 : 4);
   if (!z.uuid().safeParse(organizationId).success)
     throw new CliInputError("Invalid organization-id.");
   const auth = readStringOption(parsed, "auth-file"),
@@ -113,7 +113,7 @@ export async function handleImprovementReviewCommand(
       ...(cursor === undefined ? {} : { cursor })
     });
   }
-  if (action === "get" || action === "bundle")
+  if (action === "get" || action === "bundle" || action === "plan")
     return command({ ...base, action, reviewId: requirePositional(parsed, 4, "review-id") });
   if (action === "settings" || action === "allowance") return command({ ...base, action });
   const raw = readStringOption(parsed, "settings-json");

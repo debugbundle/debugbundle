@@ -126,7 +126,8 @@ export const LogSchema = z.object({
 export const IncidentsResponseSchema = z.object({
   incidents: z.array(IncidentSchema),
   next_cursor: z.string().nullable().optional(),
-  total_pages: z.number().int().positive().optional()
+  total_pages: z.number().int().positive().optional(),
+  total_count: z.number().int().nonnegative().optional()
 });
 
 export const IncidentResponseSchema = z.object({
@@ -240,7 +241,8 @@ export const ServicesResponseSchema = z.object({
 export const ImprovementsResponseSchema = z.object({
   improvements: z.array(ImprovementSchema),
   next_cursor: z.string().nullable().optional(),
-  total_pages: z.number().int().positive().optional()
+  total_pages: z.number().int().positive().optional(),
+  total_count: z.number().int().nonnegative().optional()
 });
 
 export const LogsResponseSchema = z.object({

@@ -78,6 +78,7 @@ export const AnalyticsOpportunitiesQuerySchema = z
     from: z.string().datetime().optional(),
     to: z.string().datetime().optional(),
     include_total: z.enum(["true", "false"]).optional(),
+    include_total_count: z.enum(["true", "false"]).optional(),
     cursor: z.string().trim().min(1).optional(),
     limit: z.coerce.number().int().min(1).max(100).optional().default(20)
   })

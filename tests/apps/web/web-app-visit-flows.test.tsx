@@ -106,7 +106,7 @@ it("uses a modal for create and edit, restores focus, and displays readable purp
   setup();
   const user = userEvent.setup();
   await screen.findByText("newsletter");
-  expect(screen.getByText(/^Acquisition · Version/)).toBeInTheDocument();
+  expect(screen.getByText(/^Acquisition.*Version/)).toHaveTextContent("Acquisition · Version");
   const create = screen.getByRole("button", { name: "Create flow" });
   await user.click(create);
   const dialog = screen.getByRole("dialog", { name: "Create flow" });

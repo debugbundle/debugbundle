@@ -98,6 +98,7 @@ help:
 	@echo "  make dev-tier        Inspect local tiers; TIER=free|solo|team|business switches the base tier"
 	@echo "  make dev-openai-plugin-preview Start dev with the local synthetic OpenAI UI review route"
 	@echo "  make dev-public      Start the public-site dev server at http://localhost:5292"
+	@echo "  make dev-public-refresh Rebuild and remount the existing local static public preview"
 	@echo "  make public-site-artifacts Refresh generated public API/reference artifacts"
 	@echo "  make dev-down        Stop the full local dev stack"
 	@echo "  make dev-reset       Drop local DB/cache/object-store state and rebuild from scratch"
@@ -690,6 +691,16 @@ dev-public:
 dev-openai-plugin-preview:
 	$(MAKE) VITE_OPENAI_PLUGIN_PREVIEW=true dev
 
+# A static export replaces site/out. Remount the existing nginx preview after
+# building so its bind mount cannot keep serving a deleted output directory.
+.PHONY: dev-public-refresh
+dev-public-refresh:
+	@test "$$(docker inspect debugbundle-public --format '{{range .Mounts}}{{if eq .Destination "/usr/share/nginx/html"}}{{.Source}}{{end}}{{end}}')" = "$(CURDIR)/site/out"
+	$(MAKE) -C site build-webpack
+	docker restart debugbundle-public
+	curl --fail --silent --show-error --retry 3 --retry-connrefused --retry-delay 1 -o /dev/null "http://127.0.0.1:$(PUBLIC_SITE_PORT)/"
+	@echo "Public preview ready: http://localhost:$(PUBLIC_SITE_PORT)"
+
 # Recreate only the frontend. API, worker and database state stay independent.
 .PHONY: dev-mock dev-mock-off
 dev-mock:
@@ -891,6 +902,18 @@ smart-report-coverage:
 	$(NODE_RUN) "apk add --no-cache git >/dev/null && node scripts/check-changed-file-coverage.mjs"
 
 .PHONY: smart-report-model-evaluate
+.PHONY: smart-improvements-model-evaluate
+.PHONY: smart-improvements-client-check
+smart-improvements-client-check:
+	$(NODE_RUN) 'corepack enable && corepack pnpm --dir apps/cli build && corepack pnpm --dir apps/mcp build && mkdir -p .tmp/review-planning-clients && npm pack ./apps/cli --ignore-scripts --pack-destination .tmp/review-planning-clients && npm pack ./apps/mcp --ignore-scripts --pack-destination .tmp/review-planning-clients'
+	@set -e; for runtime_image in node:22-alpine node:24-alpine node:26-alpine; do \
+		docker run --rm -v "$(PWD):/source:ro" -w /tmp "$$runtime_image" sh -lc 'cli_version=$$(node -p "require(\"/source/apps/cli/package.json\").version") && mcp_version=$$(node -p "require(\"/source/apps/mcp/package.json\").version") && npm install --prefix /tmp/review-clients --no-audit --no-fund --ignore-scripts "/source/.tmp/review-planning-clients/debugbundle-cli-$$cli_version.tgz" "/source/.tmp/review-planning-clients/debugbundle-mcp-$$mcp_version.tgz" >/dev/null && node /source/scripts/check-improvement-review-clients.mjs /tmp/review-clients/node_modules/@debugbundle/cli/bin/debugbundle.js /tmp/review-clients/node_modules/@debugbundle/mcp/bin/debugbundle-mcp.js'; \
+	done
+
+smart-improvements-model-evaluate:
+	test -n "$(REPORT_EVAL_KEY_FILE)"
+	docker run --rm -v "$(PWD):/workspace" -v "$(REPORT_EVAL_KEY_FILE):/run/review-evaluation-key:ro" -w /workspace $(NODE_IMAGE) sh -lc 'node_modules/.bin/tsx scripts/evaluate-improvement-reviews.ts /run/review-evaluation-key --approved-bounded-guidance'
+
 .PHONY: smart-report-pdf-dependency-info
 smart-report-pdf-dependency-info:
 	$(NODE_RUN) "corepack enable && corepack pnpm view pdfkit@0.20.2 version && corepack pnpm view @types/pdfkit version && corepack pnpm view fontkit@2.0.4 version && corepack pnpm view @types/fontkit version"

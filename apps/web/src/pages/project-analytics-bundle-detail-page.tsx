@@ -3,6 +3,7 @@ import { ArrowLeftIcon, RefreshCwIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, Navigate, useOutletContext, useParams } from "react-router-dom";
 
+import { MetadataSeparator } from "../components/system/metadata-separator.js";
 import {
   formatAnalyticsDate,
   formatAnalyticsLabel
@@ -282,7 +283,14 @@ function SegmentsSection({
               {formatAnalyticsDimensionValue(item.dimension, item.value)}
             </p>
             <p className="text-xs text-muted-foreground">{formatAnalyticsLabel(item.dimension)}</p>
-            <p className="mt-1 text-sm text-muted-foreground">{item.metrics.join(" · ")}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {item.metrics.map((metric, index) => (
+                <span key={metric}>
+                  {index ? <MetadataSeparator /> : null}
+                  {metric}
+                </span>
+              ))}
+            </p>
           </div>
         ))}
       </div>

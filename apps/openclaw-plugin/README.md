@@ -8,14 +8,12 @@ rewriting or deleting unrelated files. Symlinked files/directories fail closed.
 Normal local stores and their existing size allowance are preserved; local state
 and processing writes use guarded atomic replacement. This supersedes earlier clients.
 
-
 ## Cloud cache safety in 1.19.3
 
 Upgrade to 1.19.3 for incident-ID validation before cloud requests and cache writes.
 Unsafe IDs return `invalid_incident_id`; UUIDs and existing opaque IDs remain supported.
 Cloud cache reads, writes and retention reject symbolic links; writes use guarded
 atomic replacement. This corrects a path traversal present in earlier clients.
-
 
 ## Installation guidance in 1.19.2
 
@@ -31,7 +29,6 @@ then explicitly rebuild from its retained event files using
 capture preset. This rebuild regenerates local incident/artifact state; it does
 not change cloud records or the retained event files.
 
-
 ## Project/service consolidation 1.19.1
 
 Add logical service context and checked project-merge preview, apply, status,
@@ -39,7 +36,7 @@ verification, resume and cancellation. Existing identities, credentials and
 restricted scopes remain compatible. Merge apply requires a qualified compatible
 core 1.21.0 runtime and remains disabled by default.
 
-Connected `doctor` diagnostics check API health and saved member authentication with a one-incident probe restricted to `cloud_project_id`. Missing or blank connected project scope fails before any request. Incident contents are discarded and are not included in the report. Local-only diagnostics make no cloud request.
+Connected `doctor` diagnostics check API health and saved access-token authentication with a one-incident probe restricted to `cloud_project_id`. Missing or blank connected project scope fails before any request. Incident contents are discarded and are not included in the report. Local-only diagnostics make no cloud request.
 
 OpenClaw tools for runtime error reporting, crash reporting, incident response, live app monitoring, endpoint health checks, debug bundles, and product analytics. Monitoring is scoped to runtime failures, customer-facing incidents, and endpoint health; DebugBundle is not a generic infrastructure-monitoring platform.
 
@@ -120,7 +117,7 @@ The plugin exposes the DebugBundle MCP tool catalog with a `debugbundle_` prefix
 - `debugbundle_save_public_status_page`
 - `debugbundle_preview_public_status_page`
 
-Public status publication requires the project owner's member authentication and
+Public status publication requires the project owner's access-token authentication and
 explicit check selection. The save tool is an optional mutation: publish or
 unpublish only on the owner's instruction. Selected names and aggregate health
 become public; endpoint URLs and diagnostics remain private.
@@ -142,7 +139,7 @@ Local evidence tools may read/write `.debugbundle` artifacts and caches. Authent
 
 Release acceptance requires the exact published skill and plugin versions to have completed, clean ClawHub security outcomes. Pending, missing, blocked, or Review outcomes fail acceptance. Scanner details remain in the release report even when ClawHub's final review determines that a heuristic finding is benign. For example, the bearer/basic-token redaction regular expression is a sanitizer, not an embedded credential; authenticated API calls intentionally combine credential reads and network access. Do not remove redaction or disguise authentication to suppress scanner warnings.
 
-Use member authentication for analytics reads and management. Project tokens remain write-only SDK ingestion credentials. Keep analytics requests privacy-safe: do not request raw form values, raw click text, credentials, direct identifiers, or high-cardinality custom values.
+Use access-token authentication for analytics reads and management. Project tokens remain write-only SDK ingestion credentials. Keep analytics requests privacy-safe: do not request raw form values, raw click text, credentials, direct identifiers, or high-cardinality custom values.
 
 ## Documentation
 

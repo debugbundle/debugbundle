@@ -114,7 +114,7 @@ debugbundle-mcp
 ## Marketplace Safety Copy
 
 - Project tokens are SDK write-only ingestion credentials and must not be used for management, retrieval, billing, or MCP workflows.
-- Member tokens are for CLI, API, and MCP read/manage operations.
+- Access tokens are for CLI, API, and MCP read/manage operations.
 - The public MCP package uses stdio transport. The separate OpenAI candidate uses a twenty-three-tool OAuth-protected read-only remote projection, including nine aggregate-only analytics readers, only after its production and review gates pass.
 - Hosted and local management tools use the same underlying DebugBundle services as API and CLI.
 - The Claude Code plugin bundles local stdio MCP config and a workflow skill; it does not grant hosted account access by itself.
@@ -171,7 +171,7 @@ debugbundle-mcp
 
 - Current state on 2026-06-26: listed at `https://mcp.so/server/debugbundle/debugbundle`.
 - Positioning note: MCP.so is a third-party community MCP marketplace, not the official MCP Registry.
-- Verification check: confirm the page still uses the `npx -y @debugbundle/mcp` install path and member-token auth guidance.
+- Verification check: confirm the page still uses the `npx -y @debugbundle/mcp` install path and access-token auth guidance.
 - Preferred listing target URL: `https://github.com/debugbundle/debugbundle`
 - Keep the MCP-specific subfolder in the content/body: `https://github.com/debugbundle/debugbundle/tree/main/apps/mcp`
 - Preferred display name: `DebugBundle`
@@ -189,8 +189,8 @@ debugbundle-mcp
 - Submission notes:
   - Use the repository root as the main GitHub URL so the marketplace `Visit Server` action lands on the stable project homepage, README, license, and repo activity.
   - Put the `apps/mcp` subfolder URL in the long-form content so users can find the package-specific README and registry metadata quickly.
-  - Use a member-token placeholder in public config examples such as `"<YOUR_OWN_DEBUGBUNDLE_MEMBER_TOKEN>"`.
-  - Do not publish a real member token or any project token in the listing.
+  - Use an access-token placeholder in public config examples such as `"<YOUR_OWN_DEBUGBUNDLE_MEMBER_TOKEN>"`.
+  - Do not publish a real access token or any project token in the listing.
 
 ## Glama
 

@@ -180,6 +180,8 @@ Daily history must preserve a threshold-confirmed outage on every affected UTC d
 
 **FR-AVC-06:** The authenticated web app must provide a workspace Health Status page that summarizes retained availability-check status across projects the signed-in member can access. The page must group checks by project, show one compact daily status block for each retained day, expose per-check detail through progressive disclosure, and reuse the existing project Health tab for check management.
 
+The Health Status sidebar item must show a right-aligned red `!` badge when any accessible, enabled, unpaused check has a recorded current `failing` state. Historical failures and individual results below the configured failure threshold must not trigger it. Refresh current status every minute while the app is visible, on returning to it and on Health Status refresh. Hide the badge after recovery or when current status cannot be confirmed; reset it on account/workspace changes and provide an accessible description.
+
 Daily status tooltips must move to every immediately adjacent block in either direction without requiring a second hover. Retain keyboard focus descriptions and dismissal across authenticated health, public pages and saved previews.
 
 The workspace, project, and check history percentages must be labeled `30-day uptime` and use successful verified checks divided by all verified checks in the displayed 30-day window. Aggregate percentages must weight by check counts, exclude unknown/unmonitored periods, and never use only the latest day or an average of per-check percentages. Current status remains separate from historical impact; explicitly daily dashboard summaries remain daily. Confirmed outage days must be red after recovery. For legacy history missing incident references, a check day with at least one hour of recorded downtime must also show outage impact; shorter unconfirmed interruptions remain amber. Duration labels must retain hours, minutes, and seconds without rounding away downtime. Project tooltips must identify summed durations across checks as total check downtime rather than elapsed project outage duration.
@@ -443,7 +445,7 @@ Internal registration diagnostics may build a separately named compatibility pac
 
 **FR-WEB-02:** Billing management (Stripe).
 
-**FR-WEB-03:** Project/team settings, token management, webhook settings, and browser email-code verification/trust-gating flows.
+**FR-WEB-03:** Project/team settings, token management, webhook settings, and browser email-code verification/trust-gating flows. Dashboard Access tokens uses `/access-tokens`; the former `/member-tokens` route is not registered and has no dedicated redirect.
 
 **FR-WEB-04:** Intentionally minimal — no heavy dashboard in V1.
 
@@ -481,7 +483,7 @@ See `/spec/billing.md` and `/spec/system-emails.md` for the detailed source-of-t
 
 **FR-WEB-08:** In project settings and collaboration surfaces, role-based visibility must match server authorization: plain members do not see the members-management tab, receive only the resolved capture-policy preview, and do not see destructive settings sections; owner/admin callers receive the corresponding management affordances allowed by their role.
 
-**FR-WEB-09:** Web list pagination displays the current page and exact filtered total page count. Text actions use the shared Button primitive with centered icons and labels; table Edit/Delete and capture-rule Pause/Enable actions use accessible icon buttons with tooltips. Paired Slack weekly report Edit/Delete actions use the same ghost variant. Enabled switches in their off state are distinguishable from disabled controls and contrast against surrounding surfaces in both themes. Section status/category badges follow their title inline to the right, with wrapping on narrow screens. The analytics-disabled settings action sits at the right of its callout title row and wraps at narrow widths.
+**FR-WEB-09:** Web list pagination displays the current page and exact filtered total page count. Incident inventory, Improvement inventory, Project inventory and Analytics opportunities append the exact available filtered count inline as `(x)`, retain it across cursor navigation, update it on refresh/filter changes and omit unknown totals. Shell headers contain navigation/title only; page actions align right in the description row through PageHeader, using the shared default button size and responsive wrapping. Text actions use the shared Button primitive with centered icons and labels; table Edit/Delete and capture-rule Pause/Enable actions use accessible icon buttons with tooltips. Paired Slack weekly report Edit/Delete actions use the same ghost variant. Enabled switches in their off state are distinguishable from disabled controls and contrast against surrounding surfaces in both themes. Section status/category badges follow their title inline to the right, with wrapping on narrow screens. The analytics-disabled settings action sits at the right of its callout title row and wraps at narrow widths.
 
 **FR-WEB-10:** An explicitly opted-in local UI preview must populate the ordinary dashboard and related review surfaces with synthetic data. Simulated edits are held in memory, never forwarded to real services, and reset on preview restart. The preview is development-only, loopback-only, excluded from production builds, and disables frontend telemetry.
 
@@ -505,7 +507,7 @@ The preview includes all primary dashboard and project pages, including webhooks
 
 **FR-AUTH-02:** Three identity classes: human users, agent members, project runtime identities.
 
-**FR-AUTH-03:** Three auth artifacts: User Sessions (web interactive use), Project Tokens (SDK write, project-scoped), and Member Tokens (CLI/API/MCP read/manage).
+**FR-AUTH-03:** Three auth artifacts: User Sessions (web interactive use), Project Tokens (SDK write, project-scoped), and Access Tokens (formerly Member Tokens; CLI/API/MCP read/manage within token scope and current user permissions). The public naming change preserves existing credentials, member-token identifiers and interfaces; see `contracts/member-token-scopes.md`.
 
 **FR-AUTH-04:** Browser auth: first-party passwordless email-code flow for both signup and login, plus GitHub OAuth. Redeeming a valid email code creates the account when needed, creates the browser session, and marks the email as verified. Verified email is required before first member token creation in the web app and before enabling billing or inviting members.
 
@@ -636,6 +638,8 @@ When a collaborator is removed from a project or leaves a shared project, DebugB
 
 **FR-DOC-12:** The private website implementation must not restrict access to published documentation or require private-repository access for public product builds. Documentation, examples, and generated reference artifacts remain Apache-2.0. Maintainers must pair handwritten site documentation changes with related core/SDK changes; public contributors may supply documentation corrections through public issues and PRs. See `spec/licensing.md`.
 
+**FR-DOC-13:** Public support chat must load its third-party provider only after an explicit chat activation. Rendering, hydration, hover, scroll, timers and existing provider cookies must not initialise it. Preserve one loader/session during client navigation, contain failures with bounded loading feedback and retry/email recovery, and disclose the lifecycle on the privacy page. The homepage hero image must be discoverable in the initial exported HTML with high fetch priority without preloading it on unrelated pages. Source/build checks do not establish hosted Lighthouse scores or provider acceptance.
+
 ### 1.18 Onboarding & Installation
 
 **FR-ONB-01:** Installation documentation must offer two paths: (a) **Agent-driven** — provide a ready-made prompt/instruction the user gives to their AI agent, which then runs `debugbundle setup` to detect runtimes, install SDKs, generate scaffold, create agent skill, and configure transport; (b) **Manual** — traditional step-by-step CLI commands. See `/spec/local-first-onboarding.md`.
@@ -649,6 +653,8 @@ When a collaborator is removed from a project or leaves a shared project, DebugB
 **FR-ONB-05:** `debugbundle setup` must support local-only mode (no cloud account required) as the default starting point. Cloud connection via `debugbundle connect` is an upgrade path. See `/spec/local-first-onboarding.md` for the full onboarding flow.
 
 **FR-ONB-06:** `debugbundle setup` must manage `.gitignore` entries for `.debugbundle/local/events/`, `.debugbundle/local/state.json`, and `.debugbundle/bundles/`.
+
+**FR-ONB-07:** The signed-in dashboard must introduce a new empty workspace with a dismissible welcome modal focused on copying a credential-free agent setup prompt and opening Access tokens. A compact reminder above the account menu tracks active Access token creation, the first accessible workspace project and receipt of an incident. Optional analytics, Smart Improvements and Reports steps follow actual plan/role eligibility and never enable themselves. Setup remains reopenable from the account menu after dismissal or completion. This is dashboard guidance only: CLI, authentication, token permissions and feature enablement workflows remain unchanged. See [Dashboard welcome and setup](dashboard-welcome.md).
 
 ### 1.17 Weekly Reporting
 
@@ -1087,3 +1093,9 @@ FR-BUS-07–08 add the owner-approved Business no-card trial and separately cons
 ## Approved Smart Products extension (core 1.25.0)
 
 FR-SMI-01 through FR-SMI-04 and the FR-BUS-05/06 extension are specified in [smart-products.md](smart-products.md). This adds bounded weekly reviews, factual Solo/Team reports, restricted identity protection and public Analytics discovery while preserving the released contracts.
+
+FR-SMI-05–08 extend weekly reviews with bounded configuration/analytics evidence,
+safe typed next steps, an additive plan read and separate prompt qualification.
+Noise/configuration advice is required across the controls inventoried in
+[the guidance plan](smart-improvements-guidance-plan.md); behaviour and caps are in
+[the planning contract](../contracts/improvement-review-planning.md).

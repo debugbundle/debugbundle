@@ -23,7 +23,7 @@ export async function promptForInteractiveLoginSelection(): Promise<InteractiveL
         "Choose an authentication method:",
         "1. GitHub (auto: use gh if available, otherwise device flow)",
         "2. GitHub device flow",
-        "3. Existing member token",
+        "3. Existing access token",
         "4. Cancel"
       ].join("\n") + "\n"
     );
@@ -37,7 +37,7 @@ export async function promptForInteractiveLoginSelection(): Promise<InteractiveL
         return { kind: "github-device" };
       }
       if (selection === "3") {
-        const bearerToken = (await readlineInterface.question("Paste your member token: ")).trim();
+        const bearerToken = (await readlineInterface.question("Paste your access token: ")).trim();
         if (bearerToken.length > 0) {
           return {
             kind: "member-token",
@@ -45,7 +45,7 @@ export async function promptForInteractiveLoginSelection(): Promise<InteractiveL
           };
         }
 
-        stdout.write("Member token cannot be empty.\n");
+        stdout.write("Access token cannot be empty.\n");
         continue;
       }
       if (selection === "4") {

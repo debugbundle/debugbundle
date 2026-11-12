@@ -564,6 +564,7 @@ export const IncidentsQuerySchema = z
     severity: z.enum(["low", "medium", "high", "critical"]).optional(),
     first_seen_after: z.string().datetime().optional(),
     attention_after: z.string().datetime().optional(),
+    include_total_count: z.enum(["true", "false"]).optional(),
     cursor: z.string().min(1).optional(),
     limit: z.coerce.number().int().min(1).max(100).default(20)
   })
@@ -585,6 +586,7 @@ export const ImprovementsQuerySchema = z
         "post_deploy_regression"
       ])
       .optional(),
+    include_total_count: z.enum(["true", "false"]).optional(),
     cursor: z.string().min(1).optional(),
     limit: z.coerce.number().int().min(1).max(100).default(20)
   })
