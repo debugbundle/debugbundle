@@ -1,4 +1,14 @@
-# Smart improvement guidance follow-up — simplified local implementation
+# 12 November release — production verified; canonical gate pending
+
+Core 1.26.0 is live from `3fb2a321e3de18bac89d631a1cc21b5f46f42b79` through backend workflow 43130093460. API and worker serve the verified immutable `5bb8dfb7…` image, healthy with zero restarts; public readiness passes. All 91 source migrations match, preserving all 90 previous checksums. Aggregate counts, independent budget state, authenticated settings/consent/scope/schedule/allowance and saved-report content hashes are unchanged. Only the qualified weekly-review marker changed to `weekly-review-guidance`; no new paid evaluation or generation canary ran.
+
+App 43131222787 and site 43131226071 pass. Site 1.9.1 is live from `76a59e9c2cf17525987e3e86c0254917919e7326`; 97 site tests, 149-page export, canonical release and main CI pass. Live HTTP verifies the compact on-demand Chat controls, removed Contact placeholder, shared readiness reconciliation, high-priority home hero preload, article/sitemap, 200-tool schema, 23 immutable scripts and exact app build. Browser/Lighthouse/provider-interaction acceptance is not inferred.
+
+Shared types 3.6.0, CLI/MCP/OpenClaw 1.24.0, Codex 1.8.0, Claude Code 1.24.0, Gemini 1.7.0 and Action 2.0.1 are published with registry/native/public-source checks. Unchanged SDKs and redaction retain their versions. Both current ClawScan security gates pass; VirusTotal was retired by the provider and is recorded explicitly, with adverse historical evidence still rejected. Discovery remains 5/7 under unchanged rank requirements. OpenAI 1.1.0 remains a separately gated sealed candidate.
+
+The full runtime CI passes all 135 shards and the normal changed-source gate for 109 files, plus PDF/audit/lint/types/build. The provider-contract follow-up passes all 19 security/publication tests and scoped checks. Retention verifies active plus one previous stable release, zero candidates and 45 GiB free. The DebugBundle production incident check has zero new incidents/regressions; historical records remain. Canonical core publication and its final source-only CI receipt are the remaining local release gates. Exact evidence: [release record](spec/release-20261112.md).
+
+# Smart improvement guidance — pre-release qualification history
 
 The Owner approved implementation, then requested removal of unnecessary format
 versioning on 11 November 2026, reporting that the just-launched feature is not

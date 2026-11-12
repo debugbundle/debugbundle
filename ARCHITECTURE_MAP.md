@@ -30,8 +30,8 @@ server interface or database boundary changes. See `spec/dashboard-welcome.md`.
 The local guidance follow-up passed its final bounded synthetic qualification:
 all eighteen paid cases and two no-request abstentions, including concrete monitor
 recovery comparisons and duplicate-prose rejection. Exact evidence is in
-`evals/smart-improvements/guidance-qualification-final-20261111.json`. This is ready
-for Owner review; no production activation or deployment occurred.
+`evals/smart-improvements/guidance-qualification-final-20261111.json`. Core 1.26.0 now serves this qualified guidance from `3fb2a321`;
+production and distribution evidence is in `spec/release-20261112.md`.
 The final deep audit also closes cross-rule delivery detection, reordered duplicate
 checks and linked-group ordering; 213 affected regression tests pass. The qualified
 requests remain byte-identical and no additional provider calls were made.

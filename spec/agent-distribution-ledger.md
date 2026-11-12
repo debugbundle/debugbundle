@@ -1,11 +1,17 @@
 # Agent distribution ledger
 
-## Guidance release candidate - 12 November 2026
+## Guidance release - published 12 November 2026
 
-Codex 1.8.0, Claude Code 1.24.0 and Gemini 1.7.0 adopt the candidate MCP 1.24.0
-for saved weekly-review plans and aligned Access token/Reports guidance. Keep
-these pins on the release branch until npm publication and native artifact
-checks pass. Public installation and release receipts remain pending.
+Codex 1.8.0 and Claude Code 1.24.0 are public from core `3fb2a321`; Gemini 1.7.0
+is public from standalone `b48665da744f199f84f5eacc25e7d69e9bbb339e`, its matching
+tag and GitHub Release ZIP. All pin published MCP 1.24.0. Native candidate and
+public install/update/auth/local-evidence/removal checks pass with 200 tools;
+MCP and Gemini retain their Node 22/24/26 qualification. All five Gemini files
+match core and the downloaded archive hash matches the deterministic candidate.
+Current ClawScan security passes for both distributions after the provider's
+verified VirusTotal retirement; capability discovery remains 5/7. Gallery
+indexing and the independently gated OpenAI candidate are separate. See
+[the release record](release-20261112.md).
 
 ## Smart Products pin adoption - 11 November 2026
 

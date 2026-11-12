@@ -19,13 +19,13 @@ preserving explicit project/provider consent and default-off behaviour.
 The local guidance follow-up passed its final bounded synthetic qualification:
 all eighteen paid cases and two no-request abstentions, including concrete monitor
 recovery comparisons and duplicate-prose rejection. Exact evidence is in
-`evals/smart-improvements/guidance-qualification-final-20261111.json`. This is ready
-for Owner review; no production activation or deployment occurred.
+`evals/smart-improvements/guidance-qualification-final-20261111.json`. Core 1.26.0 now serves this qualified guidance from `3fb2a321`;
+production and distribution evidence is in `spec/release-20261112.md`.
 The final deep audit also closes cross-rule delivery detection, reordered duplicate
 checks and linked-group ordering; 213 affected regression tests pass. The qualified
 requests remain byte-identical and no additional provider calls were made.
 
-Local weekly-guidance follow-up adds bounded configuration and numeric analytics
+Weekly guidance adds bounded configuration and numeric analytics
 context, deterministic next checks and verification. The saved bundle/export shape
 is unchanged; an additive plan read exposes richer guidance through API, CLI, MCP
 and the existing UI. One nullable context column uses a forward migration. The
@@ -40,7 +40,7 @@ User-facing member-token labels now read Access tokens. Credentials remain bound
 to their issuing user's authority; prefixes, API/CLI/MCP names, configuration keys
 and storage contracts stay compatible. OAuth credentials remain separate.
 
-The local dashboard welcome adds a first empty-dashboard modal and a compact
+The dashboard welcome adds a first empty-dashboard modal and a compact
 setup reminder above the account menu. A reusable guide offers credential-free
 agent instructions and observes existing setup data without performing mutations.
 Optional analytics observes saved settings in manageable workspace projects and links
@@ -62,30 +62,32 @@ Three additive forward migrations gate API/worker readiness. Report document v2
 is opt-in; legacy/OpenAI report projections and restricted catalogs stay fixed.
 New domain boundaries are in ARCHITECTURE_MAP.md.
 
-Release state (11 November 2026): core 1.25.0 and the app are live from
-`5662ecfa`; CLI/MCP 1.23.0 and shared types 3.5.0 are published. All 90 migrations
-are applied, with all prior checksums preserved. Active and retained rollback
-readers support v2; existing report reads, account consent and the report AI budget
-are preserved. Site 1.9.0 is live from `a8ca5de8`; Codex 1.7.0, Claude Code 1.23.0
-and Gemini 1.6.0 pass public-install checks with MCP 1.23.0. ClawHub's exact uploads
-are public, but antivirus/discovery acceptance remains incomplete. Details are in
-`spec/smart-products-release-20261111.md`. The previous release remains recorded in
-`spec/smart-report-release-20261110.md`.
+Release state (12 November 2026): core 1.26.0 and the app are live from
+`3fb2a321`; CLI/MCP 1.24.0 and shared types 3.6.0 are published. All 91 migrations
+match source, preserving all 90 prior checksums. Active and retained rollback
+readers support v2; account settings, saved reads and independent budgets are
+preserved. Site 1.9.1 is live from `76a59e9c`; Codex 1.8.0, Claude Code 1.24.0
+and Gemini 1.7.0 pass public-install checks. Current ClawScan security passes;
+ClawHub discovery remains 5/7. OpenAI 1.1.0 remains a sealed independent candidate.
+Canonical core publication is the final gate. Exact deployment/version/retention
+receipts and acceptance limits are in `spec/release-20261112.md`; the previous
+release is recorded in `spec/smart-products-release-20261111.md`.
 
 Workspace Improvements reuses Analytics-style line tabs: the existing
 `/improvements` inventory is Opportunities and `/improvements/reviews` opens
 Weekly reviews. Shared settings/consent and archive access remain unchanged.
 
-Public-site support chat was released with automatic loading in site 1.9.0. The
-local follow-up replaces that bootstrap with a shared first-party button: only an
+Public-site support chat was released with automatic loading in site 1.9.0.
+Site 1.9.1 replaces that bootstrap with a shared first-party button: only an
 explicit click loads Crisp, with bounded loading feedback, retry and email recovery.
 The compact "Chat" launcher and Contact's inline chat action share that controller.
 Bounded provider-state reconciliation clears both controls if an opened event is missed.
 It preserves a single loader/session during client navigation and adds no app
 integration or identity forwarding. The privacy page describes this lifecycle.
 The homepage alone also preloads its existing hero background at high priority.
-These follow-up changes are local; hosted Lighthouse/provider acceptance remains
-separate. See FR-DOC-13 and AC-DOC-18.
+These changes pass source, automated export and live HTTP checks. Browser,
+Lighthouse and provider-interaction acceptance remain separate. See FR-DOC-13
+and AC-DOC-18.
 
 Dashboard empty resource lists and data panels reuse `ResourceEmptyState` with
 the existing Empty primitives, scoped help and permitted actions. The former
