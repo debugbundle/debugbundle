@@ -1,4 +1,4 @@
-# 12 November release — production verified; canonical gate pending
+# 12 November release — published and production verified; external discovery partial
 
 Core 1.26.0 is live from `3fb2a321e3de18bac89d631a1cc21b5f46f42b79` through backend workflow 43130093460. API and worker serve the verified immutable `5bb8dfb7…` image, healthy with zero restarts; public readiness passes. All 91 source migrations match, preserving all 90 previous checksums. Aggregate counts, independent budget state, authenticated settings/consent/scope/schedule/allowance and saved-report content hashes are unchanged. Only the qualified weekly-review marker changed to `weekly-review-guidance`; no new paid evaluation or generation canary ran.
 
@@ -6,7 +6,7 @@ App 43131222787 and site 43131226071 pass. Site 1.9.1 is live from `76a59e9c2cf1
 
 Shared types 3.6.0, CLI/MCP/OpenClaw 1.24.0, Codex 1.8.0, Claude Code 1.24.0, Gemini 1.7.0 and Action 2.0.1 are published with registry/native/public-source checks. Unchanged SDKs and redaction retain their versions. Both current ClawScan security gates pass; VirusTotal was retired by the provider and is recorded explicitly, with adverse historical evidence still rejected. Discovery remains 5/7 under unchanged rank requirements. OpenAI 1.1.0 remains a separately gated sealed candidate.
 
-The full runtime CI passes all 135 shards and the normal changed-source gate for 109 files, plus PDF/audit/lint/types/build. The provider-contract follow-up passes all 19 security/publication tests and scoped checks. Retention verifies active plus one previous stable release, zero candidates and 45 GiB free. The DebugBundle production incident check has zero new incidents/regressions; historical records remain. Canonical core publication and its final source-only CI receipt are the remaining local release gates. Exact evidence: [release record](spec/release-20261112.md).
+The full runtime CI passes all 135 shards and the normal changed-source gate for 109 files, plus PDF/audit/lint/types/build. The provider-contract follow-up passes all 19 security/publication tests and scoped checks. Retention verifies active plus one previous stable release, zero candidates and 45 GiB free. The DebugBundle production incident check has zero new incidents/regressions; historical records remain. Canonical core 1.26.0 publication passes workflow 43134185035 at tag source `40a36d43`. The final evidence-only main CI is linked from the release record and canonical GitHub Release. Exact evidence: [release record](spec/release-20261112.md).
 
 # Smart improvement guidance — pre-release qualification history
 

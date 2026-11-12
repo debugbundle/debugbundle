@@ -69,7 +69,7 @@ readers support v2; account settings, saved reads and independent budgets are
 preserved. Site 1.9.1 is live from `76a59e9c`; Codex 1.8.0, Claude Code 1.24.0
 and Gemini 1.7.0 pass public-install checks. Current ClawScan security passes;
 ClawHub discovery remains 5/7. OpenAI 1.1.0 remains a sealed independent candidate.
-Canonical core publication is the final gate. Exact deployment/version/retention
+Canonical core 1.26.0 publication passes workflow 43134185035. Exact deployment/version/retention
 receipts and acceptance limits are in `spec/release-20261112.md`; the previous
 release is recorded in `spec/smart-products-release-20261111.md`.
 
