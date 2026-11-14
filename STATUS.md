@@ -1,3 +1,33 @@
+# 14 November release — published and production verified; external discovery partial
+
+Rust 1.0.0 is published from `a522d783`, with all eight exact-source/platform jobs,
+trusted crates.io publication, real registry consumers and its GitHub release
+passing. Core 1.27.0 is live from qualified source `356461ed`, immutable digest
+`ebe218bb…`, healthy API/worker with zero restarts. App and site 1.10.1 deployments
+pass. All 91 migration checksums, configuration, credential fingerprints and
+report/budget/attempt state match; tracked row counts are unchanged. Seven
+production alarms are OK, and active plus one verified previous release remain.
+
+Shared types 3.7.0, CLI 1.25.1, MCP/OpenClaw 1.25.0, Codex 1.8.1, Claude Code
+1.24.1 and Gemini 1.7.1 are public and registry/native/public-source checks pass.
+The CLI patch corrects remaining candidate wording; MCP bundled bytes are unchanged.
+Rust follows PHP throughout public discovery and has install/setup homepage code.
+Nineteen live entry points, server-rendered code, sitemap/search, app source
+identity and seven S3/CDN byte comparisons pass. The homepage example compiles
+against the actual published crate and records its local event.
+
+Full runtime CI passes all 138 shards and normal changed-source coverage for 63
+files, plus lint/types/audit/PDF/build and installed runtime lanes. The final
+metadata CI and complete identities are linked from [the release record](spec/release-20261114.md).
+Doctor has zero errors and its existing profile-age warning. The additional cloud
+active record is a historical reviewer-credential warning recurring with eight
+days left, not a new implementation failure; retained evidence and unchanged
+monitor source were checked. Existing incidents are preserved. ClawScan/public
+installs pass; strict ClawHub search remains 5/7. The Go/.NET hook-budget follow-up
+remains in TODO. Consumer products and the independent OpenAI candidate are unchanged.
+
+# Earlier release and qualification history
+
 # 12 November release — published and production verified; external discovery partial
 
 Core 1.26.0 is live from `3fb2a321e3de18bac89d631a1cc21b5f46f42b79` through backend workflow 43130093460. API and worker serve the verified immutable `5bb8dfb7…` image, healthy with zero restarts; public readiness passes. All 91 source migrations match, preserving all 90 previous checksums. Aggregate counts, independent budget state, authenticated settings/consent/scope/schedule/allowance and saved-report content hashes are unchanged. Only the qualified weekly-review marker changed to `weekly-review-guidance`; no new paid evaluation or generation canary ran.

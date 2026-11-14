@@ -1,7 +1,7 @@
 # SDK Interface Contract — DebugBundle
 
 Version: v2
-Last updated: 2026-09-20
+Last updated: 2026-11-14
 
 The protected redaction contract below describes the next coordinated SDK release. Published v1 packages retain their prior behavior until upgraded, while compatible old events receive the server-side backstop. Package major versions and migration examples are required where an expressly supported custom-list override changes to additive behavior.
 

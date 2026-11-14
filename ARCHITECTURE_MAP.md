@@ -741,7 +741,7 @@ feature-gated package, shared capture/evidence/delivery/relay engines, and separ
 Axum/Tower and Actix adapters. The public standalone repository now exists and
 `sdks/debugbundle-rust` owns the published stable `1.0.0` SDK and release tooling. Its native
 HTTP/sender, privacy/wire, operation, probe/config, recovery ledger and log/tracing
-modules are implemented with ongoing qualification. Shared protected HTTP metadata
+modules are implemented and pass exact-crate/native qualification. Shared protected HTTP metadata
 feeds Axum/Tower and non-Send Actix middleware; body wrappers own revocable scopes
 through completion/drop. Shared relay validation/security uses the canonical debug and distinct analytics
 schemas; `client/response.rs` shares ACK/proof/piggyback state between senders and
@@ -1588,3 +1588,9 @@ bundle pages keep their handlers and imports. Analytics dimensions compose
 schema-validating browser adapter. `AnalyticsFilterPanel` exposes open changes
 so only an open metric panel loads choices. Generation dialogs retain the
 background filter container and never change its layout.
+
+Coordinated production acceptance for Rust 1.0.0, core/app 1.27.0 and site 1.10.1
+is recorded in [the dated release record](spec/release-20261114.md). The public
+Rust registry gate belongs to `scripts/check-rust-release.mjs`; SDK publication
+remains owned by the standalone Rust repository's qualified tag workflow. CLI
+1.25.1 is a documentation-only follow-up; unchanged MCP 1.25.0 bytes are verified.

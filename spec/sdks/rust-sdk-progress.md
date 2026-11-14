@@ -14,6 +14,10 @@ are public. SDK runtime code is unchanged from the audited alpha. Rust is now
 recorded in the core release train; the core gate verifies the selected public
 archive without republishing it. Core/site deployment remains a separate gate.
 
+Core/app 1.27.0 and site 1.10.1 are now production-verified; see
+[the coordinated release record](../release-20261114.md). CLI 1.25.1 documents
+the released SDK, and Rust is included in the ordinary independent release train.
+
 ## Historical alpha qualification and implementation
 
 Rust audit qualified; `1.0.0-alpha.1` published, 14 November 2026. Implementation follows

@@ -908,6 +908,11 @@ accepted registry consumers from release automation: the initial Trusted Publish
 OIDC exchange and temporary-token cleanup now pass (`43575500128`), and the
 obsolete GitHub bootstrap secret is removed. Stable all-eight-job qualification (`43576997485`) and trusted publication
 (`43581543389`) pass, including genuine registry-installed applications.
+Core/app 1.27.0 and site 1.10.1 are production-verified from their qualified
+immutable sources. Rust is a first-class independent release-train entry: the
+canonical core release checks its public archive and CI exercises actual
+ingestion/worker processing. [The coordinated release record](spec/release-20261114.md)
+separates runtime, registry, developer, public-page and remaining discovery evidence.
 Core worker `processor-bundles.ts` checks reservation source ownership before
 rebuilding, so delayed older context jobs cannot erase newer recovery evidence.
 Rust relay replay retains known ACK progress and its one bounded file lease
@@ -926,7 +931,7 @@ Comparable owner-hook budget paths in other SDKs require separate runtime follow
 Rust implementation: [implementation plan](spec/sdks/rust-sdk.md) and
 [qualification matrix](spec/sdks/rust-sdk-qualification.md) define the current
 contract baseline, Go/.NET/native-logger lessons, Axum + Actix full integrations
-and release gates. The standalone public repository exists and its local candidate
+and release gates. The standalone public repository exists and its checkout
 is under `sdks/debugbundle-rust`, registered in `sdks.json`. The remote is now
 populated after explicit source-push approval. The pre-audit baseline `244c104`
 passed all eight qualification jobs. Final audit source `eb9e09a` also passes all

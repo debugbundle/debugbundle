@@ -1,12 +1,15 @@
 # Agent distribution ledger
 
-## Rust release - 14 November 2026 in progress
+## Rust release - published 14 November 2026
 
-Codex 1.8.1, Claude Code 1.24.1 and Gemini 1.7.1 select MCP 1.25.0.
-MCP 1.25.0 is public with passing native candidate and registry installs
-(`43583901235`). Gemini standalone main/tag is published; public
-marketplace/Git installs, update and removal acceptance are pending; see
-[the coordinated release record](release-20261114.md).
+Codex 1.8.1 and Claude Code 1.24.1 are public from core `356461ed`; Gemini 1.7.1
+is public from standalone `8e3715d73ec8e0b474a3e34e575ff778e229d579`, its matching
+tag and GitHub Release ZIP. All pin published MCP 1.25.0. Native candidate and
+public marketplace/Git install, update, local evidence, auth and removal checks
+pass with 200 tools; Gemini retains Node 22/24/26 qualification and exact five-file
+and downloaded-archive parity. CLI 1.25.1 is a separate README correction; MCP
+bundled bytes are unchanged. Current ClawScan and normal public OpenClaw install
+pass; strict search discovery remains 5/7. See [the release record](release-20261114.md).
 
 ## Guidance release - published 12 November 2026
 
