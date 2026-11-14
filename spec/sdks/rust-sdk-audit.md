@@ -1,5 +1,13 @@
 # Rust SDK deep audit
 
+Current publication: stable Rust 1.0.0 is released. Its unchanged audited runtime
+passes fresh all-eight-job qualification and genuine registry consumers; see
+[stable publication evidence](rust-sdk-release.md). The audit narrative below
+records the original pre-publication source and remediation chronology. Core and
+site promotion are tracked in [the coordinated release](../release-20261114.md).
+
+## Historical audit receipts
+
 Status: Rust source and exact-artifact audit qualified, 13 November 2026.
 The subsequent [first alpha release](rust-sdk-release.md) publishes that same
 qualified archive; core/spec/site remain local and undeployed. The audit began on `244c104692f72777061c66b0a835844bd07f84c6`;

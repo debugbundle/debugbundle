@@ -5,7 +5,7 @@ Last updated: 2026-09-20
 
 The protected redaction contract below describes the next coordinated SDK release. Published v1 packages retain their prior behavior until upgraded, while compatible old events receive the server-side backstop. Package major versions and migration examples are required where an expressly supported custom-list override changes to additive behavior.
 
-This contract defines the standard interface that ALL DebugBundle SDKs must implement, regardless of language. It ensures behavioral consistency across Node.js, browser, Python, PHP/WordPress, Java, Go, Ruby, .NET, Android, Swift, React Native, and future language SDKs.
+This contract defines the standard interface that ALL DebugBundle SDKs must implement, regardless of language. It ensures behavioral consistency across Node.js, browser, Python, PHP/WordPress, Rust, Java, Go, Ruby, .NET, Android, Swift, React Native, and future language SDKs.
 
 ## Cross-SDK change obligations
 

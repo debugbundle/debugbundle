@@ -1,12 +1,13 @@
 # Rust SDK implementation plan
 
-Status: Rust implementation and deep audit qualified; first alpha published, 14 November 2026.
+Status: Rust stable 1.0.0 published and qualified, 14 November 2026.
 Source is implemented and pushed under explicit approval; final native/artifact
 receipts and separate release gates are in the [implementation record](rust-sdk-progress.md).
 [The deep audit](rust-sdk-audit.md) records findings and acceptance.
-[The release record](rust-sdk-release.md) records `1.0.0-alpha.1` publication,
-registry-installed consumers and verified initial OIDC identity. Stable `1.0.0`
-is planned for the coordinated main-repository/site release. The target is
+[The release record](rust-sdk-release.md) records stable `1.0.0` publication,
+all eight exact-source qualification jobs, registry-installed consumers and
+verified trusted publishing. Core/site publication is tracked separately in
+[the coordinated release](../release-20261114.md). The target is
 the separate `debugbundle/debugbundle-rust` repository, locally
 `sdks/debugbundle-rust`, and the crates.io package `debugbundle`.
 

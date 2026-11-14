@@ -1,9 +1,10 @@
 # Agent distribution ledger
 
-## Rust release - 14 November 2026 candidate
+## Rust release - 14 November 2026 in progress
 
 Codex 1.8.1, Claude Code 1.24.1 and Gemini 1.7.1 select MCP 1.25.0.
-These pins remain on the release branch until npm publication passes. Public
+MCP 1.25.0 is public with passing native candidate and registry installs
+(`43583901235`). Gemini standalone main/tag is published; public
 marketplace/Git installs, update and removal acceptance are pending; see
 [the coordinated release record](release-20261114.md).
 

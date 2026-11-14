@@ -35,6 +35,8 @@ Node.js, Browser, Python, PHP, WordPress, Java, Go, Ruby, .NET, Android, Swift/i
 and React Native. Node and Browser share one repository. WordPress includes PHP,
 its browser asset and relay; React Native includes JavaScript and both native
 bridges. Review framework adapters and distributions as well as base packages.
+Rust joined as the thirteenth maintained capture surface with stable 1.0.0 on
+14 November 2026, including Tower/Axum, Actix, native logging and both relays.
 Future SDKs inherit this obligation before their first release.
 
 For each affected capability, record every surface with:
