@@ -27,7 +27,7 @@ metadata:
         bins:
           - debugbundle-mcp
       - kind: node
-        package: "@debugbundle/cli@1.25.0"
+        package: "@debugbundle/cli@1.25.1"
         bins:
           - debugbundle
     skillKey: debugbundle

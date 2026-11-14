@@ -11,6 +11,7 @@ production alarms are OK, and active plus one verified previous release remain.
 Shared types 3.7.0, CLI 1.25.1, MCP/OpenClaw 1.25.0, Codex 1.8.1, Claude Code
 1.24.1 and Gemini 1.7.1 are public and registry/native/public-source checks pass.
 The CLI patch corrects remaining candidate wording; MCP bundled bytes are unchanged.
+The portable skill installer follows CLI 1.25.1 through its independent patch.
 Rust follows PHP throughout public discovery and has install/setup homepage code.
 Nineteen live entry points, server-rendered code, sitemap/search, app source
 identity and seven S3/CDN byte comparisons pass. The homepage example compiles

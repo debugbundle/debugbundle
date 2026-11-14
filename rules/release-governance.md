@@ -65,6 +65,13 @@ The public repository must contain these root-level files:
 4. Publish `@debugbundle/cli` to npm
 5. Smoke-test a clean install from the registry
 
+CLI package qualification must also verify the portable skill's exact CLI installer
+pin. Stage unpublished installer pins on a release branch until registry
+installation passes. A changed portable folder needs its own fresh ClawHub patch
+and post-publication security verification, even when a CLI change only corrects
+documentation. Retain unchanged MCP/plugin/developer versions only after checking
+their bundled artifacts; do not bypass a stale installer-pin test.
+
 **release-mcp-package.yml** — Runs on `mcp-v*` tags or manual dispatch:
 
 1. Validate the MCP release manifest and version
