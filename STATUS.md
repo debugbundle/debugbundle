@@ -2103,3 +2103,11 @@ Stable `1.0.0` is planned for the coordinated main-repository/site release after
 the stable version/README and exact-artifact qualification are ready. This is a
 release plan, not approval to publish or deploy now. Revocation of the original
 crates.io account token remains separate from the completed GitHub secret removal.
+
+14 November coordinated release in progress: Rust stable 1.0.0 is public from
+`a522d783`, all-eight CI `43576997485` and trusted publication `43581543389`
+pass. The exact homepage example compiles and records one local event against
+the actual registry crate. Public docs now identify stable Rust after PHP. Shared
+types 3.7.0 publication passes (`43583438840`); independent clients/core/site
+promotion and production acceptance remain pending. Go/.NET hook follow-up and
+external discovery limitations remain open; no consumer product is changed.

@@ -75,7 +75,7 @@
     "@debugbundle/auth": "workspace:*",
     "@debugbundle/redaction": "2.7.1",
     "@debugbundle/sdk-node": "3.2.2",
-    "@debugbundle/shared-types": "3.5.0",
+    "@debugbundle/shared-types": "3.7.0",
     "@modelcontextprotocol/sdk": "^1.31.0",
     "@node-rs/argon2": "^2.0.2",
     "fastify": "^5.12.2",

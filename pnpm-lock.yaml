@@ -48,8 +48,8 @@ importers:
         specifier: 3.2.2
         version: 3.2.2
       "@debugbundle/shared-types":
-        specifier: 3.5.0
-        version: 3.5.0
+        specifier: 3.7.0
+        version: 3.7.0
       "@modelcontextprotocol/sdk":
         specifier: 1.32.1
         version: 1.32.1(zod@4.6.7)
@@ -855,10 +855,10 @@ packages:
         integrity: sha512-aXm3r0V5/huk62jW9jQdcifDwGCsawidlJkYojIf4IoT/9ZBPwR0XLyvQa/Wlt23AmLbK8xxlbJmia2l/Yx7gQ==
       }
 
-  "@debugbundle/shared-types@3.5.0":
+  "@debugbundle/shared-types@3.7.0":
     resolution:
       {
-        integrity: sha512-/wFf4s0p9bOIM1lOiqdziSXhRX0Y/sP9kTygOWi89DdSF0zdv5f6GVpv7e4Ch43+aklcO+b9BhPtKJ12Uqm2zA==
+        integrity: sha512-HK1QhXGu8nUz4err+6O+jp6ntaCRwWF4ewTIDo9UedKKCFbbHPdtZb0b7H59KCAR8/g4rd2j9v3AgwtX7ZZPHg==
       }
 
   "@earendil-works/pi-tui@0.78.0":
@@ -1376,6 +1376,12 @@ packages:
         integrity: sha512-wgm9Ehl2jpeqP3zw/7mo3kRHFp5MEDhqAdwy1fTGkHAwnkGOVsgpvQhL8B5n1qlb01jV3n/bI0ZfZp5lWA1k4w==
       }
     engines: { node: ">=18.0.0" }
+
+  "@isaacs/nonrecursive-glob-match@1.1.0":
+    resolution:
+      {
+        integrity: sha512-GPm/Dbvk5RLmhRnxXIa7nTpK0xtl4E0wj0MslsuNiJ1FIROU+2+9lgUC/dgF7Ey4QCWhfEsgxilMRMCdHPfDfw==
+      }
 
   "@istanbuljs/schema@0.1.3":
     resolution:
@@ -3751,12 +3757,6 @@ packages:
     resolution:
       {
         integrity: sha512-xw2/TiX82lQHA06cgbqRKFb5lCAy3axQ4H4SoUFhUsg+wztiet+co86IAMDtF6Vm1hc7J6j09oh/rgDn+JdKIQ==
-      }
-
-  "@isaacs/nonrecursive-glob-match@1.1.0":
-    resolution:
-      {
-        integrity: sha512-GPm/Dbvk5RLmhRnxXIa7nTpK0xtl4E0wj0MslsuNiJ1FIROU+2+9lgUC/dgF7Ey4QCWhfEsgxilMRMCdHPfDfw==
       }
 
   abort-controller@3.0.0:
@@ -8432,7 +8432,7 @@ snapshots:
     dependencies:
       zod: 4.6.7
 
-  "@debugbundle/shared-types@3.5.0":
+  "@debugbundle/shared-types@3.7.0":
     dependencies:
       zod: 4.6.7
 
@@ -8697,6 +8697,8 @@ snapshots:
   "@isaacs/fs-minipass@4.0.1":
     dependencies:
       minipass: 7.1.3
+
+  "@isaacs/nonrecursive-glob-match@1.1.0": {}
 
   "@istanbuljs/schema@0.1.3": {}
 
@@ -10452,8 +10454,6 @@ snapshots:
       "@vitest/pretty-format": 4.1.2
       convert-source-map: 2.0.0
       tinyrainbow: 3.1.0
-
-  "@isaacs/nonrecursive-glob-match@1.1.0": {}
 
   abort-controller@3.0.0:
     dependencies:
