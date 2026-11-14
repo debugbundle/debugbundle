@@ -76,7 +76,7 @@ Local events are written under `.debugbundle/local/events/`; generated bundles a
 
 ## Install an SDK
 
-All SDKs follow the same universal interface: `init`, `captureException`, `captureError`, `captureLog`, `captureRequest`, `captureMessage`, `setContext`, `probe`, and `flush`.
+All SDKs follow the same universal interface, using language-idiomatic method names: `init`, `captureException`, `captureError`, `captureLog`, `captureRequest`, `captureMessage`, `setContext`, `probe`, and `flush`.
 
 | Runtime      | Package                                           | Install                                        | Main docs                                                               |
 | ------------ | ------------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------- |
@@ -84,7 +84,7 @@ All SDKs follow the same universal interface: `init`, `captureException`, `captu
 | Browser      | `@debugbundle/sdk-browser`                        | `npm install @debugbundle/sdk-browser`         | [Browser SDK](https://debugbundle.com/docs/sdks/browser)                |
 | Python       | `debugbundle-python`                              | `pip install debugbundle-python`               | [Python SDK](https://debugbundle.com/docs/sdks/python)                  |
 | PHP          | `debugbundle/sdk-php`                             | `composer require debugbundle/sdk-php`         | [PHP SDK](https://debugbundle.com/docs/sdks/php)                        |
-| Rust | [`debugbundle` 1.0.0](https://crates.io/crates/debugbundle/1.0.0) | Rust 1.89+, Tower/Axum/Actix Web | [Rust SDK](https://debugbundle.com/docs/sdks/rust) |
+| Rust | [`debugbundle` 1.0.0](https://crates.io/crates/debugbundle/1.0.0) | `cargo add debugbundle@1.0.0` | [Rust SDK](https://debugbundle.com/docs/sdks/rust) |
 | Java         | `com.debugbundle:debugbundle-spring-boot-starter` | Maven or Gradle dependency                     | [Java SDK](https://debugbundle.com/docs/sdks/java)                      |
 | .NET         | `DebugBundle.AspNetCore` / `DebugBundle.Sdk`      | `dotnet add package DebugBundle.AspNetCore`    | [.NET SDK](https://debugbundle.com/docs/sdks/dotnet)                    |
 | Go           | `github.com/debugbundle/debugbundle-go`           | `go get github.com/debugbundle/debugbundle-go` | [Go SDK](https://debugbundle.com/docs/sdks/go)                          |

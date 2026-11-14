@@ -1,12 +1,18 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { buildMachineReadableArtifacts } from "../../scripts/public-site-artifacts.js";
 
-const site = join(process.cwd(), "site");
+const site = process.env["DEBUGBUNDLE_SITE_ROOT"] ?? join(process.cwd(), "site");
+// The private-site pipeline supplies its checkout explicitly, as with the other
+// public docs contracts. Public core CI always verifies the generated SDK index.
+const describeSiteDocs =
+  process.env["DEBUGBUNDLE_SITE_ROOT"] !== undefined || existsSync(join(site, "content/docs"))
+    ? describe
+    : describe.skip;
 
-describe("Rust SDK public discovery and publication status", () => {
+describeSiteDocs("Rust SDK public discovery and publication status", () => {
   it("includes the stable release throughout current SDK entry points", () => {
     for (const path of [
       "index",
@@ -66,17 +72,6 @@ describe("Rust SDK public discovery and publication status", () => {
     expect(rustBlock).not.toMatch(/alpha|unpublished|candidate/i);
   });
 
-  it("places the Rust SDK link after PHP with separate publication status", async () => {
-    const artifacts = await buildMachineReadableArtifacts();
-    const content = artifacts.find((artifact) => artifact.routePath === "/llms.txt")!.content;
-    const links = content.split("\n").filter((line) => line.includes("/docs/sdks/"));
-    const rust = links.findIndex((line) => line.includes("[Rust SDK]"));
-    expect(rust).toBeGreaterThan(0);
-    expect(links[rust - 1]).toContain("[PHP SDK]");
-    expect(links[rust]).toContain("1.0.0");
-    expect(links[rust]).not.toMatch(/alpha|unpublished|candidate/i);
-  });
-
   it("keeps installation and quickstart panels paired with their reordered SDK labels", () => {
     let groups = 0;
     for (const path of ["installation", "quickstart"]) {
@@ -97,5 +92,18 @@ describe("Rust SDK public discovery and publication status", () => {
       }
     }
     expect(groups).toBe(3);
+  });
+});
+
+describe("Rust SDK generated discovery index", () => {
+  it("places the Rust SDK link after PHP with separate publication status", async () => {
+    const artifacts = await buildMachineReadableArtifacts();
+    const content = artifacts.find((artifact) => artifact.routePath === "/llms.txt")!.content;
+    const links = content.split("\n").filter((line) => line.includes("/docs/sdks/"));
+    const rust = links.findIndex((line) => line.includes("[Rust SDK]"));
+    expect(rust).toBeGreaterThan(0);
+    expect(links[rust - 1]).toContain("[PHP SDK]");
+    expect(links[rust]).toContain("1.0.0");
+    expect(links[rust]).not.toMatch(/alpha|unpublished|candidate/i);
   });
 });
