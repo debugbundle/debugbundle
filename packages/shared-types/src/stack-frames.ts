@@ -34,11 +34,11 @@ function frame(
   const classification =
     /node_modules[/\\]@debugbundle[/\\]|vendor[/\\]debugbundle[/\\]|wp-content\/plugins\/debugbundle\/|debugbundle-browser(?:-sdk)?(?:\.js|\/)|\bcom\.debugbundle\.sdk\.|\bDebugBundle\./i.test(
       text
-    )
+    ) || /^debugbundle::/.test(fn ?? "")
       ? "sdk"
       : /(?:^|[/\\])(?:node_modules|vendor|site-packages|\.venv|gems)[/\\]|^node:|\b(?:java|javax|jdk|sun|kotlin|kotlinx)\./.test(
             text
-          )
+          ) || /^(?:axum|actix_web|actix_http|tokio|tower)::/.test(fn ?? "")
         ? "framework"
         : safeFile !== null &&
             /(?:^|[/\\])(?:src|app|srv)[/\\]/.test(safeFile) &&
@@ -50,6 +50,15 @@ function frame(
 
 function parseLine(text: string, previous: string, runtime: string): EvidenceFrame | null {
   let match: RegExpExecArray | null;
+  // Rust's numbered symbol precedes its source line. Require a Rust source
+  // suffix and numbered symbol so unknown v1 runtime tags stay unambiguous.
+  if (
+    (runtime === "rust" || runtime === "unknown") &&
+    (match = /^at\s+(.+\.rs):(\d+)(?::(\d+))?$/.exec(text))
+  ) {
+    const symbol = /^\d+:\s+(.+)$/.exec(previous)?.[1];
+    if (symbol) return frame(match[1]!, match[2], match[3], symbol);
+  }
   // PHP frame arguments and Python source excerpts never enter structured fields.
   if ((match = /^#\d+\s+(.+?)\((\d+)\):\s*([^\r\n(]+)(?:\(|$)/.exec(text)))
     return frame(match[1]!, match[2], undefined, match[3]!);

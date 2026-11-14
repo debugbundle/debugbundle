@@ -6,9 +6,18 @@ import process from "node:process";
 const root = process.cwd();
 const source = path.join(root, "tests", "fixtures", "privacy-conformance.json");
 const companions = [
-  "debugbundle-js", "debugbundle-python", "debugbundle-php", "debugbundle-wordpress",
-  "debugbundle-java", "debugbundle-go", "debugbundle-ruby", "debugbundle-dotnet",
-  "debugbundle-android", "debugbundle-swift", "debugbundle-react-native"
+  "debugbundle-js",
+  "debugbundle-python",
+  "debugbundle-php",
+  "debugbundle-wordpress",
+  "debugbundle-java",
+  "debugbundle-go",
+  "debugbundle-ruby",
+  "debugbundle-dotnet",
+  "debugbundle-android",
+  "debugbundle-swift",
+  "debugbundle-react-native",
+  "debugbundle-rust"
 ];
 const write = process.argv[2] === "--write";
 if (!write && process.argv[2] !== "--check") {
@@ -35,7 +44,10 @@ for (const name of companions) {
     await writeFile(digest, checksum, "utf8");
   } else {
     try {
-      const [actualBody, actualDigest] = await Promise.all([readFile(fixture), readFile(digest, "utf8")]);
+      const [actualBody, actualDigest] = await Promise.all([
+        readFile(fixture),
+        readFile(digest, "utf8")
+      ]);
       if (!actualBody.equals(body) || actualDigest !== checksum) stale += 1;
     } catch {
       stale += 1;

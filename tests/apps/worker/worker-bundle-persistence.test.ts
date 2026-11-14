@@ -1,6 +1,7 @@
 import { gunzipSync, gzipSync } from "node:zlib";
 import { describe, expect, it, vi } from "vitest";
 import { BundleV1Schema } from "../../../packages/shared-types/src/index.js";
+import { rustSdkEvents } from "../../helpers/rust-sdk-fixtures.js";
 import { processNextBuildBundleJob } from "../../../apps/worker/src/processor.js";
 import {
   buildBundleObjectKey,
@@ -14,6 +15,90 @@ import {
 } from "../../helpers/worker-bundle-delivery.js";
 
 describe("worker bundle persistence", () => {
+  it("preserves a completed recovery bundle when an older context job arrives later", async () => {
+    const events = rustSdkEvents();
+    const primary = events[0]!;
+    const latest = events[2]!;
+    const putObject = vi.fn().mockResolvedValue(undefined);
+    const queue = { enqueue: vi.fn(), dequeue: vi.fn() };
+    const dependencies = {
+      queue,
+      incidentStore: {
+        getBundleBuildContext: vi.fn().mockResolvedValue({
+          incident_id: "inc_recovery",
+          project_id: "proj_recovery",
+          service_id: null,
+          service_name: primary.service.name,
+          service_runtime: "rust",
+          service_framework: null,
+          environment: primary.service.environment,
+          fingerprint: "fp_recovery",
+          title: "Checkout failure",
+          severity: "high",
+          first_seen_at: primary.occurred_at,
+          last_seen_at: primary.occurred_at,
+          occurrence_count: 1,
+          source_event_types: ["backend_exception"]
+        }),
+        reserveBundleGeneration: vi.fn().mockResolvedValue(
+          createReservedBundleGeneration({
+            source_event_id: latest.event_id,
+            source_occurred_at: latest.occurred_at,
+            trigger: "new_context_type"
+          })
+        ),
+        listIncidentEventReferences: vi.fn().mockResolvedValue([
+          {
+            event_id: primary.event_id,
+            event_type: primary.event_type,
+            event_class: "incident_signal",
+            occurred_at: primary.occurred_at
+          }
+        ]),
+        listEvidenceContextCandidates: vi
+          .fn()
+          .mockImplementation(async (input: { failure_event_ids: string[] }) =>
+            input.failure_event_ids.includes(primary.event_id)
+              ? events.slice(1).map((event) => ({
+                  event_id: event.event_id,
+                  occurred_at: event.occurred_at,
+                  received_at: event.occurred_at
+                }))
+              : []
+          )
+      },
+      objectStore: {
+        putObject,
+        getObject: vi.fn(async (input: { key: string }) => {
+          const event = events.find((event) => input.key.endsWith(`${event.event_id}.json.gz`));
+          if (!event) throw new Error("unexpected fixture read");
+          return gzipSync(Buffer.from(JSON.stringify(event)));
+        })
+      }
+    };
+    for (const event of [latest, events[1]!]) {
+      queue.dequeue.mockResolvedValue({
+        project_id: "proj_recovery",
+        incident_id: "inc_recovery",
+        event_id: event.event_id,
+        occurred_at: event.occurred_at,
+        occurrence_count: 1,
+        trigger: "new_context_type",
+        primary_event_id: primary.event_id,
+        primary_occurred_at: primary.occurred_at
+      });
+      expect((await processNextBuildBundleJob(dependencies)).processed).toBe(true);
+      const stored = putObject.mock.calls.at(-1)?.[0] as { body: Buffer };
+      const bundle = BundleV1Schema.parse(JSON.parse(gunzipSync(stored.body).toString("utf8")));
+      expect(
+        bundle.context.recovery?.outcome,
+        `stored writes: ${putObject.mock.calls.length}`
+      ).toBe("recovered");
+      expect(bundle.context.evidence?.primary_event_id).toBe(primary.event_id);
+    }
+    expect(putObject).toHaveBeenCalledTimes(1);
+  });
+
   it("should persist deterministic bundle scaffold for build-bundle jobs", async (): Promise<void> => {
     const queue = {
       enqueue: vi.fn(),

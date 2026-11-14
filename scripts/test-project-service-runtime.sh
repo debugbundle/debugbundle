@@ -28,4 +28,4 @@ make test-integration INTEGRATION_PROJECT="$runtime_name" \
   INTEGRATION_CONTAINER_PREFIX="$runtime_name" \
   INTEGRATION_COMPOSE="docker compose -p $runtime_name -f deploy/selfhost/docker-compose.yml -f $runtime_tmp/noports.yml" \
   PNPM_INSTALL_RELAXED=true INTEGRATION_TEST_TIMEOUT=180000 \
-  INTEGRATION_TEST_FILES=tests/integration/project-service-runtime.integration.test.ts
+  INTEGRATION_TEST_FILES="${RUNTIME_INTEGRATION_TEST_FILES:-tests/integration/project-service-runtime.integration.test.ts}"

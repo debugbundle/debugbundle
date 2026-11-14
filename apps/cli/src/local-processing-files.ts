@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import { validateEvent } from "../../../packages/event-normalizer/src/index.js";
+import { bindLocalProjectScope } from "../../../packages/event-normalizer/src/local-correlation-scope.js";
 import { type EventEnvelope } from "../../../packages/shared-types/src/index.js";
 import { isRecord } from "./cli-fs-helpers.js";
 import {
@@ -69,7 +70,7 @@ export async function readEventBatches(
           `Invalid local event in ${join(LOCAL_EVENTS_DIRECTORY_PATH, fileName)}: ${issue}`
         );
       }
-      validatedEvents.push(validated.data);
+      validatedEvents.push(bindLocalProjectScope(validated.data));
     }
 
     batches.push({

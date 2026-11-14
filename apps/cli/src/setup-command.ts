@@ -1,6 +1,27 @@
-import { manageAgentSetup, projectRoot, readManaged, safePath, writeManaged, ensureGitignore } from "../../../packages/agent-setup/src/index.js";
-import { agentChecks, appendAgentReport, localScaffoldFailure, buildManagedAgentsSection, legacyHashes, canonicalFiles, chooseAgents } from "./agent-setup.js";
-import { mkdir as mkdirFromFs, readdir as readdirFromFs, readFile as readFileFromFs, stat as statFromFs, writeFile as writeFileFromFs } from "node:fs/promises";
+import {
+  manageAgentSetup,
+  projectRoot,
+  readManaged,
+  safePath,
+  writeManaged,
+  ensureGitignore
+} from "../../../packages/agent-setup/src/index.js";
+import {
+  agentChecks,
+  appendAgentReport,
+  localScaffoldFailure,
+  buildManagedAgentsSection,
+  legacyHashes,
+  canonicalFiles,
+  chooseAgents
+} from "./agent-setup.js";
+import {
+  mkdir as mkdirFromFs,
+  readdir as readdirFromFs,
+  readFile as readFileFromFs,
+  stat as statFromFs,
+  writeFile as writeFileFromFs
+} from "node:fs/promises";
 import { join } from "node:path";
 
 import {
@@ -15,6 +36,7 @@ import {
   type SetupCheck
 } from "./setup-relay-guidance.js";
 import { selectSetupTargets } from "./setup-target-selection.js";
+import { rustSetupInstructions } from "./setup-rust-guidance.js";
 
 import {
   CONNECTION_FILE_PATH,
@@ -49,11 +71,21 @@ type SetupCommandDependencies = {
   writeFile?: FileWriter;
 };
 
-const STATIC_ANALYSIS_WARNING = "Profile generated from static analysis; validate it before relying on framework or ownership details.";
+const STATIC_ANALYSIS_WARNING =
+  "Profile generated from static analysis; validate it before relying on framework or ownership details.";
 
-function formatSetupOutput(updatedAgents: boolean, selectedTargets: string[], relayGuidance: RelayGuidance[]): string {
-  const scaffoldedRelayGuidance = relayGuidance.filter((guidance) => guidance.action === "scaffolded");
-  const instructionRelayGuidance = relayGuidance.filter((guidance) => guidance.action !== "scaffolded");
+function formatSetupOutput(
+  updatedAgents: boolean,
+  selectedTargets: string[],
+  relayGuidance: RelayGuidance[],
+  services: DetectedService[]
+): string {
+  const scaffoldedRelayGuidance = relayGuidance.filter(
+    (guidance) => guidance.action === "scaffolded"
+  );
+  const instructionRelayGuidance = relayGuidance.filter(
+    (guidance) => guidance.action !== "scaffolded"
+  );
   const lines = [
     "Completed DebugBundle setup.",
     "Created files:",
@@ -92,7 +124,8 @@ function formatSetupOutput(updatedAgents: boolean, selectedTargets: string[], re
     "Next steps:",
     "- Review .debugbundle/profile.json and confirm services, frameworks, and workflows.",
     "- Read .agents/skills/debugbundle/SKILL.md and run the Profile Validation task.",
-    "- Run debugbundle process after local events have been captured."
+    "- Run debugbundle process after local events have been captured.",
+    ...rustSetupInstructions(services, selectedTargets).map((instruction) => `- ${instruction}`)
   );
 
   return lines.join("\n");
@@ -105,7 +138,11 @@ function buildSetupJsonOutput(
   relayGuidance: RelayGuidance[]
 ): string {
   return JSON.stringify({
-    status: checks.some((check) => check.status === "error") ? "error" : checks.some((check) => check.status === "warning") ? "warning" : "healthy",
+    status: checks.some((check) => check.status === "error")
+      ? "error"
+      : checks.some((check) => check.status === "warning")
+        ? "warning"
+        : "healthy",
     detected_services: services,
     selected_targets: selectedTargetNames,
     relay_action: determineRelayAction(relayGuidance),
@@ -116,17 +153,23 @@ function buildSetupJsonOutput(
     suggested_actions: [
       "Review .debugbundle/profile.json and confirm services, frameworks, and workflows.",
       "Read .agents/skills/debugbundle/SKILL.md and run the Profile Validation task.",
-      "Run debugbundle process after local events have been captured."
+      "Run debugbundle process after local events have been captured.",
+      ...rustSetupInstructions(services, selectedTargetNames)
     ],
     auto_fix_available: false
   });
 }
 
-function detectPackageManagers(rootDirectory: string, packageJson: PackageJsonLike | null, existingPaths: Set<string>): string[] {
+function detectPackageManagers(
+  rootDirectory: string,
+  packageJson: PackageJsonLike | null,
+  existingPaths: Set<string>
+): string[] {
   const packageManagers = new Set<string>();
-  const declaredPackageManager = typeof packageJson?.packageManager === "string"
-    ? packageJson.packageManager.split("@")[0]
-    : undefined;
+  const declaredPackageManager =
+    typeof packageJson?.packageManager === "string"
+      ? packageJson.packageManager.split("@")[0]
+      : undefined;
 
   if (declaredPackageManager === "pnpm") {
     packageManagers.add("pnpm");
@@ -140,7 +183,10 @@ function detectPackageManagers(rootDirectory: string, packageJson: PackageJsonLi
     packageManagers.add("yarn");
   }
 
-  if (existingPaths.has(join(rootDirectory, "pnpm-lock.yaml")) || existingPaths.has(join(rootDirectory, "pnpm-workspace.yaml"))) {
+  if (
+    existingPaths.has(join(rootDirectory, "pnpm-lock.yaml")) ||
+    existingPaths.has(join(rootDirectory, "pnpm-workspace.yaml"))
+  ) {
     packageManagers.add("pnpm");
   }
 
@@ -152,13 +198,21 @@ function detectPackageManagers(rootDirectory: string, packageJson: PackageJsonLi
     packageManagers.add("yarn");
   }
 
-  if (existingPaths.has(join(rootDirectory, "poetry.lock")) || existingPaths.has(join(rootDirectory, "pyproject.toml"))) {
+  if (
+    existingPaths.has(join(rootDirectory, "poetry.lock")) ||
+    existingPaths.has(join(rootDirectory, "pyproject.toml"))
+  ) {
     packageManagers.add("poetry");
   }
 
   if (existingPaths.has(join(rootDirectory, "composer.json"))) {
     packageManagers.add("composer");
   }
+  if (
+    existingPaths.has(join(rootDirectory, "Cargo.toml")) ||
+    existingPaths.has(join(rootDirectory, "Cargo.lock"))
+  )
+    packageManagers.add("cargo");
 
   return [...packageManagers].sort();
 }
@@ -166,7 +220,10 @@ function detectPackageManagers(rootDirectory: string, packageJson: PackageJsonLi
 function detectPrimaryLanguages(rootDirectory: string, existingPaths: Set<string>): string[] {
   const languages = new Set<string>();
 
-  if (existingPaths.has(join(rootDirectory, "tsconfig.json")) || existingPaths.has(join(rootDirectory, "tsconfig.base.json"))) {
+  if (
+    existingPaths.has(join(rootDirectory, "tsconfig.json")) ||
+    existingPaths.has(join(rootDirectory, "tsconfig.base.json"))
+  ) {
     languages.add("TypeScript");
   } else if (existingPaths.has(join(rootDirectory, "package.json"))) {
     languages.add("JavaScript");
@@ -179,6 +236,7 @@ function detectPrimaryLanguages(rootDirectory: string, existingPaths: Set<string
   if (existingPaths.has(join(rootDirectory, "composer.json"))) {
     languages.add("PHP");
   }
+  if (existingPaths.has(join(rootDirectory, "Cargo.toml"))) languages.add("Rust");
 
   return [...languages].sort();
 }
@@ -186,14 +244,22 @@ function detectPrimaryLanguages(rootDirectory: string, existingPaths: Set<string
 function detectDeploymentTargets(rootDirectory: string, existingPaths: Set<string>): string[] {
   const targets = new Set<string>();
 
-  if (existingPaths.has(join(rootDirectory, "docker-compose.yml")) || existingPaths.has(join(rootDirectory, "deploy", "selfhost", "docker-compose.yml"))) {
+  if (
+    existingPaths.has(join(rootDirectory, "docker-compose.yml")) ||
+    existingPaths.has(join(rootDirectory, "deploy", "selfhost", "docker-compose.yml"))
+  ) {
     targets.add("docker-compose");
   }
 
   return [...targets].sort();
 }
 
-function detectDeveloperWorkflow(packageJson: PackageJsonLike | null, workflowName: "build" | "test" | "lint", existingPaths: Set<string>, rootDirectory: string): string {
+function detectDeveloperWorkflow(
+  packageJson: PackageJsonLike | null,
+  workflowName: "build" | "test" | "lint",
+  existingPaths: Set<string>,
+  rootDirectory: string
+): string {
   const packageScript = packageJson?.scripts?.[workflowName];
   if (typeof packageScript === "string" && packageScript.length > 0) {
     return packageScript;
@@ -202,11 +268,17 @@ function detectDeveloperWorkflow(packageJson: PackageJsonLike | null, workflowNa
   if (existingPaths.has(join(rootDirectory, "Makefile"))) {
     return `make ${workflowName}`;
   }
+  if (existingPaths.has(join(rootDirectory, "Cargo.toml")))
+    return workflowName === "lint" ? "cargo clippy --all-targets" : `cargo ${workflowName}`;
 
   return "manual";
 }
 
-function detectInstallWorkflow(packageManagers: string[], existingPaths: Set<string>, rootDirectory: string): string {
+function detectInstallWorkflow(
+  packageManagers: string[],
+  existingPaths: Set<string>,
+  rootDirectory: string
+): string {
   if (packageManagers.includes("pnpm")) {
     return "pnpm install";
   }
@@ -230,6 +302,10 @@ function detectInstallWorkflow(packageManagers: string[], existingPaths: Set<str
   if (existingPaths.has(join(rootDirectory, "Makefile"))) {
     return "make install";
   }
+  if (packageManagers.includes("cargo"))
+    return existingPaths.has(join(rootDirectory, "Cargo.lock"))
+      ? "cargo fetch --locked"
+      : "cargo fetch";
 
   return "manual";
 }
@@ -259,7 +335,11 @@ async function pathExists(filePath: string, stat: StatReader): Promise<boolean> 
   }
 }
 
-async function detectRootPaths(rootDirectory: string, readdir: DirectoryReader, stat: StatReader): Promise<string[]> {
+async function detectRootPaths(
+  rootDirectory: string,
+  readdir: DirectoryReader,
+  stat: StatReader
+): Promise<string[]> {
   const entries = (await readdir(rootDirectory)).sort();
   const rootPaths: string[] = [];
 
@@ -277,7 +357,15 @@ async function detectRootPaths(rootDirectory: string, readdir: DirectoryReader, 
   return rootPaths;
 }
 
-async function detectInfrastructure(rootDirectory: string, readFile: FileReader): Promise<{ databases: string[]; queues: string[]; object_storage: string[]; external_services: string[] }> {
+async function detectInfrastructure(
+  rootDirectory: string,
+  readFile: FileReader
+): Promise<{
+  databases: string[];
+  queues: string[];
+  object_storage: string[];
+  external_services: string[];
+}> {
   const composeContents: string[] = [];
 
   for (const candidatePath of [
@@ -287,7 +375,12 @@ async function detectInfrastructure(rootDirectory: string, readFile: FileReader)
     try {
       composeContents.push(await readFile(candidatePath));
     } catch (error) {
-      if (typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT") {
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        error.code === "ENOENT"
+      ) {
         continue;
       }
 
@@ -320,7 +413,10 @@ async function detectInfrastructure(rootDirectory: string, readFile: FileReader)
   };
 }
 
-async function buildProfile(rootDirectory: string, dependencies: Required<Pick<SetupCommandDependencies, "now" | "readFile" | "readdir" | "stat">>): Promise<{
+async function buildProfile(
+  rootDirectory: string,
+  dependencies: Required<Pick<SetupCommandDependencies, "now" | "readFile" | "readdir" | "stat">>
+): Promise<{
   profile_version: string;
   project: {
     name: string;
@@ -356,7 +452,10 @@ async function buildProfile(rootDirectory: string, dependencies: Required<Pick<S
     notes: string;
   };
 }> {
-  const packageJson = await readJsonFile<PackageJsonLike>(join(rootDirectory, "package.json"), dependencies.readFile);
+  const packageJson = await readJsonFile<PackageJsonLike>(
+    join(rootDirectory, "package.json"),
+    dependencies.readFile
+  );
   const existingPaths = new Set<string>([
     join(rootDirectory, "package.json"),
     join(rootDirectory, "pnpm-lock.yaml"),
@@ -366,6 +465,8 @@ async function buildProfile(rootDirectory: string, dependencies: Required<Pick<S
     join(rootDirectory, "poetry.lock"),
     join(rootDirectory, "pyproject.toml"),
     join(rootDirectory, "composer.json"),
+    join(rootDirectory, "Cargo.toml"),
+    join(rootDirectory, "Cargo.lock"),
     join(rootDirectory, "docker-compose.yml"),
     join(rootDirectory, "deploy", "selfhost", "docker-compose.yml"),
     join(rootDirectory, "Makefile"),
@@ -382,17 +483,35 @@ async function buildProfile(rootDirectory: string, dependencies: Required<Pick<S
 
   const primaryLanguages = detectPrimaryLanguages(rootDirectory, confirmedExistingPaths);
   const packageManagers = detectPackageManagers(rootDirectory, packageJson, confirmedExistingPaths);
+  const services = await detectServices(
+    rootDirectory,
+    dependencies.readdir,
+    dependencies.readFile,
+    dependencies.stat,
+    packageJson,
+    primaryLanguages
+  );
+  if (services.some((service) => service.runtime === "Rust")) {
+    if (!primaryLanguages.includes("Rust")) primaryLanguages.push("Rust");
+    if (!packageManagers.includes("cargo")) packageManagers.push("cargo");
+    primaryLanguages.sort();
+    packageManagers.sort();
+  }
 
   return {
     profile_version: "v1",
     project: {
-      name: packageJson?.name ?? "unknown-project",
+      name:
+        packageJson?.name ??
+        services.find((service) => service.runtime === "Rust" && service.paths.includes("."))
+          ?.name ??
+        "unknown-project",
       repo_url: "",
       primary_languages: primaryLanguages,
       package_managers: packageManagers,
       deployment_targets: detectDeploymentTargets(rootDirectory, confirmedExistingPaths)
     },
-    services: await detectServices(rootDirectory, dependencies.readdir, dependencies.readFile, dependencies.stat, packageJson, primaryLanguages),
+    services,
     infrastructure: await detectInfrastructure(rootDirectory, dependencies.readFile),
     critical_paths: [],
     repo: {
@@ -416,7 +535,8 @@ async function buildProfile(rootDirectory: string, dependencies: Required<Pick<S
       last_reviewed_at: dependencies.now().toISOString(),
       validation_status: "static-analysis-only",
       skill_path: SKILL_DIRECTORY_PATH,
-      notes: "Generated by debugbundle setup. Review and validate this profile before relying on it for architecture decisions."
+      notes:
+        "Generated by debugbundle setup. Review and validate this profile before relying on it for architecture decisions."
     }
   };
 }
@@ -426,23 +546,32 @@ export async function setupCommand(
   dependencies: SetupCommandDependencies = {}
 ): Promise<CliCommandResult> {
   const cwd = dependencies.cwd ?? (() => process.cwd());
-  const mkdir = dependencies.mkdir ?? (async (path: string, options: { recursive: true }) => { await mkdirFromFs(path, options); });
+  const mkdir =
+    dependencies.mkdir ??
+    (async (path: string, options: { recursive: true }) => {
+      await mkdirFromFs(path, options);
+    });
   const readFile = dependencies.readFile ?? (async (path: string) => readFileFromFs(path, "utf8"));
   const readdir = dependencies.readdir ?? (async (path: string) => readdirFromFs(path));
   const stat = dependencies.stat ?? (async (path: string) => statFromFs(path));
-  const writeFile = dependencies.writeFile ?? (async (path: string, content: string) => writeFileFromFs(path, content, "utf8"));
+  const writeFile =
+    dependencies.writeFile ??
+    (async (path: string, content: string) => writeFileFromFs(path, content, "utf8"));
   const now = dependencies.now ?? (() => new Date());
   try {
     const rootDirectory = await projectRoot(cwd());
     const selectedAgents = await chooseAgents(rootDirectory, input, dependencies);
-    const packageJson = await readJsonFile<PackageJsonLike>(join(rootDirectory, "package.json"), readFile);
+    const packageJson = await readJsonFile<PackageJsonLike>(
+      join(rootDirectory, "package.json"),
+      readFile
+    );
 
-    for (const filePath of [...GENERATED_FILE_PATHS, GITIGNORE_FILE_PATH]) await safePath(rootDirectory, filePath);
+    for (const filePath of [...GENERATED_FILE_PATHS, GITIGNORE_FILE_PATH])
+      await safePath(rootDirectory, filePath);
     for (const directoryPath of ENSURED_DIRECTORY_PATHS) {
       await safePath(rootDirectory, directoryPath);
       await mkdir(join(rootDirectory, directoryPath), { recursive: true });
     }
-
 
     const profile = await buildProfile(rootDirectory, {
       now,
@@ -451,35 +580,61 @@ export async function setupCommand(
       stat
     });
     const targetSelectionDependencies = {
-      ...(dependencies.isInteractive === undefined ? {} : { isInteractive: dependencies.isInteractive }),
+      ...(dependencies.isInteractive === undefined
+        ? {}
+        : { isInteractive: dependencies.isInteractive }),
       ...(dependencies.promptUser === undefined ? {} : { promptUser: dependencies.promptUser })
     };
-    const selectedTargetNames = dependencies.selectTargetNames !== undefined
-      ? await dependencies.selectTargetNames(profile.services)
-      : await selectSetupTargets(profile.services, input, targetSelectionDependencies);
+    const selectedTargetNames =
+      dependencies.selectTargetNames !== undefined
+        ? await dependencies.selectTargetNames(profile.services)
+        : await selectSetupTargets(profile.services, input, targetSelectionDependencies);
 
-    const preservedProfile = await readManaged(rootDirectory, PROFILE_FILE_PATH) !== undefined;
-    const preservedConnection = await readManaged(rootDirectory, CONNECTION_FILE_PATH) !== undefined;
+    const preservedProfile = (await readManaged(rootDirectory, PROFILE_FILE_PATH)) !== undefined;
+    const preservedConnection =
+      (await readManaged(rootDirectory, CONNECTION_FILE_PATH)) !== undefined;
     if (!preservedProfile) {
       const contents = `${JSON.stringify(profile, null, 2)}\n`;
-      if (dependencies.writeFile) await dependencies.writeFile(join(rootDirectory, PROFILE_FILE_PATH), contents);
+      if (dependencies.writeFile)
+        await dependencies.writeFile(join(rootDirectory, PROFILE_FILE_PATH), contents);
       else await writeManaged(rootDirectory, PROFILE_FILE_PATH, contents, undefined);
     }
     if (!preservedConnection) {
-      if (dependencies.writeFile) await dependencies.writeFile(join(rootDirectory, CONNECTION_FILE_PATH), buildConnectionConfig());
-      else await writeManaged(rootDirectory, CONNECTION_FILE_PATH, buildConnectionConfig(), undefined);
+      if (dependencies.writeFile)
+        await dependencies.writeFile(
+          join(rootDirectory, CONNECTION_FILE_PATH),
+          buildConnectionConfig()
+        );
+      else
+        await writeManaged(rootDirectory, CONNECTION_FILE_PATH, buildConnectionConfig(), undefined);
     }
-    const agentReport = await manageAgentSetup({ root: rootDirectory, files: canonicalFiles(), legacyHashes, instruction: buildManagedAgentsSection(), fix: true, legacyInstructions: true, ...(selectedAgents === undefined ? {} : { selected: selectedAgents }) });
-
-    const { relayCheck, relayGuidance } = await resolveRelaySetup(rootDirectory, profile.services, selectedTargetNames, packageJson, {
-      mkdir,
-      readFile,
-      stat,
-      writeFile
+    const agentReport = await manageAgentSetup({
+      root: rootDirectory,
+      files: canonicalFiles(),
+      legacyHashes,
+      instruction: buildManagedAgentsSection(),
+      fix: true,
+      legacyInstructions: true,
+      ...(selectedAgents === undefined ? {} : { selected: selectedAgents })
     });
 
+    const { relayCheck, relayGuidance } = await resolveRelaySetup(
+      rootDirectory,
+      profile.services,
+      selectedTargetNames,
+      packageJson,
+      {
+        mkdir,
+        readFile,
+        stat,
+        writeFile
+      }
+    );
+
     await ensureGitignore(rootDirectory, buildManagedGitignoreSection(), true);
-    const updatedAgents = !agentReport.selection_declared && await readManaged(rootDirectory, "AGENTS.md") !== undefined;
+    const updatedAgents =
+      !agentReport.selection_declared &&
+      (await readManaged(rootDirectory, "AGENTS.md")) !== undefined;
 
     const checks: SetupCheck[] = [
       {
@@ -518,17 +673,21 @@ export async function setupCommand(
         message: `Updated ${GITIGNORE_FILE_PATH}`
       },
       ...(relayCheck === null ? [] : [relayCheck]),
-      ...(!agentReport.selection_declared ? [updatedAgents
-        ? {
-            name: "agents-integration",
-            status: "ok" as const,
-            message: "Updated AGENTS.md"
-          }
-        : {
-            name: "agents-integration",
-            status: "warning" as const,
-            message: "AGENTS.md not found; skipped managed DebugBundle section."
-          }] : []),
+      ...(!agentReport.selection_declared
+        ? [
+            updatedAgents
+              ? {
+                  name: "agents-integration",
+                  status: "ok" as const,
+                  message: "Updated AGENTS.md"
+                }
+              : {
+                  name: "agents-integration",
+                  status: "warning" as const,
+                  message: "AGENTS.md not found; skipped managed DebugBundle section."
+                }
+          ]
+        : []),
       ...agentChecks(agentReport),
       {
         name: "profile-validation",
@@ -537,14 +696,31 @@ export async function setupCommand(
       }
     ];
 
-    let humanOutput = formatSetupOutput(updatedAgents, selectedTargetNames, relayGuidance);
-    if (preservedProfile || preservedConnection) humanOutput = humanOutput.replace("Created files:", "Scaffold files (existing profile and connection preserved):");
-    if (checks.some(check => check.status === "error")) humanOutput = humanOutput.replace("Completed DebugBundle setup.", "DebugBundle setup needs attention.");
+    let humanOutput = formatSetupOutput(
+      updatedAgents,
+      selectedTargetNames,
+      relayGuidance,
+      profile.services
+    );
+    if (preservedProfile || preservedConnection)
+      humanOutput = humanOutput.replace(
+        "Created files:",
+        "Scaffold files (existing profile and connection preserved):"
+      );
+    if (checks.some((check) => check.status === "error"))
+      humanOutput = humanOutput.replace(
+        "Completed DebugBundle setup.",
+        "DebugBundle setup needs attention."
+      );
     return {
-      exitCode: checks.some(check => check.status === "error") ? 4 : 0,
-      output: appendAgentReport(input.json
-        ? buildSetupJsonOutput(checks, profile.services, selectedTargetNames, relayGuidance)
-        : humanOutput, agentReport, input.json === true)
+      exitCode: checks.some((check) => check.status === "error") ? 4 : 0,
+      output: appendAgentReport(
+        input.json
+          ? buildSetupJsonOutput(checks, profile.services, selectedTargetNames, relayGuidance)
+          : humanOutput,
+        agentReport,
+        input.json === true
+      )
     };
   } catch (error) {
     return localScaffoldFailure(error, input.json);

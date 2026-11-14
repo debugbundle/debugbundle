@@ -68,6 +68,9 @@ importers:
       jose:
         specifier: ~6.2.10
         version: 6.2.10
+      minimatch:
+        specifier: 11.0.8
+        version: 11.0.8
       oidc-provider:
         specifier: ~9.11.2
         version: 9.11.5
@@ -80,6 +83,9 @@ importers:
       pino:
         specifier: ^9.7.0
         version: 9.14.0
+      smol-toml:
+        specifier: 1.9.1
+        version: 1.9.1
       stripe:
         specifier: ^22.0.0
         version: 22.0.0(@types/node@24.12.0)
@@ -3747,6 +3753,12 @@ packages:
         integrity: sha512-xw2/TiX82lQHA06cgbqRKFb5lCAy3axQ4H4SoUFhUsg+wztiet+co86IAMDtF6Vm1hc7J6j09oh/rgDn+JdKIQ==
       }
 
+  "@isaacs/nonrecursive-glob-match@1.1.0":
+    resolution:
+      {
+        integrity: sha512-GPm/Dbvk5RLmhRnxXIa7nTpK0xtl4E0wj0MslsuNiJ1FIROU+2+9lgUC/dgF7Ey4QCWhfEsgxilMRMCdHPfDfw==
+      }
+
   abort-controller@3.0.0:
     resolution:
       {
@@ -3973,6 +3985,13 @@ packages:
     resolution:
       {
         integrity: sha512-awigjhi6cLTh90bdw6+QJ9CtmJmyYhEIi70iCbc8Rozn04Fw9FeQIBjv/E22FFGuCGx1bLJyUfB64x/szUSXUg==
+      }
+    engines: { node: 20 || >=22 }
+
+  brace-expansion@5.0.13:
+    resolution:
+      {
+        integrity: sha512-Vh3dmFbc4wZeox7M9I/0L9GfFd83Su4+yCck/OF9Gi/P/dAHn0RT7X4K9R7gMNMhDck3DvhR6QXsnQdjjgwNvQ==
       }
     engines: { node: 20 || >=22 }
 
@@ -5824,6 +5843,13 @@ packages:
       }
     engines: { node: 18 || 20 || >=22 }
 
+  minimatch@11.0.8:
+    resolution:
+      {
+        integrity: sha512-nFQuYSTVrGvysVBps5Ih+0BdnYFN/Cj3C816r6+p7yK+FHrVLGE4O4N9AFwykrlNlvM2HYt+Rad1Uiro6h88Ig==
+      }
+    engines: { node: 20 || >=22 }
+
   minimatch@3.1.5:
     resolution:
       {
@@ -6852,6 +6878,13 @@ packages:
       {
         integrity: sha512-bLGGlR1QxBcynn2d5YmDX4MGjlZvy2MRBDRNHLJ8VI6l6+9FUiyTFNJ0IveOSP0bcXgVDPRcfGqA0pjaqUpfVg==
       }
+
+  smol-toml@1.9.1:
+    resolution:
+      {
+        integrity: sha512-j7WyPdf0CJoutMzMoPLF/bVXHtKZIT9Rb4eGeEbWw8X2t5oirjPgpL+OpaENZrILYaXqYwnVH+qgUwVbl+pUJQ==
+      }
+    engines: { node: ">= 18" }
 
   sonic-boom@4.2.1:
     resolution:
@@ -10420,6 +10453,8 @@ snapshots:
       convert-source-map: 2.0.0
       tinyrainbow: 3.1.0
 
+  "@isaacs/nonrecursive-glob-match@1.1.0": {}
+
   abort-controller@3.0.0:
     dependencies:
       event-target-shim: 5.0.1
@@ -10542,6 +10577,10 @@ snapshots:
       concat-map: 0.0.1
 
   brace-expansion@5.0.11:
+    dependencies:
+      balanced-match: 4.0.4
+
+  brace-expansion@5.0.13:
     dependencies:
       balanced-match: 4.0.4
 
@@ -11620,6 +11659,11 @@ snapshots:
     dependencies:
       brace-expansion: 5.0.11
 
+  minimatch@11.0.8:
+    dependencies:
+      "@isaacs/nonrecursive-glob-match": 1.1.0
+      brace-expansion: 5.0.13
+
   minimatch@3.1.5:
     dependencies:
       brace-expansion: 1.1.20
@@ -12310,6 +12354,8 @@ snapshots:
   signal-exit@3.0.7: {}
 
   sisteransi@1.0.5: {}
+
+  smol-toml@1.9.1: {}
 
   sonic-boom@4.2.1:
     dependencies:

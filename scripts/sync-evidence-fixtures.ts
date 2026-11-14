@@ -68,6 +68,7 @@ for (const fixture of corpus.capabilities) {
 }
 const corpusContent = `${JSON.stringify(corpus, null, 2)}\n`;
 const targets: Record<string, string> = {
+  rust: "sdks/debugbundle-rust/tests/fixtures/event-envelope.schema.json",
   php: "sdks/debugbundle-php/tests/fixtures/event-envelope.schema.json",
   python: "sdks/debugbundle-python/tests/fixtures/event-envelope.schema.json",
   ruby: "sdks/debugbundle-ruby/spec/fixtures/event-envelope.schema.json",
