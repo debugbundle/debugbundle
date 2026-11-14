@@ -29,7 +29,7 @@ then explicitly rebuild from its retained event files using
 capture preset. This rebuild regenerates local incident/artifact state; it does
 not change cloud records or the retained event files.
 
-The Rust integration candidate also accepts canonical SDK arrays with an absent
+The Rust integration also accepts canonical SDK arrays with an absent
 or null `project_id`. Within that repository's local store these use the local-only
 unassigned namespace `00000000-0000-0000-0000-000000000000`. Explicit project IDs
 and environments stay isolated. Processing preserves the SDK file bytes and does
@@ -90,14 +90,14 @@ debugbundle incidents
 debugbundle explain <incident-id> --source cloud
 ```
 
-## Rust setup candidate
+## Rust setup
 
-The unreleased Rust setup candidate detects Cargo binary packages and virtual or
+Rust setup detects Cargo binary packages and virtual or
 mixed workspaces, including aliased/inherited Axum and Actix Web dependencies.
 It records Cargo workflows and provides SDK feature, logger composition,
 middleware and native relay instructions in human output and JSON
 `suggested_actions`. Rust source and Cargo manifests remain unchanged.
-The Rust crate itself is unpublished until its qualification/release gates pass.
+Rust SDK 1.0.0 is released on [crates.io](https://crates.io/crates/debugbundle/1.0.0). See the [Rust SDK guide](https://debugbundle.com/docs/sdks/rust/) for installation and framework examples.
 
 Discovery reads bounded manifests without running Cargo or build scripts. It
 avoids target/vendor/generated SDK trees, symlinks and outside workspace members;

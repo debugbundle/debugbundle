@@ -8,6 +8,11 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [1.27.0] - 2026-11-14
 
+### CLI documentation follow-up
+
+- CLI 1.25.1 corrects the remaining Rust candidate/unpublished wording in its public npm README; runtime behaviour is unchanged. The CLI release gate now verifies stable Rust discovery and package guidance.
+
+
 - Add Rust Cargo package/workspace discovery and native logging, Axum, Actix Web
   and browser-relay setup guidance. Preserve application source and existing project
   bindings; qualify the independent Rust 1.0.0 crate before advertising it.

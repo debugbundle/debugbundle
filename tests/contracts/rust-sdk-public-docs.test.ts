@@ -36,7 +36,9 @@ describeSiteDocs("Rust SDK public discovery and publication status", () => {
       const page = readFileSync(join(site, `content/docs/${path}.mdx`), "utf8");
       expect(page, path).toMatch(/Rust/);
       for (const line of page.split("\n").filter((line) => /Rust|sdks\/rust/.test(line)))
-        expect(line, path).not.toMatch(/unpublished|alpha|prerelease|SDK candidate/i);
+        expect(line, path).not.toMatch(
+          /unpublished|alpha|prerelease|SDK candidate|publication (?:is |remains )?pending/i
+        );
     }
     const guide = readFileSync(join(site, "content/docs/sdks/rust.mdx"), "utf8");
     expect(guide).toMatch(/^title: "Rust SDK"$/m);
@@ -105,5 +107,9 @@ describe("Rust SDK generated discovery index", () => {
     expect(links[rust - 1]).toContain("[PHP SDK]");
     expect(links[rust]).toContain("1.0.0");
     expect(links[rust]).not.toMatch(/alpha|unpublished|candidate/i);
+    const cliReadme = readFileSync(join(process.cwd(), "apps/cli/README.md"), "utf8");
+    expect(cliReadme).toContain("https://crates.io/crates/debugbundle/1.0.0");
+    for (const line of cliReadme.split("\n").filter((line) => /Rust/.test(line)))
+      expect(line).not.toMatch(/candidate|unreleased|unpublished|publication.*pending/i);
   });
 });
