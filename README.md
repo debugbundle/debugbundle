@@ -84,6 +84,7 @@ All SDKs follow the same universal interface: `init`, `captureException`, `captu
 | Browser      | `@debugbundle/sdk-browser`                        | `npm install @debugbundle/sdk-browser`         | [Browser SDK](https://debugbundle.com/docs/sdks/browser)                |
 | Python       | `debugbundle-python`                              | `pip install debugbundle-python`               | [Python SDK](https://debugbundle.com/docs/sdks/python)                  |
 | PHP          | `debugbundle/sdk-php`                             | `composer require debugbundle/sdk-php`         | [PHP SDK](https://debugbundle.com/docs/sdks/php)                        |
+| Rust | [`debugbundle` 1.0.0](https://crates.io/crates/debugbundle/1.0.0) | Rust 1.89+, Tower/Axum/Actix Web | [Rust SDK](https://debugbundle.com/docs/sdks/rust) |
 | Java         | `com.debugbundle:debugbundle-spring-boot-starter` | Maven or Gradle dependency                     | [Java SDK](https://debugbundle.com/docs/sdks/java)                      |
 | .NET         | `DebugBundle.AspNetCore` / `DebugBundle.Sdk`      | `dotnet add package DebugBundle.AspNetCore`    | [.NET SDK](https://debugbundle.com/docs/sdks/dotnet)                    |
 | Go           | `github.com/debugbundle/debugbundle-go`           | `go get github.com/debugbundle/debugbundle-go` | [Go SDK](https://debugbundle.com/docs/sdks/go)                          |
@@ -380,7 +381,7 @@ and generated artifacts. TaskTime includes empty and analytics-disabled states.
 
 Project edits, incident/improvement actions, rule and health-check edits, webhook
 creation/tests, token creation/revocation, invitations/member edits, probe
-activation, weekly reports, repository selection, and analytics settings/flows/
+activation, weekly project digests, repository selection, and analytics settings/flows/
 funnels/bundle generation and public status publication are simulated in memory.
 Public status pages start private; select checks and publish in Project Health to
 open a loopback share link. Mock project/check IDs use UUIDs so the normal strict

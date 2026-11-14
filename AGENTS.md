@@ -214,7 +214,7 @@ Project tokens → SDK write-only (ingestion). Member tokens → CLI/API/MCP rea
 - Never revert unrelated local changes.
 - Never use destructive git commands unless explicitly requested.
 - Do not amend commits unless explicitly requested.
-- If unexpected unrelated file changes appear during work, pause and ask user how to proceed.
+- If unexpected file changes appear during work, check whether they affect the current task's flow, assumptions, or files being edited. Preserve unrelated changes and continue without pausing when they do not affect the task. Pause and ask the user only when the changes create a conflict, an overwrite risk, or uncertainty that prevents safe progress on the current task.
 
 ### Hosted Runtime Disk Retention
 

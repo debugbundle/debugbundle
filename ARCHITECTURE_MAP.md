@@ -3,6 +3,25 @@ separate discovery checks. Its report preserves findings and ClawHub's verified
 VirusTotal retirement without inventing an antivirus pass; active audits and
 moderation remain fail-closed.
 
+Project table follow-up: `table-list-footer.tsx` composes the existing CardFooter,
+Field and Select with responsive navigation placement. CursorPaginationControls
+supports embedding without a second footer. Project incident/bundle/improvement
+pages own page size; browser artifact readers request existing first-page exact
+counts, and useCursorPagination retains totals and resets cursor caches on size
+changes. Analytics inventories and retained samples use the same card/footer and
+cursor hook. Existing analytics bundle/sample storage readers expose filtered
+first-page counts behind the additive API count opt-in. Shared schemas/OpenAPI
+and CLI/MCP readers preserve metadata; `analytics-inventory-read.ts` owns strict
+predecessor fallback. Group inspection reuses the footer; alert rules retain a
+fixed bounded read without a row-size UI. No schema migration is needed.
+Workspace incident/improvement/analytics inventories and Dashboard's incident
+table reuse this composition; Dashboard Projects is unchanged.
+`dashboard-incidents-today-data.ts` accepts the display size and returns its
+already-computed exact attention count. `improvement-review-inventory.ts` loads
+complete authorised metadata through the existing review client with finite
+continuation/cancellation guards; the review card owns local display pages and
+totals. No review settings, authority, generation or storage boundary changes.
+
 Dashboard health alert: `workspace-health-alert.ts` reads existing project/check
 APIs in batches of four and reuses shared current-state derivation, excluding
 disabled/paused checks and suspended shares. `workspace-health-alert-context.tsx`
@@ -695,6 +714,89 @@ Detailed implementation plans live in `spec/sdks/`. Current published lines are 
 | C# (published)  | `github.com/debugbundle/debugbundle-dotnet` | NuGet (`DebugBundle.Sdk` + `DebugBundle.*`) | ASP.NET Core / .NET |
 | Kotlin (server) | `github.com/debugbundle/debugbundle-kotlin` | Maven Central                               | Ktor                |
 | Rust            | `github.com/debugbundle/debugbundle-rust`   | crates.io (`debugbundle`)                   | Axum, Actix Web     |
+
+Rust audit ownership: SDK source, fixtures and artifact gates remain in the
+standalone repository; Core/CLI readers stay in their existing packages, and
+public references stay in `site/content/docs` plus the generated `llms.txt`
+index. [The deep audit](spec/sdks/rust-sdk-audit.md) records findings and acceptance
+without authorising publication or deployment.
+Core worker `processor-bundles.ts` checks reservation source ownership before
+rebuilding, so delayed older context jobs cannot erase newer recovery evidence.
+Rust relay replay retains known ACK progress and its one bounded file lease
+through callback/storage contention. `runtime/native.rs` waits on the existing
+callback lane for persistence; exact authenticated retries are idempotent and
+flush/shutdown retain finite deadlines.
+Rust native logging rejects disabled no-sink capture before its record-building
+frame; application tee sinks retain their own filtering and flush semantics.
+Logging and panic-observation guards are acquired only on successful entry, so
+rejected nested calls cannot clear their caller's recursion/suppression state.
+Rust wire protection reduces optional evidence at the combined serialized budget
+before dropping a valid primary or restoring owner-removed hook content. Capture
+and both relay adapters share that helper; ingress validation remains strict.
+Comparable owner-hook budget paths in other SDKs require separate runtime follow-up.
+
+Rust work is recorded in [the implementation plan](spec/sdks/rust-sdk.md)
+and [qualification matrix](spec/sdks/rust-sdk-qualification.md): one standalone
+feature-gated package, shared capture/evidence/delivery/relay engines, and separate
+Axum/Tower and Actix adapters. The public standalone repository now exists and
+`sdks/debugbundle-rust` owns the published stable `1.0.0` SDK and release tooling. Its native
+HTTP/sender, privacy/wire, operation, probe/config, recovery ledger and log/tracing
+modules are implemented with ongoing qualification. Shared protected HTTP metadata
+feeds Axum/Tower and non-Send Actix middleware; body wrappers own revocable scopes
+through completion/drop. Shared relay validation/security uses the canonical debug and distinct analytics
+schemas; `client/response.rs` shares ACK/proof/piggyback state between senders and
+forwarders. `relay/spool.rs` owns immutable arrays and authenticated scoped state;
+`client/spool.rs` owns bounded restart replay and indexed ACK progress. Native
+Axum/Actix relay factories acquire shared ingress permits before reading streams.
+Core local ingestion uses `event-normalizer/local-correlation-scope.ts` to bind
+optional missing/null SDK project IDs only at `cli/local-processing-files.ts`.
+That local-only namespace never infers cloud scope; explicit IDs/environments
+remain isolated. Actual Rust crate arrays are reader/process regression fixtures.
+`bundle-engine/probe-data.ts` shares protected inline probe projection and stable
+deduplication between the worker and local CLI bundle construction.
+`testkit.rs` provides explicit bounded recording transport and optional numeric
+resource snapshots without payloads, identities or credentials. The isolated
+`smoke/package-consumers` workspace resolves only the extracted local crate and
+exercises vanilla HTTP plus both native TCP middleware/relay applications. Its
+browser host consumes the separately frozen published Browser SDK in headless
+Chromium through both native relays. The independent `smoke/performance` binary
+owns allocation instrumentation; the production SDK does not replace allocators.
+`storage/unix.rs` owns handle-relative private files; `storage/windows.rs` pins
+native ancestors and delegates its narrow audited Win32 ABI calls to
+`storage/windows/ffi.rs`. Native OS runtime/coverage lanes remain distinct from
+cross-compilation. The bounded fuzz workspace audits its frozen graph separately.
+CI creates one `.crate` identity for Linux/native/Browser consumers. Python native
+artifact extraction validates portable paths and the approved source/document/
+fixture inventory before copying. `make package` applies the same Python guard
+to exported candidates; anchored Cargo include patterns exclude local development
+dependencies, hidden metadata and unrelated payloads. The automated tag-release
+planner derives exact source/version/checksum from passing qualification. Separate
+tooling/source checkouts and fresh Cargo publish targets preserve archive identity.
+The publishing job compares repackaged bytes before credentials and verifies real
+registry-installed consumers. [The release record](spec/sdks/rust-sdk-release.md)
+tracks first publication, verified one-time OIDC identity (`43575500128`) and
+bootstrap-secret removal. Stable `1.0.0` will use its own tag in the coordinated
+main-repository/site release after exact-source/artifact qualification.
+Core `packages/project-discovery/src/rust.ts` owns bounded read-only Cargo
+package/workspace and framework detection; it reuses safe project-file reads.
+CLI setup maps those results into profiles/Cargo workflows, with Rust API text
+owned by `apps/cli/src/setup-rust-guidance.ts` and native relay guidance alongside
+the other frameworks. It never executes Cargo or rewrites Rust source.
+Final source/artifact `eb9e09a` passes all eight CI jobs (`43468613263`). Audit fixes
+retain nested safe graphs, bound public privacy-key work and explicitly disable
+HTTP decompression under Cargo feature unification. Real TLS fixtures extend the
+packaged/native qualification gates, now passed on all four supported platforms. Consult the audit and
+[implementation record](spec/sdks/rust-sdk-progress.md). The exact audited alpha
+is published and passes real registry-installed standalone/Axum/Actix consumers.
+`storage.rs` owns canonical arrays and the portable API; `storage/unix.rs` uses
+safe descriptor-relative Linux/macOS file operations, private ownership checks
+and no-replace publication. `storage/windows.rs` pins native ancestor handles,
+refuses reparse paths and uses private DACL/regular-file checks. Its narrow
+`windows/ffi.rs` boundary alone permits owned Win32 ABI calls. Windows source
+cross-compiles under Rust 1.89; baseline native file/relay/coverage
+acceptance passed alongside macOS and Linux on the same crate checksum. Fresh
+audit-native acceptance remains tied to its own commit and crate checksum.
+Other local-file platforms fail closed.
 
 **Mobile expansion status, following the Mobile Correlation Contract:**
 

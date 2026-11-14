@@ -29,6 +29,12 @@ then explicitly rebuild from its retained event files using
 capture preset. This rebuild regenerates local incident/artifact state; it does
 not change cloud records or the retained event files.
 
+The Rust integration candidate also accepts canonical SDK arrays with an absent
+or null `project_id`. Within that repository's local store these use the local-only
+unassigned namespace `00000000-0000-0000-0000-000000000000`. Explicit project IDs
+and environments stay isolated. Processing preserves the SDK file bytes and does
+not infer a cloud project, connection or permission from the unassigned namespace.
+
 Connected `doctor` diagnostics check API health and saved access-token authentication with a one-incident probe restricted to `cloud_project_id`. Missing or blank connected project scope fails before any request. Incident contents are discarded and are not included in the report. Local-only diagnostics make no cloud request.
 
 In a connected workspace, `debugbundle incidents` and `--source cloud` default
@@ -84,7 +90,24 @@ debugbundle incidents
 debugbundle explain <incident-id> --source cloud
 ```
 
+## Rust setup candidate
+
+The unreleased Rust setup candidate detects Cargo binary packages and virtual or
+mixed workspaces, including aliased/inherited Axum and Actix Web dependencies.
+It records Cargo workflows and provides SDK feature, logger composition,
+middleware and native relay instructions in human output and JSON
+`suggested_actions`. Rust source and Cargo manifests remain unchanged.
+The Rust crate itself is unpublished until its qualification/release gates pass.
+
+Discovery reads bounded manifests without running Cargo or build scripts. It
+avoids target/vendor/generated SDK trees, symlinks and outside workspace members;
+libraries without binary targets are not registered as backend deployables.
+Review the static profile, especially target-specific/optional dependencies or
+large/deep workspaces. Name backend services such as `checkout-api` separately
+from a browser's `checkout-web`; Rust relay defaults preserve the browser service.
+
 ## Agent-aware setup
+
 
 ```sh
 debugbundle setup --agent codex --agent claude-code --agent gemini-cli --agent muse-code --non-interactive

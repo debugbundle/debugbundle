@@ -315,6 +315,49 @@ closed evidence and context with downstream proof intersection and indexed
 opt-in rejection details. Runtime and installed-artifact receipts are recorded
 separately from publication in the release handoff linked from `STATUS.md`.
 
+The unpublished Rust `debugbundle` candidate uses SDK-owned protected snapshots,
+`ExceptionInput::borrowed` without Display/Debug/source traversal, revocable
+`Operation` / `OperationContext` owners and poll-scoped propagation. Its service
+runtime is `rust`, while v1 exception evidence deliberately uses the existing
+`unknown` runtime enum. `capture_recovery_observations` defaults false and
+`evidence_capabilities` is an explicit complete-path pin, subject to valid native
+discovery and ACK revocation. Explicit panic observation chains native hooks and
+uses the smaller callback-free budget; panic-abort delivery is not guaranteed.
+Composable tracing/log adapters retain app sinks and use exact occurrence receipts
+for same-operation pairing. Axum/Tower and non-Send Actix source adapters preserve
+native request/stream/error behavior and use opt-in parsed body snapshots, never
+automatic stream buffering. First-party trace targets are explicit exact origins.
+Request context preserves bounded protected `X-Request-Id` values or supplies a
+fresh opaque ID; manual callers use `Context::with_request_id`. A selectable
+`testkit` provides bounded protected in-memory transport with canonical ACKs.
+JSON numeric normalization follows Core's mathematical-integer semantics, and
+reader pins normalize unique known features independent of input order.
+Snapshot composition preserves reachable cause/aggregate nodes, field clipping
+reports truncation and unsafe child provenance survives composition/byte pressure.
+Lazy probe admission checks joint event ownership before scheduling and invoking
+producers. A numeric-only testkit resource snapshot exposes bounded accounting.
+Private local/spool storage has Linux/macOS handle-relative and Windows pinned
+handle/DACL implementations. Known durable-relay ACK progress retains one bounded
+record and its file lease across callback contention and persistence failures;
+idempotent progress/completion retries cannot resend its accepted indices. A
+stalled persistence lane pauses that client's replay while flush/shutdown remain
+finite. Crash or shutdown before durable ACK persistence retains the documented
+at-least-once limitation. Current-candidate native file/HTTP application and
+per-file coverage checks pass on Windows, macOS and Linux using the same crate
+checksum; cross-compilation alone is not their evidence. Published Browser 3.2.2 passes ordinary, native beacon and
+keepalive-fallback traffic through both extracted Rust relays on Linux arm64.
+The configured native/exact-crate matrix passes on `244c104`. Deep audit and
+published-registry acceptance remain required before release; this is not a fresh
+family-wide release/parity claim.
+Nested SDK-owned safe snapshot graphs retain their cause/aggregate edges while
+remapping node IDs under the shared node, edge, depth and byte budgets. An omitted
+child reports honest truncation without erasing already retained evidence. Rust
+HTTP explicitly selects Rustls and disables automatic response decompression,
+including under consumer Cargo feature unification.
+
+See [the Rust execution record](../spec/sdks/rust-sdk-progress.md). See also
+[the deep-audit record](../spec/sdks/rust-sdk-audit.md).
+
 Browser passive collection uses one resource observer and a CSP listener with
 bounded sanitized DTOs, expiry and at most one coalesced late context per failure.
 No historical performance-buffer scan, policy mutation or diagnostic request is
@@ -344,19 +387,19 @@ Every language SDK must implement the same core methods. This universal interfac
 
 SDKs must use the idiomatic naming convention for the target language while keeping method names semantically identical:
 
-| Language          | Style                 | Example                               |
-| ----------------- | --------------------- | ------------------------------------- |
-| Node.js / Browser | camelCase             | `debugbundle.captureException(err)`   |
-| Python            | snake_case            | `debugbundle.capture_exception(err)`  |
-| PHP               | camelCase (PSR)       | `DebugBundle::captureException($e)`   |
-| Go                | PascalCase (exported) | `debugbundle.CaptureException(err)`   |
-| Ruby              | snake_case            | `DebugBundle.capture_exception(err)`  |
-| Java              | camelCase             | `DebugBundle.captureException(err)`   |
-| C#                | PascalCase            | `DebugBundle.CaptureException(err)`   |
-| Kotlin            | camelCase             | `DebugBundle.captureException(err)`   |
-| Swift             | camelCase             | `DebugBundle.captureException(err)`   |
-| Rust              | snake_case            | `debugbundle::capture_exception(err)` |
-| Dart              | camelCase             | `debugBundle.captureException(err)`   |
+| Language          | Style                 | Example                                         |
+| ----------------- | --------------------- | ----------------------------------------------- |
+| Node.js / Browser | camelCase             | `debugbundle.captureException(err)`             |
+| Python            | snake_case            | `debugbundle.capture_exception(err)`            |
+| PHP               | camelCase (PSR)       | `DebugBundle::captureException($e)`             |
+| Go                | PascalCase (exported) | `debugbundle.CaptureException(err)`             |
+| Ruby              | snake_case            | `DebugBundle.capture_exception(err)`            |
+| Java              | camelCase             | `DebugBundle.captureException(err)`             |
+| C#                | PascalCase            | `DebugBundle.CaptureException(err)`             |
+| Kotlin            | camelCase             | `DebugBundle.captureException(err)`             |
+| Swift             | camelCase             | `DebugBundle.captureException(err)`             |
+| Rust              | snake_case            | `client.capture_exception(&snapshot, &context)` |
+| Dart              | camelCase             | `debugBundle.captureException(err)`             |
 
 ---
 
@@ -890,7 +933,7 @@ Framework integrations must auto-register log capture alongside error/request ca
 | --------------- | --------------------------------------------------- | ------------- | --------------- |
 | C#              | `DebugBundle.Sdk` plus `DebugBundle.*` integrations | NuGet         | Released v1.3.0 |
 | Kotlin (server) | `com.debugbundle:debugbundle-kotlin`                | Maven Central | Planned         |
-| Rust            | `debugbundle`                                       | crates.io     | Planned         |
+| Rust            | `debugbundle`                                       | crates.io     | Unpublished candidate |
 
 ### V1 SDK Targets (Wave 3 — Client & Mobile Expansion)
 
@@ -1457,6 +1500,12 @@ Future server SDKs must implement the same full relay handler contract before th
 | Ruby            | Rack middleware, Rails engine                |
 | C#              | ASP.NET Core endpoint mapping and middleware |
 | Kotlin (server) | Ktor plugin                                  |
+
+Rust is an unpublished candidate implementing this full relay contract through
+`axum::browser_relay` and `actix_web::browser_relay`. Both adapters and CLI Cargo
+discovery/guidance are required for first release; qualification is recorded in
+[the Rust audit](../spec/sdks/rust-sdk-audit.md). This does not add Rust to the
+published distribution list.
 
 All server SDKs must implement sections 1–8, section 11, section 12, and section 13 of this contract before release.
 
