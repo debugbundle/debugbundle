@@ -126,3 +126,95 @@ describe("Rust CLI setup", () => {
     }
   );
 });
+
+const legacyCases: Array<{
+  label: string;
+  runtime: string;
+  framework: string;
+  files: Record<string, string>;
+}> = [
+  {
+    label: "Rails Gemfile",
+    runtime: "Ruby",
+    framework: "Rails",
+    files: { Gemfile: 'gem "rails"\n' }
+  },
+  { label: "Rack Gemfile", runtime: "Ruby", framework: "Rack", files: { Gemfile: 'gem "rack"\n' } },
+  {
+    label: "Rack entrypoint",
+    runtime: "Ruby",
+    framework: "Rack",
+    files: { Gemfile: 'gem "sinatra"\n', "config.ru": "run App\n" }
+  },
+  {
+    label: "plain Ruby",
+    runtime: "Ruby",
+    framework: "unknown",
+    files: { Gemfile: 'gem "sinatra"\n' }
+  },
+  {
+    label: "Spring Maven",
+    runtime: "Java",
+    framework: "Spring Boot",
+    files: { "pom.xml": "<project><dependency>spring-boot-starter-web</dependency></project>" }
+  },
+  {
+    label: "Spring Gradle",
+    runtime: "Java",
+    framework: "Spring Boot",
+    files: {
+      "build.gradle":
+        "dependencies { implementation 'org.springframework.boot:spring-boot-starter-web:4.0.0' }"
+    }
+  },
+  {
+    label: "Spring Kotlin Gradle",
+    runtime: "Java",
+    framework: "Spring Boot",
+    files: {
+      "build.gradle.kts":
+        'dependencies { implementation("org.springframework.boot:spring-boot-starter-web:4.0.0") }'
+    }
+  },
+  {
+    label: "Servlet",
+    runtime: "Java",
+    framework: "Servlet",
+    files: { "pom.xml": "<project />", "src/main/webapp/WEB-INF/web.xml": "<web-app />" }
+  },
+  {
+    label: "plain Java",
+    runtime: "Java",
+    framework: "unknown",
+    files: { "pom.xml": "<project />" }
+  }
+];
+
+it.each(legacyCases)(
+  "preserves $label discovery beside a Cargo service without rewriting manifests",
+  async ({ runtime, framework, files }) => {
+    const root = await fixture();
+    const cargo = '[package]\nname="rust-api"\nversion="0.1.0"\n[dependencies]\naxum="0.8"\n';
+    await file(root, "Cargo.toml", cargo);
+    await file(root, "src/main.rs", "fn main() {}\n");
+    for (const [path, contents] of Object.entries(files))
+      await file(root, `apps/legacy-api/${path}`, contents);
+    const result = await setupCommand({ json: true }, { cwd: () => root });
+    expect(result.exitCode).toBe(0);
+    const output = JSON.parse(result.output) as Output;
+    expect(output.detected_services).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "rust-api",
+          runtime: "Rust",
+          framework: "Axum",
+          paths: ["."]
+        }),
+        expect.objectContaining({ runtime, framework, paths: ["apps/legacy-api"] })
+      ])
+    );
+    expect(await readFile(join(root, "Cargo.toml"), "utf8")).toBe(cargo);
+    for (const [path, contents] of Object.entries(files))
+      expect(await readFile(join(root, "apps/legacy-api", path), "utf8")).toBe(contents);
+  }
+);
