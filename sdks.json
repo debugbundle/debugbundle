@@ -51,9 +51,23 @@
       "branch": "main"
     },
     {
+      "path": "sdks/debugbundle-rust",
+      "cloneUrl": "https://github.com/debugbundle/debugbundle-rust.git",
+      "branch": "main"
+    },
+    {
       "path": "sdks/debugbundle-dotnet",
       "cloneUrl": "https://github.com/debugbundle/debugbundle-dotnet.git",
       "branch": "main"
     }
-  ]
+  ],
+  "releases": {
+    "rust": {
+      "repository": "debugbundle/debugbundle-rust",
+      "registry": "crates.io",
+      "package": "debugbundle",
+      "version": "1.0.0",
+      "workflow": "release.yml"
+    }
+  }
 }

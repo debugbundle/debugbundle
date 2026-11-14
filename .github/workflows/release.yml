@@ -90,6 +90,18 @@ jobs:
           pnpm vitest run tests/apps/cli/cli-workspace-package.test.ts tests/apps/mcp/mcp-workspace-package.test.ts tests/apps/mcp/mcp-stdio-server.test.ts
           pnpm public-site:artifacts
 
+      - name: Verify the independent Rust SDK release
+        run: node scripts/check-rust-release.mjs
+
+      - name: Retain independent SDK registry receipts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: sdk-release-train
+          path: .tmp/sdk-release-train/
+          if-no-files-found: warn
+          include-hidden-files: true
+
       - name: Create GitHub release
         shell: bash
         run: |
@@ -105,6 +117,7 @@ jobs:
           mcp_version="$(node --input-type=module -e "import { readFileSync } from 'node:fs'; console.log(JSON.parse(readFileSync(process.argv[1], 'utf8')).version)" apps/mcp/package.json)"
           shared_types_version="$(node --input-type=module -e "import { readFileSync } from 'node:fs'; console.log(JSON.parse(readFileSync(process.argv[1], 'utf8')).version)" packages/shared-types/package.json)"
           redaction_version="$(node --input-type=module -e "import { readFileSync } from 'node:fs'; console.log(JSON.parse(readFileSync(process.argv[1], 'utf8')).version)" packages/redaction/package.json)"
+          rust_version="$(node --input-type=module -e "import { readFileSync } from 'node:fs'; console.log(JSON.parse(readFileSync(process.argv[1], 'utf8')).version)" .tmp/sdk-release-train/rust.json)"
 
           notes="$(cat <<EOF
           This is the canonical product release for the DebugBundle core monorepo.
@@ -114,11 +127,13 @@ jobs:
           - CLI package: @debugbundle/cli@${cli_version}
           - MCP package: @debugbundle/mcp@${mcp_version}
           - Shared JS packages: @debugbundle/shared-types@${shared_types_version}, @debugbundle/redaction@${redaction_version}
+          - Rust SDK: debugbundle@${rust_version} on crates.io (debugbundle/debugbundle-rust)
 
           Package-specific distribution tags remain separate:
           - cli-v* for @debugbundle/cli
           - mcp-v* for @debugbundle/mcp
           - shared-js-v* for @debugbundle/shared-types and @debugbundle/redaction
+          - v* in debugbundle/debugbundle-rust for the Rust crate
           EOF
           )"
 

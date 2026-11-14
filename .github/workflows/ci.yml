@@ -78,6 +78,21 @@ jobs:
       - name: Build
         run: pnpm build
 
+  rust-core-pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install frozen dependencies in Docker
+        run: make install
+
+      - name: Qualify Rust artifact ingestion and worker processing
+        run: make rust-core-integration
+
   gemini-extension:
     runs-on: ubuntu-latest
     timeout-minutes: 15

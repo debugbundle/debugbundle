@@ -6,6 +6,24 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.27.0] - 2026-11-14
+
+- Add Rust Cargo package/workspace discovery and native logging, Axum, Actix Web
+  and browser-relay setup guidance. Preserve application source and existing project
+  bindings; qualify the independent Rust 1.0.0 crate before advertising it.
+- Read Rust stack frames and protected inline probe evidence consistently in local
+  CLI processing and the worker. Prevent delayed context jobs from overwriting a
+  newer bundle generation's primary recovery evidence.
+- Use shared responsive table footers and exact filtered totals across project and
+  workspace inventories, retained analytics samples and weekly reviews. Add optional
+  first-page analytics count metadata with predecessor fallback in CLI/MCP reads.
+- Improve notification schedule help, incident log-level filtering, Discord channel
+  labelling and billing-email whitespace without changing notification delivery,
+  permissions, billing amounts or saved preferences.
+- Register Rust in the coordinated release train and gate canonical core releases
+  on the advertised stable crate's metadata, index and downloaded checksum. Keep
+  independent SDK version tags and trusted-publishing qualification.
+
 ## [1.26.0] - 2026-11-12
 
 - Align MCP ecosystem verification with ClawHub's documented VirusTotal retirement.
