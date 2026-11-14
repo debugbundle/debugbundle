@@ -123,12 +123,15 @@ export interface ApiAnalyticsDependencies {
           service?: string | undefined;
           environment?: string | undefined;
           tag?: string | undefined;
+          include_total?: boolean | undefined;
           cursor?: { last_seen_at: string; sample_id: string } | undefined;
           limit: number;
           now: string;
         }): Promise<{
           samples: Array<AnalyticsJourneySampleMetadata & { object_key: string }>;
           next_cursor: string | null;
+          total_pages?: number;
+          total_count?: number;
         }>;
         getAnalyticsJourneySampleForProject(input: {
           organization_id: string;
@@ -208,6 +211,7 @@ export interface ApiAnalyticsDependencies {
           bundles: AnalyticsBundleGenerationRecord[];
           next_cursor: string | null;
           total_pages?: number;
+          total_count?: number;
         }>;
         listAnalyticsBundleGenerationsForOrganization(
           input: ProjectActorReadScope & {
@@ -226,6 +230,7 @@ export interface ApiAnalyticsDependencies {
           bundles: AnalyticsBundleGenerationInventoryRecord[];
           next_cursor: string | null;
           total_pages?: number;
+          total_count?: number;
         }>;
         requestAnalyticsBundleGenerationForProject(input: {
           initiating_authority?: ProjectJobInitiator;

@@ -259,6 +259,10 @@ Ordered correlation locks plus transactional durable rebuild intents cover both
 arrival orders and sampled failures. Context-only processing cannot invoke incident
 lifecycle services. Local CLI uses the same pure association rules. Retention
 removes expired references; retry and replay do not duplicate associations/jobs.
+When bundle reservation returns a newer source identity, the superseded job must
+complete without rewriting that source's artifact. Its primary-occurrence override
+does not belong to the newer generation; rebuilding would lose or misassociate
+recovery evidence. Compare source event IDs, including same-millisecond events.
 
 ## FR-EVID-08: Provenance and readers
 

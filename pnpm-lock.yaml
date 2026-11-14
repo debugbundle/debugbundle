@@ -48,8 +48,8 @@ importers:
         specifier: 3.2.2
         version: 3.2.2
       "@debugbundle/shared-types":
-        specifier: 3.5.0
-        version: 3.5.0
+        specifier: 3.7.0
+        version: 3.7.0
       "@modelcontextprotocol/sdk":
         specifier: 1.32.1
         version: 1.32.1(zod@4.6.7)
@@ -68,6 +68,9 @@ importers:
       jose:
         specifier: ~6.2.10
         version: 6.2.10
+      minimatch:
+        specifier: 11.0.8
+        version: 11.0.8
       oidc-provider:
         specifier: ~9.11.2
         version: 9.11.5
@@ -80,6 +83,9 @@ importers:
       pino:
         specifier: ^9.7.0
         version: 9.14.0
+      smol-toml:
+        specifier: 1.9.1
+        version: 1.9.1
       stripe:
         specifier: ^22.0.0
         version: 22.0.0(@types/node@24.12.0)
@@ -849,10 +855,10 @@ packages:
         integrity: sha512-aXm3r0V5/huk62jW9jQdcifDwGCsawidlJkYojIf4IoT/9ZBPwR0XLyvQa/Wlt23AmLbK8xxlbJmia2l/Yx7gQ==
       }
 
-  "@debugbundle/shared-types@3.5.0":
+  "@debugbundle/shared-types@3.7.0":
     resolution:
       {
-        integrity: sha512-/wFf4s0p9bOIM1lOiqdziSXhRX0Y/sP9kTygOWi89DdSF0zdv5f6GVpv7e4Ch43+aklcO+b9BhPtKJ12Uqm2zA==
+        integrity: sha512-HK1QhXGu8nUz4err+6O+jp6ntaCRwWF4ewTIDo9UedKKCFbbHPdtZb0b7H59KCAR8/g4rd2j9v3AgwtX7ZZPHg==
       }
 
   "@earendil-works/pi-tui@0.78.0":
@@ -1370,6 +1376,12 @@ packages:
         integrity: sha512-wgm9Ehl2jpeqP3zw/7mo3kRHFp5MEDhqAdwy1fTGkHAwnkGOVsgpvQhL8B5n1qlb01jV3n/bI0ZfZp5lWA1k4w==
       }
     engines: { node: ">=18.0.0" }
+
+  "@isaacs/nonrecursive-glob-match@1.1.0":
+    resolution:
+      {
+        integrity: sha512-GPm/Dbvk5RLmhRnxXIa7nTpK0xtl4E0wj0MslsuNiJ1FIROU+2+9lgUC/dgF7Ey4QCWhfEsgxilMRMCdHPfDfw==
+      }
 
   "@istanbuljs/schema@0.1.3":
     resolution:
@@ -3976,6 +3988,13 @@ packages:
       }
     engines: { node: 20 || >=22 }
 
+  brace-expansion@5.0.13:
+    resolution:
+      {
+        integrity: sha512-Vh3dmFbc4wZeox7M9I/0L9GfFd83Su4+yCck/OF9Gi/P/dAHn0RT7X4K9R7gMNMhDck3DvhR6QXsnQdjjgwNvQ==
+      }
+    engines: { node: 20 || >=22 }
+
   brotli@1.3.3:
     resolution:
       {
@@ -5824,6 +5843,13 @@ packages:
       }
     engines: { node: 18 || 20 || >=22 }
 
+  minimatch@11.0.8:
+    resolution:
+      {
+        integrity: sha512-nFQuYSTVrGvysVBps5Ih+0BdnYFN/Cj3C816r6+p7yK+FHrVLGE4O4N9AFwykrlNlvM2HYt+Rad1Uiro6h88Ig==
+      }
+    engines: { node: 20 || >=22 }
+
   minimatch@3.1.5:
     resolution:
       {
@@ -6852,6 +6878,13 @@ packages:
       {
         integrity: sha512-bLGGlR1QxBcynn2d5YmDX4MGjlZvy2MRBDRNHLJ8VI6l6+9FUiyTFNJ0IveOSP0bcXgVDPRcfGqA0pjaqUpfVg==
       }
+
+  smol-toml@1.9.1:
+    resolution:
+      {
+        integrity: sha512-j7WyPdf0CJoutMzMoPLF/bVXHtKZIT9Rb4eGeEbWw8X2t5oirjPgpL+OpaENZrILYaXqYwnVH+qgUwVbl+pUJQ==
+      }
+    engines: { node: ">= 18" }
 
   sonic-boom@4.2.1:
     resolution:
@@ -8399,7 +8432,7 @@ snapshots:
     dependencies:
       zod: 4.6.7
 
-  "@debugbundle/shared-types@3.5.0":
+  "@debugbundle/shared-types@3.7.0":
     dependencies:
       zod: 4.6.7
 
@@ -8664,6 +8697,8 @@ snapshots:
   "@isaacs/fs-minipass@4.0.1":
     dependencies:
       minipass: 7.1.3
+
+  "@isaacs/nonrecursive-glob-match@1.1.0": {}
 
   "@istanbuljs/schema@0.1.3": {}
 
@@ -10545,6 +10580,10 @@ snapshots:
     dependencies:
       balanced-match: 4.0.4
 
+  brace-expansion@5.0.13:
+    dependencies:
+      balanced-match: 4.0.4
+
   brotli@1.3.3:
     dependencies:
       base64-js: 1.5.1
@@ -11620,6 +11659,11 @@ snapshots:
     dependencies:
       brace-expansion: 5.0.11
 
+  minimatch@11.0.8:
+    dependencies:
+      "@isaacs/nonrecursive-glob-match": 1.1.0
+      brace-expansion: 5.0.13
+
   minimatch@3.1.5:
     dependencies:
       brace-expansion: 1.1.20
@@ -12310,6 +12354,8 @@ snapshots:
   signal-exit@3.0.7: {}
 
   sisteransi@1.0.5: {}
+
+  smol-toml@1.9.1: {}
 
   sonic-boom@4.2.1:
     dependencies:

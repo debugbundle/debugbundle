@@ -513,6 +513,19 @@ It also carries credibility with advanced developer audiences.
 
 - Keep the SDK core small and composable.
 - Provide ergonomic support for error chains, spans, request context, and panics.
+- The prepared [Rust implementation plan](sdks/rust-sdk.md) and
+  [qualification matrix](sdks/rust-sdk-qualification.md) define the current SDK
+  safety, privacy, evidence, policy/probe, delivery and relay baseline. Both Axum
+  and Actix Web are required for the first release. The public standalone
+  repository exists, and the published `1.0.0` implements both with
+  full relays, native logs, policy/probes and safe bounded evidence. Audited candidate
+  `eb9e09a` passes all eight qualification jobs, including native macOS ARM64/Windows,
+  Linux x64/arm64, exact-crate consumers and published Browser relay checks.
+  The [deep audit](sdks/rust-sdk-audit.md) records seventeen findings and their
+  final acceptance evidence. See the
+  [implementation record](sdks/rust-sdk-progress.md) and
+  [first publication record](sdks/rust-sdk-release.md). Genuine registry-installed
+  standalone, Axum and Actix applications pass for that exact alpha.
 
 ---
 
@@ -821,7 +834,7 @@ For the next phase of SDK implementation, DebugBundle should prioritize these tw
 
 - **Immediate implementation focus (Wave 1):** TS/JS, Python, PHP, WordPress plugin, Java core + Spring Boot + servlet/JAX-RS app-server support, Ruby, Go
 - **Pre-release expansion:** Ruby and Go publication handoff
-- **Next depth layer (Wave 2):** C#/.NET is on 1.3.0; Kotlin server and Rust remain future work.
+- **Next depth layer (Wave 2):** C#/.NET's older 1.3.0 planning milestone is historical; Kotlin server remains future work. Rust is implemented and audited; `1.0.0` is published with final native/artifact and genuine registry-consumer qualification.
 - **Strategic product expansion (Wave 3):** Kotlin Android, Swift iOS, and React Native are published on the coordinated 1.2.0 remediation line; Dart/Flutter remains future work.
 
 ### V1 framework scope per SDK

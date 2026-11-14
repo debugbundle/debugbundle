@@ -15,6 +15,8 @@ import { Skeleton } from "../ui/skeleton.js";
 import { AnalyticsBundlesTable } from "./analytics-bundles-table.js";
 import { AppliedAnalyticsFilterList } from "./analytics-filter-panel.js";
 import { CursorPaginationControls } from "./cursor-pagination-controls.js";
+import { TableListFooter } from "./table-list-footer.js";
+import { inventoryTitle } from "../../lib/inventory-title.js";
 import { ResourceListState } from "./resource-list-state.js";
 import { TableRefreshButton } from "./table-refresh-button.js";
 import {
@@ -37,16 +39,18 @@ export function WorkspaceAnalyticsBundles({
     createWorkspaceAnalyticsFilters("bundles")
   );
   const [filters, setFilters] = useState(draftFilters);
+  const [pageSize, setPageSize] = useState(20);
   const pagination = useCursorPagination(
     async (cursor) => {
-      const response = await listAnalyticsBundles(buildBundleQuery(filters, cursor));
+      const response = await listAnalyticsBundles(buildBundleQuery(filters, cursor, pageSize));
       return {
         items: response.bundles,
         nextCursor: response.next_cursor,
-        totalPages: response.total_pages
+        totalPages: response.total_pages,
+        totalCount: response.total_count
       };
     },
-    [filters]
+    [filters, pageSize]
   );
 
   function resetFilters(): void {
@@ -71,7 +75,9 @@ export function WorkspaceAnalyticsBundles({
   return (
     <Card className="w-full min-w-0">
       <CardHeader className="grid grid-cols-1 items-center gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
-        <CardTitle>Generated analytics bundles</CardTitle>
+        <CardTitle>
+          {inventoryTitle("Generated analytics bundles", pagination.totalCount)}
+        </CardTitle>
         <div
           role="group"
           aria-label="Analytics inventory controls"
@@ -131,31 +137,41 @@ export function WorkspaceAnalyticsBundles({
             {(bundles) => (
               <div className="flex flex-col gap-4">
                 <AnalyticsBundlesTable bundles={bundles} />
-                <CursorPaginationControls
-                  page={pagination.page}
-                  totalPages={pagination.totalPages}
-                  hasNextPage={pagination.hasNextPage}
-                  isLoading={pagination.isLoading}
-                  onPreviousPage={pagination.goToPreviousPage}
-                  onNextPage={() => void pagination.goToNextPage()}
-                />
               </div>
             )}
           </ResourceListState>
         )}
       </CardContent>
+      <TableListFooter
+        id="workspace-analytics-bundles-page-size"
+        ariaLabel="Generated analytics bundles rows per page"
+        value={pageSize}
+        onChange={setPageSize}
+        disabled={pagination.isLoading}
+      >
+        <CursorPaginationControls
+          embedded
+          page={pagination.page}
+          totalPages={pagination.totalPages}
+          hasNextPage={pagination.hasNextPage}
+          isLoading={pagination.isLoading}
+          onPreviousPage={pagination.goToPreviousPage}
+          onNextPage={() => void pagination.goToNextPage()}
+        />
+      </TableListFooter>
     </Card>
   );
 }
 
 function buildBundleQuery(
   filters: WorkspaceAnalyticsFilterValues,
-  cursor: string | null
+  cursor: string | null,
+  limit: number
 ): AnalyticsBundleInventoryQuery {
   const from = toAnalyticsDateStart(filters.from);
   const to = toAnalyticsDateEnd(filters.to);
   return {
-    limit: 20,
+    limit,
     status: filters.status as Exclude<AnalyticsBundleInventoryQuery["status"], undefined>,
     ...(filters.projectId === "all" ? {} : { projectId: filters.projectId }),
     ...(filters.kind === "all"

@@ -424,8 +424,8 @@ export function renderWeeklyReportEmail(
   const primaryProject = normalized.projects[0];
   const subject =
     projectCount === 1 && primaryProject !== undefined
-      ? `DebugBundle weekly report for ${primaryProject.projectName}`
-      : `DebugBundle weekly report for ${projectCount} projects`;
+      ? `DebugBundle weekly project digest for ${primaryProject.projectName}`
+      : `DebugBundle weekly project digest for ${projectCount} projects`;
   const formattedWindow = `${formatEmailDate(normalized.windowStart)} to ${formatEmailDate(normalized.windowEnd)}`;
   const lead = formatWeeklyReportLead(normalized.projects);
   const preheader = formatWeeklyReportPreheader(normalized.projects, formattedWindow);
@@ -450,8 +450,8 @@ export function renderWeeklyReportEmail(
     .trimEnd();
   const html = renderEmailLayout({
     brandMarkUrl: normalized.brandMarkUrl,
-    eyebrow: "Weekly report",
-    title: "DebugBundle weekly report",
+    eyebrow: "Weekly project digest",
+    title: "DebugBundle weekly project digest",
     intro: `${escapeHtml(lead)} ${escapeHtml(formattedWindow)}.`,
     preheader,
     bodyHtml: [

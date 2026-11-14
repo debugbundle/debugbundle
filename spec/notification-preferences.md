@@ -13,6 +13,10 @@ while notification delivery is paused. Existing rules and delivery defaults rema
 - Account Settings and Project Settings expose the same reusable notification
   editor. Projects inherit account defaults; explicit project modes override them.
   Active account pauses always win. Each channel displays its effective policy.
+  Choosing Use account schedule displays the account's current daily time and
+  timezone beneath the selector. Time and timezone controls and their guidance
+  appear only for a custom project schedule or the account editor; saving an
+  inherited project schedule retains `daily: null`.
 - Personal preferences apply only to the signed-in user's email recipient. Shared
   destination preferences are explicitly labelled as affecting the team and require
   account-owner or project-owner/admin authority. Shared delivery restrictions and

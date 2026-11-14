@@ -8,7 +8,7 @@ import type {
   AlertGroupResponse
 } from "../../../../../packages/alert-client/src/index.js";
 import { getAlertGroup, listAlertGroups } from "../../lib/api-alert-groups.js";
-import { BoundedListLimit } from "./bounded-list-limit.js";
+import { TableListFooter } from "./table-list-footer.js";
 import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card.js";
@@ -98,20 +98,6 @@ export function AlertGroupsCard({ projectId }: { projectId: string }): JSX.Eleme
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        <BoundedListLimit
-          id="alert-group-limit"
-          label="Grouped delivery page limit"
-          value={limit}
-          paginated
-          disabled={loading}
-          onChange={(value) => {
-            setLimit(value);
-            setGroupCursors([undefined]);
-            setMemberCursors([undefined]);
-            setGroupPage(0);
-            setMemberPage(0);
-          }}
-        />
         {selected === null ? null : (
           <>
             <Button
@@ -238,13 +224,28 @@ export function AlertGroupsCard({ projectId }: { projectId: string }): JSX.Eleme
             )}
           </>
         )}
+      </CardContent>
+      <TableListFooter
+        id="alert-group-limit"
+        ariaLabel="Grouped deliveries rows per page"
+        value={limit}
+        disabled={loading}
+        onChange={(value) => {
+          setLimit(value);
+          setGroupCursors([undefined]);
+          setMemberCursors([undefined]);
+          setGroupPage(0);
+          setMemberPage(0);
+        }}
+      >
         {page > 0 || next != null ? (
-          <div className="flex flex-wrap items-center gap-3 border-t pt-4">
+          <>
             <p className="text-sm text-muted-foreground">Page {page + 1}</p>
-            <Pagination className="mx-0 ml-auto w-auto justify-end">
+            <Pagination className="mx-0 w-auto shrink-0 justify-end">
               <PaginationContent>
                 <PaginationItem>
                   <PaginationPrevious
+                    compactOnMobile
                     aria-label={`Previous ${label}`}
                     disabled={page === 0 || loading}
                     onClick={() =>
@@ -256,6 +257,7 @@ export function AlertGroupsCard({ projectId }: { projectId: string }): JSX.Eleme
                 </PaginationItem>
                 <PaginationItem>
                   <PaginationNext
+                    compactOnMobile
                     aria-label={`Next ${label}`}
                     disabled={next == null || loading || error}
                     onClick={nextPage}
@@ -263,9 +265,9 @@ export function AlertGroupsCard({ projectId }: { projectId: string }): JSX.Eleme
                 </PaginationItem>
               </PaginationContent>
             </Pagination>
-          </div>
+          </>
         ) : null}
-      </CardContent>
+      </TableListFooter>
     </Card>
   );
 }

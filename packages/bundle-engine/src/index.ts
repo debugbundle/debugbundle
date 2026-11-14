@@ -1,4 +1,5 @@
 import { buildRuntimeContext, buildDeviceContext } from "./occurrence-context.js";
+export { collectInlineProbeItems, mergeProbeDataItems } from "./probe-data.js";
 import { associateDiagnosticEvidence, buildEvidenceProvenance } from "./diagnostic-evidence.js";
 import { buildErrorContext } from "./error-context.js";
 import {

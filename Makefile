@@ -353,6 +353,25 @@ test-focused:
 project-service-test:
 	$(NODE_RUN) "node_modules/.bin/vitest run --reporter=dot $(if $(TEST_FILES),$(TEST_FILES),tests/packages/storage/project-merge-plan.test.ts)"
 
+.PHONY: rust-discovery-dependencies
+rust-discovery-dependencies:
+	$(NODE_RUN) "corepack enable && corepack pnpm install --frozen-lockfile --ignore-scripts"
+
+.PHONY: rust-cli-package-check
+rust-cli-package-check:
+	$(NODE_RUN) 'corepack enable && corepack pnpm --dir apps/cli build && mkdir -p .tmp/rust-cli-package && npm pack ./apps/cli --ignore-scripts --pack-destination .tmp/rust-cli-package'
+	@set -e; for runtime_image in node:22-alpine node:24-alpine node:26-alpine; do \
+		docker run --rm -v "$(PWD):/source:ro" -w /tmp "$$runtime_image" sh -lc 'cli_version=$$(node -p "require(\"/source/apps/cli/package.json\").version") && npm install --prefix /tmp/rust-cli --no-audit --no-fund --ignore-scripts "/source/.tmp/rust-cli-package/debugbundle-cli-$$cli_version.tgz" >/dev/null && node /source/scripts/check-rust-setup-package.mjs /tmp/rust-cli/node_modules/@debugbundle/cli/bin/debugbundle.js'; \
+	done
+
+.PHONY: rust-core-integration
+rust-core-integration:
+	RUNTIME_INTEGRATION_TEST_FILES=tests/integration/rust-sdk-pipeline.integration.test.ts sh scripts/test-project-service-runtime.sh
+
+.PHONY: rust-browser-registry-info
+rust-browser-registry-info:
+	$(NODE_RUN) 'mkdir -p .tmp/rust-browser-artifacts && cd /tmp && npm view @debugbundle/sdk-browser@latest version dist dependencies --json --registry=https://registry.npmjs.org --userconfig=/dev/null > /workspace/.tmp/rust-browser-artifacts/browser-registry.json'
+
 project-service-format:
 	test -n "$(FORMAT_FILES)"
 	$(NODE_RUN) "node_modules/.bin/prettier --write $(FORMAT_FILES)"
@@ -559,6 +578,10 @@ license-check:
 	$(NODE_RUN) 'corepack pnpm vitest run tests/infrastructure/release-governance.test.ts tests/infrastructure/public-core-repo.test.ts tests/apps/cli/cli-workspace-package.test.ts tests/apps/mcp/mcp-workspace-package.test.ts tests/apps/mcp/mcp-claude-code-plugin.test.ts tests/apps/mcp/mcp-clawhub-skill.test.ts tests/apps/mcp/mcp-ecosystem-release.test.ts tests/apps/mcp/mcp-legacy-contract.test.ts tests/apps/mcp/mcp-openai-plugin.test.ts tests/apps/openclaw-plugin/openclaw-plugin-package.test.ts'
 
 .PHONY: release-mcp-ecosystem-plan
+.PHONY: rust-release-check
+rust-release-check:
+	$(NODE_RUN) 'node scripts/check-rust-release.mjs'
+
 release-mcp-ecosystem-plan:
 	node scripts/release-mcp-ecosystem.mjs plan $(if $(VERSION),--version $(VERSION),) $(if $(TARGETS),--targets $(TARGETS),) $(if $(CLAWHUB_VERSION),--clawhub-version $(CLAWHUB_VERSION),)
 
@@ -826,6 +849,10 @@ business-browser-review:
 .PHONY: evidence-fixtures
 evidence-fixtures:
 	$(NODE_RUN) 'SDK_FIXTURE_TARGETS="$(SDK_FIXTURE_TARGETS)" corepack pnpm exec tsx scripts/sync-evidence-fixtures.ts $(FIXTURE_ARGS)'
+
+.PHONY: rust-analytics-fixtures
+rust-analytics-fixtures:
+	$(NODE_RUN) 'corepack pnpm exec tsx scripts/sync-rust-analytics-fixtures.ts'
 
 .PHONY: license-site-check
 license-site-check:

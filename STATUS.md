@@ -1977,3 +1977,137 @@ Report evaluation decision: corrected fixture review qualifies Terra as the inte
 7 November export/lifecycle continuation: the browser-Owner account export now adds fixed, bounded report definition/run/delivery/numeric-history and personal referral-finance sections. The legacy attachment gains a manifest; report content keeps its current authenticated JSON/HTML/PDF readers. No model receipt, worker lease, private object key, provider message ID or protected identity hash is exported. Real PostgreSQL tests caught and now protect microsecond pagination, original-origin filtering, twelve-month retention, per-recipient delivery uniqueness, actual account deletion and retained financial markers. Export/API/legacy-account regressions pass 27 cases; export/lifecycle/content SQL qualification passes all 27 cases across the main run plus its corrected delivery fixture rerun (26 earlier + eight final export cases). Root types/lint/style pass. All 83 migrations from the immutable installed predecessor plus retention/ownership preservation pass three real PostgreSQL cases; historical 66 migrations are unchanged. Next: finish the Business-aware rollback activation bridge, public site/catalogue/terms and final ecosystem/resource/regression qualification. No live activation, provider write, deployment, notification or distribution has been performed.
 
 9 November local app UI refinement (owner-approved, not deployed): section badges now follow titles in a shared wrapping row across callouts, analytics details and email previews (FR-WEB-06/09). Legacy token replacement is a row action with explicit manual-handover guidance, preserving scoped defaults and verification gates (FR-WEB-03, FR-BUS-03). Validation: 113 affected app tests, root typecheck, scoped lint/format and the Docker app build pass. Isolated Chromium and WebKit checks cover Settings, Reports, Billing and token creation at 320/375/768/1440 px in both themes; headings and dialogs remain within the viewport and no real API writes were allowed. A WebKit browser crash in the shared-browser test run did not recur in fresh per-case browsers. No backend, schema, token data or deployment changes.
+
+13 November Rust SDK implementation (native qualification in progress, unpublished): explicit owner
+approval created the public `debugbundle/debugbundle-rust` repository. A separate
+owner approval authorised SDK source commits/push and CI fixes. Initial source
+`e2a7be11da889de07f817c312ed4a3ae78f55f5f` is on `main`; qualification run
+`43386149247` was superseded by portability fix `d54692c` and native lease/fixture
+fix `9e4bb48`. Run `43389554253` validates the Windows lease fix and macOS runtime,
+but additional fixture/coverage/resource gates remain open. Measurement-only run
+`43393447198` completed three same-source repeats; reviewed CI-host budgets use
+the existing formula and unchanged resource caps. Commit `0706383` includes the
+separate baseline and recovery qualification tests. Run `43395654404` passes both
+Browser/resource paths, fuzz and complete Windows/macOS functional suites; its
+coverage-only native-cleanup gap is covered by focused real-file tests in
+`908a46f` (all 53 local per-file floors and Windows MSRV lint pass). Current full
+qualification run `43397367345` passed full Windows and Linux arm64 acceptance,
+coverage/security, fuzz and Browser/resources. macOS logging and Linux x64 panic
+fixtures needed best-effort observation fixes. Those and a newly found local-only
+Cargo package-inventory gap are fixed in `7b8e9bc`: local source/coverage/MSRV/
+exact-crate and independent logger-feature checks pass, frozen locks are unchanged.
+Candidate creation in `43403436610` exposed a Linux output-ownership issue in the
+validation-only helper. `446101e` makes that path repository-read-only; its new
+reproducing test and all seven helper tests pass. Current full qualification run
+`43404451547` passes candidate/coverage/fuzz/Browser resources and the corrected
+macOS functional suite. Its Linux ENOSPC fixture had seeded only seven primaries;
+`244c104` observes all eight before the unchanged failed-write retention check.
+The real tmpfs test and strict lint pass. Current full qualification run
+`43406799897` passes all eight jobs on sealed source `244c104`: Linux x64/arm64,
+macOS and Windows attest the same `6b1511cc…99d56b20` crate. Native per-file floors,
+packaged tests/apps, Linux compiler/lower-consumer/panic/ENOSPC checks and all
+Browser/resource/security/fuzz gates pass. The SDK is ready for the deep audit;
+publication and other releases remain on hold. TLS handshake acceptance and the
+documented nested aggregate snapshot policy are explicit audit topics. Combined
+receipt: `sdks/debugbundle-rust/.tmp/ci-244c104/qualification.json`.
+Privacy/wire/ACK, native HTTP, private Unix local output, bounded delivery,
+operation/task ownership, probes/authenticated configuration/signed request
+triggers, opt-in recovery/64 KiB ledger and native log/tracing composition have
+passing functional tests. Native span caches and exact occurrence receipts are
+bounded; owner hooks/sampling disable irreversible logger pairing. Blocked
+application destructor cleanup is isolated from capture/drop and the SDK runtime,
+with a shared permit retaining all eight-client process limits. Full release
+qualification remains open. Panic unwind/abort source checks pass. Axum/Tower and
+non-Send Actix middleware now pass source tests for request/trace metadata, opt-in
+protected bodies, native typed errors, readiness, nested layers, cancellation,
+body errors/drop and handler panic propagation. Empty SDK contexts preserve native
+extractor behaviour. The full current source suite passes. Automatic signed probe
+triggers work in both frameworks. Shared relay ingress, protected local debug and
+analytics output, and low-latency ACK proof revocation have source tests. Both
+native relay mounts pass the shared handler corpus and bounded body tests.
+Connected durable mode persists scoped authenticated state and replays at startup;
+partial ACK, restart, credential, forgery and retention tests pass. Full relay
+qualification remains open. Relay owner hooks and shared limiter tests now pass;
+vanilla, Axum and non-Send Actix consumers pass against the extracted local crate.
+CLI Cargo/workspace discovery and exact feature/logger/middleware/relay guidance
+pass focused tests and installed CLI checks on Node 22/24/26. Request-ID correlation,
+mathematical-integer wire semantics and bounded testkit are implemented. Source
+checks pass on Rust 1.89, 1.99.1 and 1.100.0. Disposable authenticated Core
+ingestion/worker/bundle retrieval, installed CLI local processing and genuine
+published Browser-to-both-Rust-relay checks pass. Executable-line coverage passed
+for 53 Linux source modules; 22 measured resource/cost cases have enforced
+regression budgets. Snapshot composition and full-queue lazy producers received
+red/green fixes. The new Windows private-file backend cross-compiles under 1.89;
+native CI for ACL/relay/runtime/per-file coverage is executing, with the Windows
+lease fix verified and the full current-commit matrix still pending.
+Configuration ETag/304/invalid-refresh tests, real Linux ENOSPC retention and four
+bounded AddressSanitizer fuzz targets now pass. CI shares one candidate checksum
+across Linux/native/Browser artifact lanes; manual release and genuine registry
+consumer automation are prepared and statically checked, with no publication.
+Native Browser beacon/keepalive fallback also pass through both Rust relays.
+The final local crate (`236fd811…12d524`) passes packaged tests, panic profiles,
+normal/lower dependency consumers and both published Browser relays, including
+opted-in analytics/mixed batches. Remaining work is native platform execution and
+coverage, including those platforms' same-artifact consumers. See
+`spec/sdks/rust-sdk-progress.md` for the detailed handoff. Unrelated concurrent work
+is preserved; no consumer, production or package-publication action is taken.
+Handoff: SDK source push and necessary SDK CI fixes are authorised. Inspect the
+live qualification run and fix failures in that scope. Core/site concurrent work
+stays uncommitted. Do not run release workflows, create releases or publish a
+crate; the owner explicitly requires a deep audit first. The historical sealed
+local source inventory is `sdks/debugbundle-rust/.tmp/final-review.json`.
+
+
+13 November Rust SDK deep audit qualified (unpublished; release held):
+SDK `eb9e09afc02751ebd34464bfa4b8808a565635b4` closes seventeen findings in
+[the audit record](spec/sdks/rust-sdk-audit.md). All eight jobs in CI `43468613263`
+pass on one immutable crate: Linux x64/arm64, macOS ARM64 and Windows x64,
+compiler/features, native coverage, packaged consumers, Browser relays, four fuzz
+campaigns and 22 unchanged resource budgets. All 181 local tests and lint pass;
+coverage clears 53 Linux/macOS and 54 Windows module floors. Windows capture
+coverage is 85.47% after the final test-only correction. Earlier failed receipts
+remain recorded. Exact-crate Core fixtures pass the focused regressions and real
+isolated pipeline. Public Rust references cover 18 articles, homepage and discovery
+index; all 98 site tests, typecheck and the 150-page export pass. Shared worker recovery ownership
+is fixed and tested locally. Other SDK owner-hook budget paths need separate
+runtime follow-up; no family-wide parity closure is claimed. Core/spec/site changes
+remain local; only approved Rust SDK source is committed/pushed. No crate
+publication, release, deployment or consumer adoption occurred.
+
+14 November Rust alpha publication and release recovery: `debugbundle` 1.0.0-alpha.1
+is published on crates.io and as a GitHub prerelease from the audited `eb9e09a`.
+Public index/download and GitHub asset match sealed SHA-256 `1aed6405…07abd8bc`
+(224714 bytes). Genuine registry-installed standalone, Axum and non-Send Actix
+applications pass. The final verification-only recovery `43531207396` is green;
+it skips every credential/upload step and retains the correct exact-source tag.
+Release tooling commits `1112653`, `6d33321`, `2d98d9b` fix container Git ownership,
+fresh Cargo publish output, Cargo token forwarding and readable diagnostics.
+Twenty-one release-tool tests and pinned workflow validation pass. Version tags
+now derive their qualified source/version/checksum automatically with no recurring
+approval form. One-time crates.io Trusted Publisher registration and real OIDC
+proof subsequently pass in `43575500128`, including temporary-token cleanup;
+the obsolete GitHub bootstrap secret is removed. SDK repository docs advance separately at `b02edf0`.
+Core/spec/site edits stay local; no other SDK or consumer application changed.
+See [publication, failures and recovery evidence](spec/sdks/rust-sdk-release.md).
+
+The local Rust publication-doc update passes all 3 discovery/installation tests,
+98 site tests, root types/focused lint/format, static export and site types.
+Generated artifacts and the remounted public preview at `http://localhost:5292`
+serve the published alpha instructions. The same-workflow credential-only check
+at SDK `42dfc32` can verify initial Trusted Publishing without another crate.
+Historical check `43532449126` reported the then-missing registry mapping. After
+the owner saved owner `debugbundle`, repo `debugbundle-rust`, workflow `release.yml`,
+environment `crates-io`, check `43575500128` passes the real OIDC exchange and cleanup.
+Qualification and publication were skipped; no additional package was uploaded.
+Stable `1.0.0` is planned for the coordinated main-repository/site release after
+the stable version/README and exact-artifact qualification are ready. This is a
+release plan, not approval to publish or deploy now. Revocation of the original
+crates.io account token remains separate from the completed GitHub secret removal.
+
+14 November coordinated release in progress: Rust stable 1.0.0 is public from
+`a522d783`, all-eight CI `43576997485` and trusted publication `43581543389`
+pass. The exact homepage example compiles and records one local event against
+the actual registry crate. Public docs now identify stable Rust after PHP. Shared
+types 3.7.0 publication passes (`43583438840`); independent clients/core/site
+promotion and production acceptance remain pending. Go/.NET hook follow-up and
+external discovery limitations remain open; no consumer product is changed.

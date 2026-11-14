@@ -14,9 +14,11 @@ import {
 } from "../../../../packages/storage/src/artifact-privacy.js";
 import { isObjectNotFoundError, requireRateLimitedProjectAccess } from "../api-helpers.js";
 
-const AnalyticsJourneySampleParamsSchema = z.object({
-  id: z.string().guid()
-}).strict();
+const AnalyticsJourneySampleParamsSchema = z
+  .object({
+    id: z.string().guid()
+  })
+  .strict();
 
 const AnalyticsJourneySamplesListQuerySchema = z
   .object({
@@ -24,6 +26,7 @@ const AnalyticsJourneySamplesListQuerySchema = z
     service: z.string().trim().min(1).max(120).optional(),
     environment: z.string().trim().min(1).max(120).optional(),
     tag: z.string().trim().min(1).max(120).optional(),
+    include_total_count: z.enum(["true", "false"]).optional(),
     cursor: z.string().trim().min(1).optional(),
     limit: z.coerce.number().int().min(1).max(100).optional().default(20)
   })
@@ -36,10 +39,17 @@ const AnalyticsJourneySampleQuerySchema = z
   .strict();
 
 type AnalyticsJourneySample = NonNullable<
-  Awaited<ReturnType<NonNullable<ApiDependencies["analyticsJourneySamples"]>["getAnalyticsJourneySampleForProject"]>>
+  Awaited<
+    ReturnType<
+      NonNullable<ApiDependencies["analyticsJourneySamples"]>["getAnalyticsJourneySampleForProject"]
+    >
+  >
 >;
 
-export function registerAnalyticsJourneySampleRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
+export function registerAnalyticsJourneySampleRoutes(
+  app: FastifyInstance,
+  dependencies: ApiDependencies
+): void {
   app.get("/v1/analytics/journey-samples", async (request, reply) => {
     const parsedQuery = AnalyticsJourneySamplesListQuerySchema.safeParse(request.query);
     if (!parsedQuery.success) {
@@ -51,7 +61,12 @@ export function registerAnalyticsJourneySampleRoutes(app: FastifyInstance, depen
       return reply.status(400).send({ error: "invalid_query" });
     }
 
-    const access = await requireAnalyticsProjectReadAccess(request, reply, dependencies, parsedQuery.data.project_id);
+    const access = await requireAnalyticsProjectReadAccess(
+      request,
+      reply,
+      dependencies,
+      parsedQuery.data.project_id
+    );
     if (access === null) {
       return;
     }
@@ -60,25 +75,39 @@ export function registerAnalyticsJourneySampleRoutes(app: FastifyInstance, depen
       return reply.status(404).send({ error: "analytics_journey_samples_not_available" });
     }
 
-    const samples = await dependencies.analyticsJourneySamples.listAnalyticsJourneySamplesForProject({
-      organization_id: access.organization_id,
-      project_id: parsedQuery.data.project_id,
-      service: parsedQuery.data.service,
-      environment: parsedQuery.data.environment,
-      tag: parsedQuery.data.tag,
-      ...(parsedCursor === null ? {} : { cursor: parsedCursor }),
-      limit: parsedQuery.data.limit,
-      now: new Date().toISOString()
-    });
+    const samples =
+      await dependencies.analyticsJourneySamples.listAnalyticsJourneySamplesForProject({
+        organization_id: access.organization_id,
+        project_id: parsedQuery.data.project_id,
+        service: parsedQuery.data.service,
+        environment: parsedQuery.data.environment,
+        tag: parsedQuery.data.tag,
+        ...(parsedQuery.data.include_total_count === "true" && parsedCursor === null
+          ? { include_total: true }
+          : {}),
+        ...(parsedCursor === null ? {} : { cursor: parsedCursor }),
+        limit: parsedQuery.data.limit,
+        now: new Date().toISOString()
+      });
 
-    const projected = samples.samples.map((sample) => sanitizeAnalyticsJourneyMetadata(toAnalyticsJourneySampleMetadata(sample)));
+    const projected = samples.samples.map((sample) =>
+      sanitizeAnalyticsJourneyMetadata(toAnalyticsJourneySampleMetadata(sample))
+    );
     if (projected.some((sample) => sample === null)) {
       return reply.status(503).send({ error: "privacy_projection_unavailable" });
     }
-    return reply.status(200).send(AnalyticsJourneySamplesListResponseSchema.parse({
-      samples: projected,
-      next_cursor: samples.next_cursor
-    }));
+    return reply.status(200).send(
+      AnalyticsJourneySamplesListResponseSchema.parse({
+        samples: projected,
+        next_cursor: samples.next_cursor,
+        ...(parsedQuery.data.include_total_count === "true" && parsedCursor === null
+          ? {
+              ...(samples.total_count === undefined ? {} : { total_count: samples.total_count }),
+              ...(samples.total_pages === undefined ? {} : { total_pages: samples.total_pages })
+            }
+          : {})
+      })
+    );
   });
 
   app.get("/v1/analytics/journey-samples/:id", async (request, reply) => {
@@ -92,7 +121,12 @@ export function registerAnalyticsJourneySampleRoutes(app: FastifyInstance, depen
       return reply.status(400).send({ error: "invalid_query" });
     }
 
-    const access = await requireAnalyticsProjectReadAccess(request, reply, dependencies, parsedQuery.data.project_id);
+    const access = await requireAnalyticsProjectReadAccess(
+      request,
+      reply,
+      dependencies,
+      parsedQuery.data.project_id
+    );
     if (access === null) {
       return;
     }
@@ -129,11 +163,14 @@ export function registerAnalyticsJourneySampleRoutes(app: FastifyInstance, depen
     }
 
     const safeMetadata = sanitizeAnalyticsJourneyMetadata(toAnalyticsJourneySampleMetadata(sample));
-    if (safeMetadata === null) return reply.status(503).send({ error: "privacy_projection_unavailable" });
-    return reply.status(200).send(AnalyticsJourneySampleResponseSchema.parse({
-      sample: safeMetadata,
-      journey: parsedArtifact.data
-    }));
+    if (safeMetadata === null)
+      return reply.status(503).send({ error: "privacy_projection_unavailable" });
+    return reply.status(200).send(
+      AnalyticsJourneySampleResponseSchema.parse({
+        sample: safeMetadata,
+        journey: parsedArtifact.data
+      })
+    );
   });
 }
 
@@ -198,13 +235,15 @@ function parseAnalyticsJourneySamplesCursor(
     return null;
   }
 
-  const parsed = z.object({
-    last_seen_at: z.string().datetime(),
-    sample_id: z.string().guid()
-  }).safeParse({
-    last_seen_at: new Date(parsedTimestamp).toISOString(),
-    sample_id: sampleId
-  });
+  const parsed = z
+    .object({
+      last_seen_at: z.string().datetime(),
+      sample_id: z.string().guid()
+    })
+    .safeParse({
+      last_seen_at: new Date(parsedTimestamp).toISOString(),
+      sample_id: sampleId
+    });
 
   return parsed.success ? parsed.data : null;
 }

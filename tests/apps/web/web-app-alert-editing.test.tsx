@@ -39,7 +39,7 @@ describe("alert editing", () => {
       }
 
       if (
-        url.endsWith("/v1/alerts?project_id=proj_123&limit=20&include_scope=true") &&
+        url.endsWith("/v1/alerts?project_id=proj_123&limit=100&include_scope=true") &&
         init?.method === undefined
       ) {
         return jsonResponse(200, {
@@ -134,7 +134,7 @@ describe("alert editing", () => {
       }
 
       if (
-        url.endsWith("/v1/alerts?project_id=proj_123&limit=20&include_scope=true") &&
+        url.endsWith("/v1/alerts?project_id=proj_123&limit=100&include_scope=true") &&
         init?.method === undefined
       ) {
         return jsonResponse(200, {
@@ -214,7 +214,7 @@ describe("alert editing", () => {
       }
 
       if (
-        url.endsWith("/v1/alerts?project_id=proj_123&limit=20&include_scope=true") &&
+        url.endsWith("/v1/alerts?project_id=proj_123&limit=100&include_scope=true") &&
         init?.method === undefined
       ) {
         return jsonResponse(200, {
@@ -318,7 +318,7 @@ describe("alert editing", () => {
       }
 
       if (
-        url.endsWith("/v1/alerts?project_id=proj_123&limit=20&include_scope=true") &&
+        url.endsWith("/v1/alerts?project_id=proj_123&limit=100&include_scope=true") &&
         init?.method === undefined
       ) {
         return jsonResponse(200, {
@@ -391,7 +391,7 @@ describe("alert editing", () => {
       }
 
       if (
-        url.endsWith("/v1/alerts?project_id=proj_123&limit=20&include_scope=true") &&
+        url.endsWith("/v1/alerts?project_id=proj_123&limit=100&include_scope=true") &&
         init?.method === undefined
       ) {
         return jsonResponse(200, {
@@ -473,7 +473,7 @@ describe("alert editing", () => {
       }
 
       if (
-        url.endsWith("/v1/alerts?project_id=proj_123&limit=20&include_scope=true") &&
+        url.endsWith("/v1/alerts?project_id=proj_123&limit=100&include_scope=true") &&
         init?.method === undefined
       ) {
         return jsonResponse(200, {

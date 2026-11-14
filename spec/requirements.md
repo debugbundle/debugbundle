@@ -51,6 +51,14 @@ records exact versions, qualification and deferred ClawHub/OpenClaw acceptance.
 
 PHP exception capture must satisfy the canonical envelope even when the throwable has no message or request context is absent: use the throwable class for an empty message before hooks/suppression and encode empty request maps as JSON objects. Preserve nonempty messages and stack evidence through mandatory redaction.
 
+Rust expansion inherits this backend baseline through the universal SDK contract
+and [Rust plan](sdks/rust-sdk.md). Borrowed native errors must not invoke arbitrary
+formatters/source accessors; explicit safe snapshots supply full evidence, and
+panic observation is opt-in with honest abort limitations. Axum/Tower and Actix
+must preserve native futures, streams and local non-Send behavior. Both framework
+integrations require full browser relays and CLI setup follow-through before
+release. Rust's service runtime does not extend the v1 evidence runtime enum.
+
 **FR-SDK-04:** Browser SDK must capture: route changes, clicks, sanitized form submissions, console logs, network request summaries, frontend exceptions, lightweight DOM context near the error. Non-exception captures (route changes, clicks, console logs, network summaries) are breadcrumbs — by default they are held in a local ring buffer and only shipped alongside a `frontend_exception` (see FR-SDK-24).
 
 **FR-SDK-05:** SDKs must emit eight normalized event types: `backend_exception`, `request_event`, `log_event`, `frontend_breadcrumb`, `frontend_exception`, `deploy_metadata`, `error_suppressed` (aggregate), `probe_event` (diagnostic). The first six are signal events; `error_suppressed` is an operational aggregate emitted by duplicate suppression (see FR-SDK-09); `probe_event` is a diagnostic event emitted by activated probes (see FR-PRB-01).
@@ -354,6 +362,11 @@ Project list/detail metrics must include `attention_incidents_today`, counting i
 
 **FR-CLI-04:** All commands must support human-readable output and `--json` for machine-readable output.
 
+Local `process` accepts canonical SDK arrays whose optional `project_id` is absent
+or null, assigning the local-only unassigned UUID namespace within the repository
+store. Preserve explicit project/environment scope, original event/trace IDs and
+retained file bytes. This fallback never selects or authorises a cloud project.
+
 **FR-CLI-05:** Exit codes: 0 (success), 1 (general failure), 2 (auth/config error), 3 (resource not found), 4 (validation error).
 
 Incident/improvement lifecycle writes with an unreadable success response, a transport failure, or an HTTP 5xx must report `mutation_outcome_unconfirmed` with no automatic retry. JSON includes `outcome: "unknown"` and `retry_safe: false`; callers must inspect current state before retrying. Exit 1 in this case means unavailable confirmation, not a proven failed write. Doctor reports with errors exit 1; healthy or warning-only reports retain exit 0.
@@ -487,6 +500,44 @@ See `/spec/billing.md` and `/spec/system-emails.md` for the detailed source-of-t
 
 **FR-WEB-09:** Web list pagination displays the current page and exact filtered total page count. Incident inventory, Improvement inventory, Project inventory and Analytics opportunities append the exact available filtered count inline as `(x)`, retain it across cursor navigation, update it on refresh/filter changes and omit unknown totals. Shell headers contain navigation/title only; page actions align right in the description row through PageHeader, using the shared default button size and responsive wrapping. Text actions use the shared Button primitive with centered icons and labels; table Edit/Delete and capture-rule Pause/Enable actions use accessible icon buttons with tooltips. Paired Slack weekly report Edit/Delete actions use the same ghost variant. Enabled switches in their off state are distinguishable from disabled controls and contrast against surrounding surfaces in both themes. Section status/category badges follow their title inline to the right, with wrapping on narrow screens. The analytics-disabled settings action sits at the right of its callout title row and wraps at narrow widths.
 
+Alert rules have no row-limit or page-size controls; load the API's supported
+maximum of 100 rules automatically. Grouped deliveries use a reusable bottom-right
+table footer with an immediate `Rows per page` selector (10/20/50/100, default 20)
+beside the existing group/member navigation. Replace the top-of-table numeric
+limit and Apply form. Changing grouped page size resets both cursor chains.
+Incident logs use a compact level selector with common levels, contextual guidance
+and an explicit custom-level entry that preserves exact logger names and casing.
+Common choices apply immediately; All levels clears the filter. The shared footer
+contains rows per page and, only when more than one page is known, Page N and
+Previous/Next. This cursor-only endpoint does not expose a total page count.
+Project Incidents, Improvements and Debug bundles tables use the same footer with
+`Rows per page`, `Page N of X` and Previous/Next in one desktop row. On phones the
+selector sits above the wrapping page/navigation row, with room for selected-row
+bulk actions. Page-size changes reset cursor navigation. Their titles append the
+exact filtered total `(x)`, retained across paging and refreshed with filters/data;
+unknown totals are omitted. Use existing first-page count metadata without new
+server routes or schema changes.
+The same card/footer/count pattern applies to project Analytics Opportunities,
+generated Analytics Bundles and Retained journey samples. Page wording and
+Previous/Next are hidden for a single page across all these inventories; the row
+selector remains. Footer Previous/Next buttons use compact arrows on phones,
+retain accessible names and show text labels from the small-screen breakpoint
+upward. Exact bundle/sample counts are additive first-page opt-ins, using the
+same authorised filters (including sample tags and unexpired artifacts).
+Default and cursor responses retain their existing keys. CLI and ordinary MCP
+share count-aware clients with one read-only fallback for strict older servers.
+Dashboard Incidents today, workspace Incidents, Improvements (including Weekly
+reviews), and both workspace Analytics inventories use the same footer and title
+totals. Dashboard's Projects table is excluded. Preserve Dashboard's local-day
+attention filter and ten-row default. Weekly reviews reads the existing
+authorised metadata pages (50 per request, at most 100 requests, cancelled between
+pages on scope/unmount), counts unique returned reviews only after the complete
+read succeeds, and pages that retained history locally. Failed/incomplete reads
+never supply a total. Workspace Improvements restores `Select improvements on
+this page to apply a bulk action.` before its Select all visible improvements
+button. Existing permissions, filters, selections and review-generation consent
+remain authoritative.
+
 **FR-WEB-10:** An explicitly opted-in local UI preview must populate the ordinary dashboard and related review surfaces with synthetic data. Simulated edits are held in memory, never forwarded to real services, and reset on preview restart. The preview is development-only, loopback-only, excluded from production builds, and disables frontend telemetry.
 
 Billing preview includes Free/Solo/Team/Business, month/year and paid/complimentary/
@@ -614,7 +665,7 @@ When a collaborator is removed from a project or leaves a shared project, DebugB
 
 ### 1.16 Documentation
 
-**FR-DOC-01:** Documentation is a first-class product interface (human and machine-readable).
+**FR-DOC-01:** Documentation is a first-class product interface (human and machine-readable). Pricing and alert guides must describe channel availability accurately: email, Discord and custom webhook alerts are included on every plan within shared delivery allowances; Slack integration requires Team or Business. Promotional copy names Discord alerts without a delivery-mechanism qualifier; connection details belong in setup instructions.
 
 **FR-DOC-02:** Machine-readable artifacts: OpenAPI spec, JSON schema for bundle/webhooks, CLI JSON output schema, MCP tool schema.
 
@@ -658,9 +709,9 @@ When a collaborator is removed from a project or leaves a shared project, DebugB
 
 **FR-ONB-07:** The signed-in dashboard must introduce a new empty workspace with a dismissible welcome modal focused on copying a credential-free agent setup prompt and opening Access tokens. A compact reminder above the account menu tracks active Access token creation, the first accessible workspace project and receipt of an incident. Optional analytics, Smart Improvements and Reports steps follow actual plan/role eligibility and never enable themselves. Setup remains reopenable from the account menu after dismissal or completion. This is dashboard guidance only: CLI, authentication, token permissions and feature enablement workflows remain unchanged. See [Dashboard welcome and setup](dashboard-welcome.md).
 
-### 1.17 Weekly Reporting
+### 1.17 Weekly Project Digests
 
-**FR-RPT-01:** Weekly email/Slack report of bundles generated (by type), new incidents, resolved incidents, regressions, and top spiking incidents.
+**FR-RPT-01:** Weekly email/Slack digest of bundles generated (by type), new incidents, resolved incidents, regressions, and top spiking incidents. The customer-facing feature is named **Weekly project digest**, distinct from the broader saved Reports feature. Email/Slack settings, actions, notices and digest email subjects use digest wording; public `weekly-report` API, CLI and MCP identifiers and saved schedules remain compatible.
 
 **FR-RPT-02:** Weekly report enablement is project-scoped. Project owner/admin settings must be able to enable or disable email weekly reporting for a project, configure up to 3 recipients, and choose day/hour/timezone.
 

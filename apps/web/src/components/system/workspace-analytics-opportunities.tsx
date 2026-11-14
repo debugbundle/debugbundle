@@ -15,6 +15,7 @@ import { Skeleton } from "../ui/skeleton.js";
 import { AnalyticsOpportunitiesTable } from "./analytics-opportunities-table.js";
 import { AppliedAnalyticsFilterList } from "./analytics-filter-panel.js";
 import { CursorPaginationControls } from "./cursor-pagination-controls.js";
+import { TableListFooter } from "./table-list-footer.js";
 import { ResourceListState } from "./resource-list-state.js";
 import { TableRefreshButton } from "./table-refresh-button.js";
 import {
@@ -37,9 +38,12 @@ export function WorkspaceAnalyticsOpportunities({
     createWorkspaceAnalyticsFilters("opportunities")
   );
   const [filters, setFilters] = useState(draftFilters);
+  const [pageSize, setPageSize] = useState(20);
   const pagination = useCursorPagination(
     async (cursor) => {
-      const response = await listAnalyticsOpportunities(buildOpportunityQuery(filters, cursor));
+      const response = await listAnalyticsOpportunities(
+        buildOpportunityQuery(filters, cursor, pageSize)
+      );
       return {
         items: response.opportunities,
         nextCursor: response.next_cursor,
@@ -47,7 +51,7 @@ export function WorkspaceAnalyticsOpportunities({
         totalCount: response.total_count
       };
     },
-    [filters]
+    [filters, pageSize]
   );
 
   function resetFilters(): void {
@@ -133,31 +137,41 @@ export function WorkspaceAnalyticsOpportunities({
             {(opportunities) => (
               <div className="flex flex-col gap-4">
                 <AnalyticsOpportunitiesTable opportunities={opportunities} />
-                <CursorPaginationControls
-                  page={pagination.page}
-                  totalPages={pagination.totalPages}
-                  hasNextPage={pagination.hasNextPage}
-                  isLoading={pagination.isLoading}
-                  onPreviousPage={pagination.goToPreviousPage}
-                  onNextPage={() => void pagination.goToNextPage()}
-                />
               </div>
             )}
           </ResourceListState>
         )}
       </CardContent>
+      <TableListFooter
+        id="workspace-analytics-opportunities-page-size"
+        ariaLabel="Analytics opportunities rows per page"
+        value={pageSize}
+        onChange={setPageSize}
+        disabled={pagination.isLoading}
+      >
+        <CursorPaginationControls
+          embedded
+          page={pagination.page}
+          totalPages={pagination.totalPages}
+          hasNextPage={pagination.hasNextPage}
+          isLoading={pagination.isLoading}
+          onPreviousPage={pagination.goToPreviousPage}
+          onNextPage={() => void pagination.goToNextPage()}
+        />
+      </TableListFooter>
     </Card>
   );
 }
 
 function buildOpportunityQuery(
   filters: WorkspaceAnalyticsFilterValues,
-  cursor: string | null
+  cursor: string | null,
+  limit: number
 ): AnalyticsOpportunityInventoryQuery {
   const from = toAnalyticsDateStart(filters.from);
   const to = toAnalyticsDateEnd(filters.to);
   return {
-    limit: 20,
+    limit,
     status: filters.status as Exclude<AnalyticsOpportunityInventoryQuery["status"], undefined>,
     ...(filters.projectId === "all" ? {} : { projectId: filters.projectId }),
     ...(filters.kind === "all"

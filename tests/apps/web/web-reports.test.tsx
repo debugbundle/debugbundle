@@ -721,7 +721,9 @@ it("keeps schedule, recipients and weekly overlap explicit and resets consent wh
   await user.click(screen.getByRole("button", { name: /Email recipients:/ }));
   await user.click(await screen.findByRole("menuitemcheckbox", { name: "Verified owner" }));
   await user.keyboard("{Escape}");
-  await user.click(screen.getByLabelText("Keep the existing weekly digest alongside this report"));
+  await user.click(
+    screen.getByLabelText("Keep the existing weekly project digest alongside this report")
+  );
   expect(changes).toHaveBeenLastCalledWith(
     expect.objectContaining({
       schedule: { time: "14:30", timezone: "America/New_York" },
@@ -729,7 +731,9 @@ it("keeps schedule, recipients and weekly overlap explicit and resets consent wh
       weekly_overlap: "keep_existing"
     })
   );
-  await user.click(screen.getByLabelText("Keep the existing weekly digest alongside this report"));
+  await user.click(
+    screen.getByLabelText("Keep the existing weekly project digest alongside this report")
+  );
   expect(changes.mock.lastCall?.[0]).not.toHaveProperty("weekly_overlap");
   await user.click(screen.getByRole("radio", { name: "Restricted" }));
   expect(screen.queryByLabelText(/I agree to collect/)).not.toBeInTheDocument();
@@ -737,7 +741,9 @@ it("keeps schedule, recipients and weekly overlap explicit and resets consent wh
   await user.click(screen.getByRole("radio", { name: "Full" }));
   expect(screen.getByLabelText(/I agree to collect/)).not.toBeChecked();
   await user.click(screen.getByRole("radio", { name: "Monthly" }));
-  expect(screen.queryByLabelText(/Keep the existing weekly digest/)).not.toBeInTheDocument();
+  expect(
+    screen.queryByLabelText(/Keep the existing weekly project digest/)
+  ).not.toBeInTheDocument();
   await user.click(screen.getByLabelText("Generate reports automatically"));
   expect(screen.queryByLabelText("Delivery time")).not.toBeInTheDocument();
   expect(changes.mock.lastCall?.[0].schedule).toEqual({

@@ -1,0 +1,182 @@
+[
+  {
+    "context": {
+      "evidence_reference": {
+        "failure_ref": "11111111-1111-4111-8111-111111111111",
+        "scope": {
+          "kind": "operation",
+          "operation_id": "e8b901de-4ffb-4aab-a453-954d7a64b3d6"
+        },
+        "version": 1
+      }
+    },
+    "correlation": {
+      "trace_id": "11111111-1111-4111-8111-111111111111"
+    },
+    "event_id": "58e4bcca-5d9d-4cdb-9644-59de8ac4e7b8",
+    "event_type": "backend_exception",
+    "occurred_at": "2026-11-13T17:06:21.872Z",
+    "payload": {
+      "exception_evidence": {
+        "nodes": [
+          {
+            "frames": [],
+            "id": 0,
+            "message": "payment failed",
+            "name": "CheckoutFailure",
+            "parsing_status": "unparsed",
+            "relationships": [
+              {
+                "kind": "cause",
+                "target_id": 1
+              }
+            ],
+            "stack": "0: checkout::authorize\n   at /srv/src/checkout.rs:42:7",
+            "trace_origin": "runtime_reported"
+          },
+          {
+            "frames": [],
+            "id": 1,
+            "message": "password=[REDACTED]",
+            "name": "StorageFailure",
+            "parsing_status": "unavailable",
+            "relationships": [],
+            "stack": null,
+            "trace_origin": "unavailable"
+          }
+        ],
+        "root_id": 0,
+        "runtime": "unknown",
+        "truncated": false,
+        "unavailable_reason": null,
+        "version": 1
+      },
+      "execution": {
+        "elapsed_ms": 0.753583,
+        "kind": "command",
+        "limit_ms": 10000.0,
+        "name": "checkout.retry",
+        "version": 1
+      },
+      "handled": true,
+      "message": "payment failed",
+      "name": "CheckoutFailure",
+      "probe_data": {
+        "items": [
+          {
+            "activation_id": null,
+            "data": {
+              "password": "[REDACTED]",
+              "phase": "authorize"
+            },
+            "label": "checkout.state",
+            "timestamp": "2026-11-13T17:06:21.871Z"
+          }
+        ],
+        "version": 1
+      },
+      "request": {
+        "headers": {},
+        "method": "UNKNOWN",
+        "path": "/",
+        "query": {}
+      },
+      "response": {
+        "status_code": 0
+      },
+      "runtime": {
+        "arch": "aarch64",
+        "pid": 1081,
+        "platform": "linux",
+        "version": "1.99.1"
+      },
+      "stack": "0: checkout::authorize\n   at /srv/src/checkout.rs:42:7"
+    },
+    "schema_version": "2026-03-01",
+    "sdk_name": "@debugbundle/sdk-rust",
+    "sdk_version": "1.0.0-alpha.1",
+    "service": {
+      "environment": "artifact-test",
+      "name": "artifact-local-rust",
+      "runtime": "rust"
+    }
+  },
+  {
+    "context": {
+      "evidence_reference": {
+        "failure_ref": "11111111-1111-4111-8111-111111111111",
+        "scope": {
+          "kind": "operation",
+          "operation_id": "e8b901de-4ffb-4aab-a453-954d7a64b3d6"
+        },
+        "version": 1
+      }
+    },
+    "correlation": {
+      "trace_id": "11111111-1111-4111-8111-111111111111"
+    },
+    "event_id": "45bf2eae-8e03-423c-b9cd-b3bb6ba059de",
+    "event_type": "diagnostic_context",
+    "occurred_at": "2026-11-13T17:06:21.873Z",
+    "payload": {
+      "attempt_id": "22222222-2222-4222-8222-222222222222",
+      "failure_ref": "11111111-1111-4111-8111-111111111111",
+      "kind": "recovery",
+      "operation": "checkout.retry",
+      "scope": {
+        "kind": "operation",
+        "operation_id": "e8b901de-4ffb-4aab-a453-954d7a64b3d6"
+      },
+      "state": "attempt_completed",
+      "status_code": 200,
+      "version": 1
+    },
+    "schema_version": "2026-03-01",
+    "sdk_name": "@debugbundle/sdk-rust",
+    "sdk_version": "1.0.0-alpha.1",
+    "service": {
+      "environment": "artifact-test",
+      "name": "artifact-local-rust",
+      "runtime": "rust"
+    }
+  },
+  {
+    "context": {
+      "evidence_reference": {
+        "failure_ref": "11111111-1111-4111-8111-111111111111",
+        "scope": {
+          "kind": "operation",
+          "operation_id": "e8b901de-4ffb-4aab-a453-954d7a64b3d6"
+        },
+        "version": 1
+      }
+    },
+    "correlation": {
+      "trace_id": "11111111-1111-4111-8111-111111111111"
+    },
+    "event_id": "74ae8761-0d9d-4a40-9fd8-df3922b977ca",
+    "event_type": "diagnostic_context",
+    "occurred_at": "2026-11-13T17:06:21.874Z",
+    "payload": {
+      "attempt_id": "22222222-2222-4222-8222-222222222222",
+      "failure_ref": "11111111-1111-4111-8111-111111111111",
+      "kind": "recovery",
+      "operation": "checkout.retry",
+      "scope": {
+        "kind": "operation",
+        "operation_id": "e8b901de-4ffb-4aab-a453-954d7a64b3d6"
+      },
+      "state": "recovery_observed",
+      "status_code": 200,
+      "version": 1
+    },
+    "schema_version": "2026-03-01",
+    "sdk_name": "@debugbundle/sdk-rust",
+    "sdk_version": "1.0.0-alpha.1",
+    "service": {
+      "environment": "artifact-test",
+      "name": "artifact-local-rust",
+      "runtime": "rust"
+    }
+  }
+]

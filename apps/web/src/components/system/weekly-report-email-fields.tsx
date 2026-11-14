@@ -24,7 +24,7 @@ export function WeeklyReportEmailFields({
             Enabled
           </FieldLabel>
           <FieldDescription>
-            Include this project in scheduled weekly email reports.
+            Include this project in scheduled weekly email digests.
           </FieldDescription>
         </div>
         <Switch

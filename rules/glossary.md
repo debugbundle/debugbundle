@@ -4,6 +4,15 @@ This glossary defines durable product terms used across requirements, contracts,
 and implementation documentation. Source-of-truth requirements and contracts remain
 authoritative when a term's behavior is specified in more detail.
 
+## Distribution Terms
+
+### Trusted Publisher
+
+A registry-side mapping from a repository and workflow identity, optionally bound
+to an environment, to permission to publish a particular package. OIDC exchanges
+that identity for a short-lived publishing credential. A configured CI workflow
+alone does not establish the registry mapping or prove an actual exchange.
+
 ## Project and Service Terms
 
 ### Weekly improvement plan
@@ -361,7 +370,8 @@ new failure IDs remain visible.
 - **Personal notification preferences:** A user's delivery choices for their own email, independently of the alert rule creator.
 - **Shared notification preferences:** Account/project delivery choices affecting configured team destinations; changes require owner or project admin authority.
 - **Notification pause:** A temporary or indefinite delivery override that preserves saved channel modes and incident monitoring. Resuming never replays suppressed history.
-- **Daily incident digest:** A local-time email of newly opened/reopened, still-unresolved matched incidents. It is separate from short burst batching and weekly reports; health outages bypass daily mode.
+- **Daily incident digest:** A local-time email of newly opened/reopened, still-unresolved matched incidents. It is separate from short burst batching and weekly project digests; health outages bypass daily mode.
+- **Weekly project digest:** A scheduled email or Slack summary of a project's incidents and failure/improvement bundle activity. It is separate from the saved, broader Reports feature. Existing `weekly-report` API, CLI and MCP identifiers remain compatible.
 - **Daily allowance admission:** One project/window's accepted daily delivery, recorded without recipients or telemetry. Its usage survives retries, rescheduling and queue/incident cleanup; moving already-admitted items does not consume another allowance.
 
 ## Billing operation terms

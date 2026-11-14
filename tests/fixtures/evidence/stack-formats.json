@@ -88,6 +88,22 @@
     "function": "run"
   },
   {
+    "runtime": "unknown",
+    "stack": "stack backtrace:\n   0: checkout::submit\n             at /srv/src/checkout.rs:42:7",
+    "file": "/srv/src/checkout.rs",
+    "line": 42,
+    "column": 7,
+    "function": "checkout::submit"
+  },
+  {
+    "runtime": "unknown",
+    "stack": "stack backtrace:\n   0: checkout::submit\n             at C:\\app\\src\\checkout.rs:42:7",
+    "file": "C:\\app\\src\\checkout.rs",
+    "line": 42,
+    "column": 7,
+    "function": "checkout::submit"
+  },
+  {
     "runtime": "react_native",
     "stack": "run@index.android.bundle:1:1234",
     "file": "index.android.bundle",

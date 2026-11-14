@@ -4,6 +4,7 @@ import {
   type AnalyticsJourneySampleResponse,
   type AnalyticsJourneySamplesListResponse
 } from "../../../packages/shared-types/src/index.js";
+import { readAnalyticsInventoryPage } from "./analytics-inventory-read.js";
 import { createCliHttpClient, runAuthenticatedCliCommand } from "./auth-context.js";
 import { readCliAuthState } from "./auth-state.js";
 import type { CliAuthState } from "./auth-state.js";
@@ -40,7 +41,12 @@ export interface AnalyticsJourneySampleGetCommandInput {
 }
 
 function toApiError(status: number, body: unknown, fallback: string): AnalyticsMetricsApiError {
-  if (typeof body === "object" && body !== null && "error" in body && typeof body.error === "string") {
+  if (
+    typeof body === "object" &&
+    body !== null &&
+    "error" in body &&
+    typeof body.error === "string"
+  ) {
     return new AnalyticsMetricsApiError(status, body.error);
   }
 
@@ -50,8 +56,12 @@ function toApiError(status: number, body: unknown, fallback: string): AnalyticsM
 export function createAnalyticsJourneySampleApi(httpClient: {
   request(request: AnalyticsJourneySampleHttpRequest): Promise<AnalyticsJourneySampleHttpResponse>;
 }): {
-  listJourneySamples(input: Omit<AnalyticsJourneySamplesListCommandInput, "json">): Promise<AnalyticsJourneySamplesListResponse>;
-  getJourneySample(input: Omit<AnalyticsJourneySampleGetCommandInput, "json">): Promise<AnalyticsJourneySampleResponse>;
+  listJourneySamples(
+    input: Omit<AnalyticsJourneySamplesListCommandInput, "json">
+  ): Promise<AnalyticsJourneySamplesListResponse>;
+  getJourneySample(
+    input: Omit<AnalyticsJourneySampleGetCommandInput, "json">
+  ): Promise<AnalyticsJourneySampleResponse>;
 } {
   return {
     async listJourneySamples(input): Promise<AnalyticsJourneySamplesListResponse> {
@@ -63,14 +73,17 @@ export function createAnalyticsJourneySampleApi(httpClient: {
       if (input.limit !== undefined) {
         params.set("limit", String(input.limit));
       }
-
-      const response = await httpClient.request({
-        method: "GET",
-        path: `/v1/analytics/journey-samples?${params.toString()}`,
+      const response = await readAnalyticsInventoryPage(httpClient, {
+        path: "/v1/analytics/journey-samples",
+        params,
         bearerToken: input.bearerToken
       });
       if (response.status !== 200) {
-        throw toApiError(response.status, response.body, "Failed to list analytics journey samples.");
+        throw toApiError(
+          response.status,
+          response.body,
+          "Failed to list analytics journey samples."
+        );
       }
 
       const parsed = AnalyticsJourneySamplesListResponseSchema.safeParse(response.body);
@@ -102,7 +115,11 @@ export function createAnalyticsJourneySampleApi(httpClient: {
   };
 }
 
-function appendOptionalParam(params: URLSearchParams, key: string, value: string | undefined): void {
+function appendOptionalParam(
+  params: URLSearchParams,
+  key: string,
+  value: string | undefined
+): void {
   if (value !== undefined) {
     params.set(key, value);
   }
@@ -132,14 +149,16 @@ function formatJourneySamplesList(response: AnalyticsJourneySamplesListResponse)
   }
 
   return response.samples
-    .map((sample) => [
-      sample.sample_id,
-      sample.service ?? "",
-      sample.environment ?? "",
-      sample.last_seen_at,
-      sample.analysis_tags.join(",") || "no tags",
-      sample.has_artifact ? "artifact" : "no artifact"
-    ].join("  "))
+    .map((sample) =>
+      [
+        sample.sample_id,
+        sample.service ?? "",
+        sample.environment ?? "",
+        sample.last_seen_at,
+        sample.analysis_tags.join(",") || "no tags",
+        sample.has_artifact ? "artifact" : "no artifact"
+      ].join("  ")
+    )
     .join("\n");
 }
 
@@ -159,7 +178,9 @@ function formatJourneySample(response: AnalyticsJourneySampleResponse): string {
 export async function listAnalyticsJourneySamplesCommand(
   input: AnalyticsJourneySamplesListCommandInput,
   api: {
-    listJourneySamples(input: Omit<AnalyticsJourneySamplesListCommandInput, "json">): Promise<AnalyticsJourneySamplesListResponse>;
+    listJourneySamples(
+      input: Omit<AnalyticsJourneySamplesListCommandInput, "json">
+    ): Promise<AnalyticsJourneySamplesListResponse>;
   }
 ): Promise<CliCommandResult> {
   try {
@@ -188,7 +209,9 @@ export async function listAnalyticsJourneySamplesCommand(
 export async function getAnalyticsJourneySampleCommand(
   input: AnalyticsJourneySampleGetCommandInput,
   api: {
-    getJourneySample(input: Omit<AnalyticsJourneySampleGetCommandInput, "json">): Promise<AnalyticsJourneySampleResponse>;
+    getJourneySample(
+      input: Omit<AnalyticsJourneySampleGetCommandInput, "json">
+    ): Promise<AnalyticsJourneySampleResponse>;
   }
 ): Promise<CliCommandResult> {
   try {
@@ -214,9 +237,11 @@ async function createAuthenticatedAnalyticsJourneySampleApi(
   input: { authFilePath?: string },
   dependencies?: {
     readAuthState?: (input: { authFilePath?: string }) => Promise<CliAuthState>;
-    createHttpClient?: (input: {
-      baseUrl: string;
-    }) => { request(request: AnalyticsJourneySampleHttpRequest): Promise<AnalyticsJourneySampleHttpResponse> };
+    createHttpClient?: (input: { baseUrl: string }) => {
+      request(
+        request: AnalyticsJourneySampleHttpRequest
+      ): Promise<AnalyticsJourneySampleHttpResponse>;
+    };
     createApi?: typeof createAnalyticsJourneySampleApi;
     fetchImpl?: typeof fetch;
   }
@@ -228,14 +253,16 @@ async function createAuthenticatedAnalyticsJourneySampleApi(
   }
 
   const authState = await readAuthState(authStateInput);
-  const createHttpClient = dependencies?.createHttpClient ?? ((clientInput: { baseUrl: string }) => {
-    const httpClientDependencies: { fetchImpl?: typeof fetch } = {};
-    if (dependencies?.fetchImpl !== undefined) {
-      httpClientDependencies.fetchImpl = dependencies.fetchImpl;
-    }
+  const createHttpClient =
+    dependencies?.createHttpClient ??
+    ((clientInput: { baseUrl: string }) => {
+      const httpClientDependencies: { fetchImpl?: typeof fetch } = {};
+      if (dependencies?.fetchImpl !== undefined) {
+        httpClientDependencies.fetchImpl = dependencies.fetchImpl;
+      }
 
-    return createCliHttpClient(clientInput, httpClientDependencies);
-  });
+      return createCliHttpClient(clientInput, httpClientDependencies);
+    });
   const httpClient = createHttpClient({ baseUrl: authState.base_url });
   const createApi = dependencies?.createApi ?? createAnalyticsJourneySampleApi;
 
@@ -245,10 +272,14 @@ async function createAuthenticatedAnalyticsJourneySampleApi(
   };
 }
 
-type AnalyticsJourneySamplesListWithAuthInput =
-  Omit<AnalyticsJourneySamplesListCommandInput, "bearerToken"> & { authFilePath?: string };
-type AnalyticsJourneySampleGetWithAuthInput =
-  Omit<AnalyticsJourneySampleGetCommandInput, "bearerToken"> & { authFilePath?: string };
+type AnalyticsJourneySamplesListWithAuthInput = Omit<
+  AnalyticsJourneySamplesListCommandInput,
+  "bearerToken"
+> & { authFilePath?: string };
+type AnalyticsJourneySampleGetWithAuthInput = Omit<
+  AnalyticsJourneySampleGetCommandInput,
+  "bearerToken"
+> & { authFilePath?: string };
 
 export async function listAnalyticsJourneySamplesWithAuthCommand(
   input: AnalyticsJourneySamplesListWithAuthInput,

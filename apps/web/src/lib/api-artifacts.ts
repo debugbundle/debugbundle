@@ -307,14 +307,17 @@ export async function listProjectIncidents(
   incidents: IncidentRecord[];
   nextCursor: string | null;
   totalPages?: number | undefined;
+  totalCount?: number | undefined;
 }> {
   const searchParams = new URLSearchParams({ project_id: projectId, limit: String(limit) });
   if (cursor !== undefined) searchParams.set("cursor", cursor);
   if (status !== undefined) searchParams.set("status", status);
+  if (cursor === undefined) searchParams.set("include_total_count", "true");
   const body = await readJson<{
     incidents: IncidentRecord[];
     next_cursor: string | null;
     total_pages?: number;
+    total_count?: number;
   }>(
     await fetch(`${API_BASE}/v1/incidents?${searchParams.toString()}`, {
       credentials: "include"
@@ -323,7 +326,8 @@ export async function listProjectIncidents(
   return {
     incidents: body.incidents,
     nextCursor: body.next_cursor,
-    ...(body.total_pages === undefined ? {} : { totalPages: body.total_pages })
+    ...(body.total_pages === undefined ? {} : { totalPages: body.total_pages }),
+    ...(body.total_count === undefined ? {} : { totalCount: body.total_count })
   };
 }
 
@@ -336,14 +340,17 @@ export async function listProjectImprovements(
   improvements: ImprovementRecord[];
   nextCursor: string | null;
   totalPages?: number | undefined;
+  totalCount?: number | undefined;
 }> {
   const searchParams = new URLSearchParams({ project_id: projectId, limit: String(limit) });
   if (cursor !== undefined) searchParams.set("cursor", cursor);
   if (status !== undefined) searchParams.set("status", status);
+  if (cursor === undefined) searchParams.set("include_total_count", "true");
   const body = await readJson<{
     improvements: ImprovementRecord[];
     next_cursor: string | null;
     total_pages?: number;
+    total_count?: number;
   }>(
     await fetch(`${API_BASE}/v1/improvements?${searchParams.toString()}`, {
       credentials: "include"
@@ -352,6 +359,7 @@ export async function listProjectImprovements(
   return {
     improvements: body.improvements.map(normalizeImprovementRecord),
     nextCursor: body.next_cursor,
-    ...(body.total_pages === undefined ? {} : { totalPages: body.total_pages })
+    ...(body.total_pages === undefined ? {} : { totalPages: body.total_pages }),
+    ...(body.total_count === undefined ? {} : { totalCount: body.total_count })
   };
 }

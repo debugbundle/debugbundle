@@ -5,6 +5,15 @@ import type { BundleBuildContext } from "../../../packages/storage/src/index.js"
 import { buildRawEventObjectKey } from "../../../packages/storage/src/index.js";
 import { type EventClass, type EventEnvelope } from "../../../packages/shared-types/src/index.js";
 import { type BuildBundleWorkerDependencies } from "./processor-shared.js";
+import {
+  collectInlineProbeItems,
+  mergeProbeDataItems
+} from "../../../packages/bundle-engine/src/probe-data.js";
+export {
+  collectInlineProbeItems,
+  stableStringify,
+  toProbeDedupKey
+} from "../../../packages/bundle-engine/src/probe-data.js";
 
 export function parseEventEnvelopeFromRaw(rawBody: Buffer): EventEnvelope | null {
   return parseStoredEvent(rawBody);
@@ -28,43 +37,6 @@ export type BundleProbeItem = {
   timestamp: string;
   activation_id: string | null;
 };
-
-export function stableStringify(value: unknown): string {
-  if (Array.isArray(value)) {
-    return `[${value.map((item) => stableStringify(item)).join(",")}]`;
-  }
-
-  if (value !== null && typeof value === "object") {
-    const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
-      a.localeCompare(b)
-    );
-    return `{${entries.map(([key, entryValue]) => `${JSON.stringify(key)}:${stableStringify(entryValue)}`).join(",")}}`;
-  }
-
-  return JSON.stringify(value);
-}
-
-export function toProbeDedupKey(item: BundleProbeItem): string {
-  return `${item.label}|${item.timestamp}|${item.activation_id ?? "null"}|${stableStringify(item.data)}`;
-}
-
-export function collectInlineProbeItems(envelope: EventEnvelope): BundleProbeItem[] {
-  if (envelope.event_type !== "backend_exception" && envelope.event_type !== "frontend_exception") {
-    return [];
-  }
-
-  const probeDataBlock = envelope.payload.probe_data;
-  if (probeDataBlock === undefined) {
-    return [];
-  }
-
-  return probeDataBlock.items.map((item) => ({
-    label: item.label,
-    data: item.data,
-    timestamp: toIsoTimestamp(item.timestamp),
-    activation_id: item.activation_id
-  }));
-}
 
 export async function loadIncidentEnvelopes(input: {
   dependencies: BuildBundleWorkerDependencies;
@@ -193,20 +165,7 @@ export async function collectProbeDataItems(input: {
     }
   }
 
-  const deduped = new Map<string, BundleProbeItem>();
-  for (const item of items) {
-    const dedupKey = toProbeDedupKey(item);
-    if (!deduped.has(dedupKey)) {
-      deduped.set(dedupKey, item);
-    }
-  }
-
-  return [...deduped.values()].sort((a, b) => {
-    if (a.timestamp === b.timestamp) {
-      return a.label.localeCompare(b.label);
-    }
-    return a.timestamp.localeCompare(b.timestamp);
-  });
+  return mergeProbeDataItems(items);
 }
 
 export function addNonEmptyCorrelationValue(

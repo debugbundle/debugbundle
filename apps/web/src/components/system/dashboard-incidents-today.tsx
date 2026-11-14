@@ -1,5 +1,5 @@
 import { SirenIcon } from "lucide-react";
-import { type MouseEvent } from "react";
+import { useState, type MouseEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { formatIncidentMatchedFields } from "../../lib/incident-copy.js";
@@ -9,6 +9,8 @@ import { getLocalDayWindow } from "../../lib/incidents-today.js";
 import { useCursorPagination } from "../../lib/use-cursor-pagination.js";
 import { shouldIgnoreTableRowActivation } from "./selectable-table-actions.js";
 import { CursorPaginationControls } from "./cursor-pagination-controls.js";
+import { TableListFooter } from "./table-list-footer.js";
+import { inventoryTitle } from "../../lib/inventory-title.js";
 import { BoundedTableTitle } from "./bounded-table-title.js";
 import { TableRefreshButton } from "./table-refresh-button.js";
 import { Badge } from "../ui/badge.js";
@@ -29,19 +31,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 
 export function DashboardIncidentsToday(): JSX.Element {
   const navigate = useNavigate();
+  const [pageSize, setPageSize] = useState(10);
   const todayWindow = getLocalDayWindow();
   const {
     items: incidents,
     isLoading,
     page,
     totalPages,
+    totalCount,
     hasNextPage,
     goToNextPage,
     goToPreviousPage,
     refreshPage
   } = useCursorPagination(
-    async (cursor) => await loadDashboardAttentionIncidentPage(todayWindow, cursor),
-    [todayWindow.startsAtIso]
+    async (cursor) => await loadDashboardAttentionIncidentPage(todayWindow, cursor, pageSize),
+    [todayWindow.startsAtIso, pageSize]
   );
 
   return (
@@ -49,7 +53,7 @@ export function DashboardIncidentsToday(): JSX.Element {
       <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex w-full items-center justify-between gap-3 sm:w-auto">
           <div className="space-y-1.5">
-            <CardTitle>Incidents today</CardTitle>
+            <CardTitle>{inventoryTitle("Incidents today", totalCount)}</CardTitle>
             <CardDescription>
               Incidents opened or regressed today across this workspace.
             </CardDescription>
@@ -131,23 +135,27 @@ export function DashboardIncidentsToday(): JSX.Element {
                   ))}
                 </TableBody>
               </Table>
-
-              <CursorPaginationControls
-                page={page}
-                totalPages={totalPages}
-                hasNextPage={hasNextPage}
-                isLoading={isLoading}
-                onPreviousPage={() => {
-                  goToPreviousPage();
-                }}
-                onNextPage={() => {
-                  void goToNextPage();
-                }}
-              />
             </div>
           )}
         </ResourceListState>
       </CardContent>
+      <TableListFooter
+        id="dashboard-incidents-page-size"
+        ariaLabel="Incidents today rows per page"
+        value={pageSize}
+        onChange={setPageSize}
+        disabled={isLoading}
+      >
+        <CursorPaginationControls
+          embedded
+          page={page}
+          totalPages={totalPages}
+          hasNextPage={hasNextPage}
+          isLoading={isLoading}
+          onPreviousPage={goToPreviousPage}
+          onNextPage={() => void goToNextPage()}
+        />
+      </TableListFooter>
     </Card>
   );
 }

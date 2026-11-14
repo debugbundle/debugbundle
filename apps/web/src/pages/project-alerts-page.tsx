@@ -1,7 +1,6 @@
 import { AlertRulesTable } from "../components/system/alert-rules-table.js";
 import { getAlertScope, reconcileAlertScopeRead } from "../lib/alert-scope.js";
 import { PendingButton } from "../components/system/pending-button.js";
-import { BoundedListLimit } from "../components/system/bounded-list-limit.js";
 import {
   TEAM_ALERT_CHANNEL_OPTIONS,
   STANDARD_ALERT_CHANNEL_OPTIONS,
@@ -67,14 +66,14 @@ import {
 } from "../lib/slack-destinations.js";
 import { useDelayedVisibility } from "../lib/use-delayed-visibility.js";
 
+const ALERT_RULE_LIST_LIMIT = 100;
+
 export function ProjectAlertsPage(): JSX.Element {
   const { project, projectId } = useOutletContext<ProjectContext>();
   const { session } = useSession();
   const [searchParams, setSearchParams] = useSearchParams();
   const [alerts, setAlerts] = useState<AlertRecord[] | null>(null);
   const [alertsError, setAlertsError] = useState(false);
-  const [alertLimit, setAlertLimit] = useState(20);
-  const currentAlertLimit = useRef(alertLimit);
   const [alertsRevision, setAlertsRevision] = useState(0);
   const projectGeneration = useRef(0);
   const alertsReadGeneration = useRef(0);
@@ -117,12 +116,11 @@ export function ProjectAlertsPage(): JSX.Element {
   useEffect(() => {
     let active = true;
     alertsReadGeneration.current += 1;
-    currentAlertLimit.current = alertLimit;
     alertsLoaded.current = false;
     deletedAlertIds.current = new Set();
     setAlerts(null);
     setAlertsError(false);
-    void listProjectAlerts(projectId, alertLimit, { includeScope: true }).then(
+    void listProjectAlerts(projectId, ALERT_RULE_LIST_LIMIT, { includeScope: true }).then(
       (records) => {
         if (!active || alertsLoaded.current) return;
         alertsLoaded.current = true;
@@ -138,7 +136,7 @@ export function ProjectAlertsPage(): JSX.Element {
     return () => {
       active = false;
     };
-  }, [projectId, alertsRevision, alertLimit]);
+  }, [projectId, alertsRevision]);
   useEffect(() => {
     projectGeneration.current += 1;
     setIsCreateOpen(false);
@@ -161,7 +159,7 @@ export function ProjectAlertsPage(): JSX.Element {
     const generation = projectGeneration.current;
     const readGeneration = ++alertsReadGeneration.current;
     try {
-      const records = await listProjectAlerts(projectId, currentAlertLimit.current, {
+      const records = await listProjectAlerts(projectId, ALERT_RULE_LIST_LIMIT, {
         includeScope: true
       });
       if (
@@ -692,12 +690,6 @@ export function ProjectAlertsPage(): JSX.Element {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <BoundedListLimit
-              id="alert-rule-limit"
-              label="Alert rule limit"
-              value={alertLimit}
-              onChange={setAlertLimit}
-            />
             {alertsError ? (
               <div className="flex flex-col gap-3">
                 <p role="alert" className="text-sm text-destructive">

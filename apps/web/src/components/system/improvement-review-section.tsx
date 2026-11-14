@@ -8,6 +8,10 @@ import {
 } from "../../../../../packages/smart-improvements/src/review-contract.js";
 import type { SessionRecord } from "../../lib/api.js";
 import { improvementReviewApi, improvementReviewError } from "../../lib/improvement-review-api.js";
+import { loadImprovementReviewInventory } from "../../lib/improvement-review-inventory.js";
+import { inventoryTitle } from "../../lib/inventory-title.js";
+import { TableListFooter } from "./table-list-footer.js";
+import { CursorPaginationControls } from "./cursor-pagination-controls.js";
 import { reportScope } from "../../lib/report-api.js";
 import { reportPeriodLabel } from "../../../../../packages/smart-reports/src/report-presentation.js";
 import {
@@ -47,7 +51,6 @@ const labels: Record<ReviewRecord["status"], string> = {
 };
 type Data = {
   reviews: ReviewRecord[];
-  next: string | null;
   settings: ReviewSettings | null;
   allowance: { remaining: number; limit: number } | null;
 };
@@ -75,7 +78,8 @@ function ImprovementReviewInventory({
     [error, setError] = useState<string | null>(null),
     [revision, setRevision] = useState(0),
     [settingsOpen, setSettingsOpen] = useState(false);
-  const [cursor, setCursor] = useState<string | undefined>(),
+  const [page, setPage] = useState(0),
+    [pageSize, setPageSize] = useState(10),
     [selected, setSelected] = useState<ReviewRecord | null>(null),
     [bundle, setBundle] = useState<ReviewPlanDocument | null>(null),
     [viewError, setViewError] = useState<string | null>(null),
@@ -92,16 +96,10 @@ function ImprovementReviewInventory({
     let active = true;
     setData(null);
     setError(null);
+    setPage(0);
     const scope = reportScope(session.organization_id);
     void Promise.allSettled([
-      improvementReviewApi.list({
-        ...scope,
-        query: {
-          limit: 10,
-          ...(projectId ? { project_id: projectId } : {}),
-          ...(cursor ? { cursor } : {})
-        }
-      }),
+      loadImprovementReviewInventory(session.organization_id, projectId, () => active),
       improvementReviewApi.settings(scope),
       improvementReviewApi.allowance(scope)
     ]).then(([reviews, settings, allowance]) => {
@@ -111,8 +109,7 @@ function ImprovementReviewInventory({
         return;
       }
       setData({
-        reviews: reviews.value.reviews,
-        next: reviews.value.next_cursor,
+        reviews: reviews.value,
         settings: settings.status === "fulfilled" ? settings.value : null,
         allowance: allowance.status === "fulfilled" ? allowance.value : null
       });
@@ -120,7 +117,7 @@ function ImprovementReviewInventory({
     return () => {
       active = false;
     };
-  }, [key, session.organization_id, projectId, cursor, revision]);
+  }, [key, session.organization_id, projectId, revision]);
   useEffect(() => {
     let active = true;
     setBundle(null);
@@ -145,11 +142,15 @@ function ImprovementReviewInventory({
       active = false;
     };
   }, [selected, key, session.organization_id]);
+  const totalPages = Math.max(1, Math.ceil((data?.reviews.length ?? 0) / pageSize));
+  const visibleReviews = data?.reviews.slice(page * pageSize, (page + 1) * pageSize) ?? [];
   return (
     <Card>
       <CardHeader className="flex flex-wrap justify-between gap-4">
         <div className="flex min-w-0 max-w-lg flex-1 basis-80 flex-col gap-1">
-          <CardTitle>Weekly reviews</CardTitle>
+          <CardTitle>
+            {inventoryTitle("Weekly reviews", error ? null : (data?.reviews.length ?? null))}
+          </CardTitle>
           <CardDescription>
             {policy.available
               ? "Priorities from incidents, analytics and health. No automatic actions."
@@ -163,7 +164,12 @@ function ImprovementReviewInventory({
         </div>
         <CardAction className="max-w-full">
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={() => setRevision((value) => value + 1)}>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!data && !error}
+              onClick={() => setRevision((value) => value + 1)}
+            >
               Refresh weekly reviews
             </Button>
             {canManageSettings ? (
@@ -212,7 +218,7 @@ function ImprovementReviewInventory({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.reviews.map((review) => (
+                  {visibleReviews.map((review) => (
                     <TableRow key={review.id}>
                       <TableCell>
                         <span className="block font-medium">{review.project_name}</span>
@@ -233,29 +239,29 @@ function ImprovementReviewInventory({
                 </TableBody>
               </Table>
             )}
-            {cursor || data.next ? (
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!cursor}
-                  onClick={() => setCursor(undefined)}
-                >
-                  Latest reviews
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!data.next}
-                  onClick={() => setCursor(data.next ?? undefined)}
-                >
-                  Older reviews
-                </Button>
-              </div>
-            ) : null}
           </>
         )}
       </CardContent>
+      <TableListFooter
+        id="weekly-reviews-page-size"
+        ariaLabel="Weekly reviews rows per page"
+        value={pageSize}
+        disabled={data === null}
+        onChange={(value) => {
+          setPageSize(value);
+          setPage(0);
+        }}
+      >
+        <CursorPaginationControls
+          embedded
+          page={page + 1}
+          totalPages={totalPages}
+          hasNextPage={page + 1 < totalPages}
+          isLoading={data === null}
+          onPreviousPage={() => setPage((current) => Math.max(0, current - 1))}
+          onNextPage={() => setPage((current) => Math.min(totalPages - 1, current + 1))}
+        />
+      </TableListFooter>
       {data?.settings ? (
         <ImprovementReviewSettingsDialog
           open={settingsOpen}
@@ -263,7 +269,7 @@ function ImprovementReviewInventory({
           settings={data.settings}
           session={session}
           onSaved={() => {
-            setCursor(undefined);
+            setPage(0);
             setRevision((value) => value + 1);
           }}
         />

@@ -234,6 +234,7 @@ function buildLlmsTxt(): string {
       `- ${toMarkdownLink("Browser relay", toAbsoluteUrl("/docs/sdks/browser-relay/"))}`,
       `- ${toMarkdownLink("Python SDK", toAbsoluteUrl("/docs/sdks/python/"))}`,
       `- ${toMarkdownLink("PHP SDK", toAbsoluteUrl("/docs/sdks/php/"))}`,
+      `- ${toMarkdownLink("Rust SDK", toAbsoluteUrl("/docs/sdks/rust/"))} — released 1.0.0 on crates.io.`,
       `- ${toMarkdownLink("Java SDK", toAbsoluteUrl("/docs/sdks/java/"))}`,
       `- ${toMarkdownLink(".NET SDK", toAbsoluteUrl("/docs/sdks/dotnet/"))}`,
       `- ${toMarkdownLink("Go SDK", toAbsoluteUrl("/docs/sdks/go/"))}`,

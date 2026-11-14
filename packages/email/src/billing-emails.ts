@@ -59,7 +59,7 @@ function getTrialSuspensionItems(trialPlan: TierName): string[] {
     return [
       "Remote probe activations",
       "GitHub automation setup and dispatch rules",
-      "Slack destinations plus Slack alert and weekly report channels",
+      "Slack destinations plus Slack alert and weekly digest channels",
       "Project collaborators and pending invites",
       "Automated improvement bundle settings, open opportunities, and generated hosted improvement bundle artifacts"
     ];

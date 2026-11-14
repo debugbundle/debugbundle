@@ -145,6 +145,11 @@ export async function processNextBuildBundleJob(
       occurred_at: job.occurred_at,
       trigger: job.trigger
     });
+    // Reservation preserves a newer source when jobs arrive out of order. The
+    // older job does not own that source's primary-occurrence override and must
+    // not replace its bundle with missing or incorrectly associated evidence.
+    if (bundleMetadata.source_event_id !== job.event_id)
+      return { processed: true, reason: "superseded_bundle_job" };
     const incidentEnvelopes = await loadIncidentEnvelopes({
       dependencies,
       incidentId: incident.incident_id,

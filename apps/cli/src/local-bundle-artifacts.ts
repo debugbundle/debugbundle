@@ -1,5 +1,9 @@
 import { resolveLocalArtifactPath } from "./local-artifact-paths.js";
-import { buildBundle } from "../../../packages/bundle-engine/src/index.js";
+import {
+  buildBundle,
+  collectInlineProbeItems,
+  mergeProbeDataItems
+} from "../../../packages/bundle-engine/src/index.js";
 import {
   associateDiagnosticEvidence,
   type RetainedDiagnosticContext
@@ -56,7 +60,7 @@ function localBundle(input: LocalArtifactsInput): BundleV1 {
     diagnosticContexts: input.contexts.filter(
       (context) => context.event.project_id === incident.project_id
     ),
-    probeDataItems: []
+    probeDataItems: mergeProbeDataItems(incident.source_events.flatMap(collectInlineProbeItems))
   });
   return BundleV1Schema.parse({
     ...bundle,

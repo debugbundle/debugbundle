@@ -331,7 +331,9 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
         : { environment: parsedQuery.data.environment }),
       ...(parsedQuery.data.from === undefined ? {} : { from: parsedQuery.data.from }),
       ...(parsedQuery.data.to === undefined ? {} : { to: parsedQuery.data.to }),
-      ...(parsedQuery.data.include_total === "true" && parsedCursor === null
+      ...((parsedQuery.data.include_total === "true" ||
+        parsedQuery.data.include_total_count === "true") &&
+      parsedCursor === null
         ? { include_total: true }
         : {}),
       ...(parsedCursor === null ? {} : { cursor: parsedCursor }),
@@ -356,6 +358,11 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
       next_cursor: generations.next_cursor,
       ...(filters.include_total && generations.total_pages !== undefined
         ? { total_pages: generations.total_pages }
+        : {}),
+      ...(parsedQuery.data.include_total_count === "true" &&
+      parsedCursor === null &&
+      generations.total_count !== undefined
+        ? { total_count: generations.total_count }
         : {})
     });
     if (!projected.ok) return reply.status(503).send({ error: "privacy_projection_unavailable" });

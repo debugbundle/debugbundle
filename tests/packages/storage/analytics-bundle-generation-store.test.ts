@@ -56,6 +56,7 @@ describe("analytics bundle generation store", () => {
       include_total: true
     });
     expect(empty.total_pages).toBe(1);
+    expect(empty.total_count).toBe(0);
     expect(query.mock.lastCall?.[0]).toContain("COUNT(*) OVER()");
   });
 
@@ -72,6 +73,7 @@ describe("analytics bundle generation store", () => {
     });
 
     expect(result.total_pages).toBe(3);
+    expect(result.total_count).toBe(21);
     expect(query.mock.calls[0]?.[0]).toContain("COUNT(*) OVER() AS total_count");
   });
 

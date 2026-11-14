@@ -3,12 +3,20 @@ import { ResourceEmptyState } from "./resource-empty-state.js";
 import { useEffect, useState } from "react";
 import { getIncidentContext, listIncidentLogs } from "../../lib/api-incident-evidence.js";
 import { HighlightedCodeBlock } from "./highlighted-code-block.js";
-import { BoundedListLimit } from "./bounded-list-limit.js";
+import { TableListFooter } from "./table-list-footer.js";
 import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../ui/card.js";
-import { Field, FieldLabel } from "../ui/field.js";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "../ui/field.js";
 import { Input } from "../ui/input.js";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "../ui/select.js";
 import { Notice } from "../ui/notice.js";
 import {
   Pagination,
@@ -19,6 +27,21 @@ import {
 } from "../ui/pagination.js";
 import { Table, TableHeader, TableBody, TableRow, TableCell, TableHead } from "../ui/table.js";
 import { EvidenceSection, IncidentEvidenceReader } from "./incident-evidence-reader.js";
+
+// Loggers may use other names or casing; custom filtering preserves their exact stored level.
+const logLevelOptions = [
+  { value: "trace", label: "Trace", description: "Very detailed step-by-step diagnostics." },
+  {
+    value: "debug",
+    label: "Debug",
+    description: "Diagnostic details for investigating a problem."
+  },
+  { value: "info", label: "Info", description: "Routine application activity." },
+  { value: "warn", label: "Warn", description: "Potential problems recorded as “warn”." },
+  { value: "warning", label: "Warning", description: "Potential problems recorded as “warning”." },
+  { value: "error", label: "Error", description: "Operations that failed." },
+  { value: "fatal", label: "Fatal", description: "Severe failures such as an application crash." }
+] as const;
 export function IncidentContextTab({ incidentId }: { incidentId: string }): JSX.Element {
   const [context, setContext] = useState<Awaited<ReturnType<typeof getIncidentContext>> | null>(
     null
@@ -108,6 +131,7 @@ export function IncidentLogsTab({ incidentId }: { incidentId: string }): JSX.Ele
   const [records, setRecords] = useState<Awaited<ReturnType<typeof listIncidentLogs>> | null>(null);
   const [levelDraft, setLevelDraft] = useState("");
   const [level, setLevel] = useState("");
+  const [customLevel, setCustomLevel] = useState(false);
   const [limit, setLimit] = useState(20);
   const [cursors, setCursors] = useState<Array<string | undefined>>([undefined]);
   const [page, setPage] = useState(0);
@@ -145,6 +169,10 @@ export function IncidentLogsTab({ incidentId }: { incidentId: string }): JSX.Ele
     setCursors([undefined]);
     setPage(0);
   }
+  const levelDescription = customLevel
+    ? "Enter the exact level used by your logger, such as critical or notice."
+    : (logLevelOptions.find((option) => option.value === level)?.description ??
+      "Shows every retained record, including events without a log level.");
   return (
     <Card>
       <CardHeader>
@@ -157,38 +185,74 @@ export function IncidentLogsTab({ incidentId }: { incidentId: string }): JSX.Ele
       <CardContent className="flex flex-col gap-4">
         <Field>
           <FieldLabel htmlFor="incident-log-level">Log level</FieldLabel>
-          <div className="flex flex-wrap gap-3">
-            <Input
+          <Select
+            value={customLevel ? "custom" : level || "all"}
+            disabled={loading}
+            onValueChange={(next) => {
+              if (next === "custom") {
+                setCustomLevel(true);
+                setLevelDraft(level);
+                return;
+              }
+              setCustomLevel(false);
+              setLevel(next === "all" ? "" : next);
+              resetPage();
+            }}
+          >
+            <SelectTrigger
               id="incident-log-level"
-              placeholder="All levels"
-              value={levelDraft}
-              onChange={(event) => setLevelDraft(event.currentTarget.value)}
-              disabled={loading}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              disabled={loading}
-              onClick={() => {
-                setLevel(levelDraft.trim());
-                resetPage();
-              }}
+              className="w-full max-w-48"
+              aria-describedby="incident-log-level-description"
             >
-              Apply log level
-            </Button>
-          </div>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="all">All levels</SelectItem>
+                {logLevelOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+                <SelectItem value="custom">Custom level…</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <FieldDescription id="incident-log-level-description">
+            {levelDescription} Filters this table only by exact level; capture settings are
+            unchanged.
+          </FieldDescription>
         </Field>
-        <BoundedListLimit
-          id="incident-log-limit"
-          label="Log page limit"
-          paginated
-          value={limit}
-          disabled={loading}
-          onChange={(value) => {
-            setLimit(value);
-            resetPage();
-          }}
-        />
+        {customLevel && (
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (loading || levelDraft.trim().length === 0) return;
+              setLevel(levelDraft.trim());
+              resetPage();
+            }}
+          >
+            <FieldGroup className="flex-row flex-wrap items-end gap-3">
+              <Field className="max-w-48">
+                <FieldLabel htmlFor="incident-custom-log-level">Custom log level</FieldLabel>
+                <Input
+                  id="incident-custom-log-level"
+                  value={levelDraft}
+                  onChange={(event) => setLevelDraft(event.currentTarget.value)}
+                  disabled={loading}
+                  aria-describedby="incident-log-level-description"
+                />
+              </Field>
+              <Button
+                type="submit"
+                variant="outline"
+                disabled={loading || levelDraft.trim().length === 0}
+              >
+                Apply custom log level
+              </Button>
+            </FieldGroup>
+          </form>
+        )}
         {loading ? (
           <p role="status">Loading incident logs...</p>
         ) : error ? (
@@ -232,33 +296,53 @@ export function IncidentLogsTab({ incidentId }: { incidentId: string }): JSX.Ele
             </TableBody>
           </Table>
         )}
-        <Pagination aria-label="Incident log pages">
-          <PaginationContent>
-            <PaginationItem>
-              <PaginationPrevious
-                aria-label="Previous logs"
-                disabled={page === 0 || loading}
-                onClick={() => setPage((value) => value - 1)}
-              />
-            </PaginationItem>
-            <PaginationItem>
-              <span>Page {page + 1}</span>
-            </PaginationItem>
-            <PaginationItem>
-              <PaginationNext
-                aria-label="Next logs"
-                disabled={loading || error || !records?.next_cursor}
-                onClick={() => {
-                  const next = records?.next_cursor;
-                  if (!next) return;
-                  setCursors((current) => [...current.slice(0, page + 1), next]);
-                  setPage((value) => value + 1);
-                }}
-              />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
       </CardContent>
+      <TableListFooter
+        id="incident-log-limit"
+        ariaLabel="Log page limit"
+        value={limit}
+        disabled={loading}
+        onChange={(value) => {
+          setLimit(value);
+          resetPage();
+        }}
+      >
+        {(page > 0 || Boolean(records?.next_cursor)) && (
+          <>
+            <span className="text-sm text-muted-foreground whitespace-nowrap">Page {page + 1}</span>
+            <Pagination
+              aria-label="Incident log pages"
+              className="mx-0 w-auto shrink-0 justify-end"
+            >
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    compactOnMobile
+                    type="button"
+                    aria-label="Previous logs"
+                    disabled={page === 0 || loading}
+                    onClick={() => setPage((value) => value - 1)}
+                  />
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationNext
+                    compactOnMobile
+                    type="button"
+                    aria-label="Next logs"
+                    disabled={loading || error || !records?.next_cursor}
+                    onClick={() => {
+                      const next = records?.next_cursor;
+                      if (!next) return;
+                      setCursors((current) => [...current.slice(0, page + 1), next]);
+                      setPage((value) => value + 1);
+                    }}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </>
+        )}
+      </TableListFooter>
     </Card>
   );
 }

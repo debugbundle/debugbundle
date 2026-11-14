@@ -1,21 +1,17 @@
 import { RouteIcon } from "lucide-react";
 import { ResourceEmptyState } from "./resource-empty-state.js";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { listProjectAnalyticsJourneySamples } from "../../lib/api-analytics.js";
-import { BoundedListLimit } from "./bounded-list-limit.js";
+import { TableListFooter } from "./table-list-footer.js";
+import { CursorPaginationControls } from "./cursor-pagination-controls.js";
+import { useCursorPagination } from "../../lib/use-cursor-pagination.js";
+import { inventoryTitle } from "../../lib/inventory-title.js";
 import { Button } from "../ui/button.js";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../ui/card.js";
 import { Field, FieldLabel } from "../ui/field.js";
 import { Input } from "../ui/input.js";
 import { Notice } from "../ui/notice.js";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationNext,
-  PaginationPrevious
-} from "../ui/pagination.js";
 import { Table, TableHeader, TableBody, TableRow, TableCell, TableHead } from "../ui/table.js";
 export function AnalyticsJourneySamplesCard({
   projectId,
@@ -26,55 +22,33 @@ export function AnalyticsJourneySamplesCard({
   service?: string | undefined;
   environment?: string | undefined;
 }): JSX.Element {
-  const [samples, setSamples] = useState<Awaited<
-    ReturnType<typeof listProjectAnalyticsJourneySamples>
-  > | null>(null);
   const [tagDraft, setTagDraft] = useState("");
   const [tag, setTag] = useState("");
   const [limit, setLimit] = useState(20);
-  const [cursors, setCursors] = useState<Array<string | undefined>>([undefined]);
-  const [page, setPage] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-  const [revision, setRevision] = useState(0);
-  // The parent keys this inventory by scope, so cursors cannot carry into a different scope.
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    setError(false);
-    setSamples(null);
-    void listProjectAnalyticsJourneySamples(projectId, {
-      limit,
-      ...(service === undefined ? {} : { service }),
-      ...(environment === undefined ? {} : { environment }),
-      ...(tag ? { tag } : {}),
-      ...(cursors[page] === undefined ? {} : { cursor: cursors[page] })
-    }).then(
-      (result) => {
-        if (active) {
-          setSamples(result);
-          setLoading(false);
-        }
-      },
-      () => {
-        if (active) {
-          setError(true);
-          setLoading(false);
-        }
-      }
-    );
-    return () => {
-      active = false;
-    };
-  }, [projectId, service, environment, tag, limit, cursors, page, revision]);
-  function resetPage(): void {
-    setCursors([undefined]);
-    setPage(0);
-  }
+  const pagination = useCursorPagination(
+    async (cursor) => {
+      const result = await listProjectAnalyticsJourneySamples(projectId, {
+        limit,
+        ...(service === undefined ? {} : { service }),
+        ...(environment === undefined ? {} : { environment }),
+        ...(tag ? { tag } : {}),
+        ...(cursor === null ? {} : { cursor })
+      });
+      return {
+        items: result.samples,
+        nextCursor: result.next_cursor,
+        totalPages: result.total_pages,
+        totalCount: result.total_count
+      };
+    },
+    [projectId, service, environment, tag, limit]
+  );
+  const loading = pagination.isLoading;
+  const error = pagination.hasError;
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Retained journey samples</CardTitle>
+        <CardTitle>{inventoryTitle("Retained journey samples", pagination.totalCount)}</CardTitle>
         <CardDescription>
           Browse retained redacted samples by service, environment and tag. This inventory is
           independent of the aggregate time window and device filters; expired samples are omitted.
@@ -100,38 +74,22 @@ export function AnalyticsJourneySamplesCard({
               disabled={loading}
               onClick={() => {
                 setTag(tagDraft.trim());
-                resetPage();
               }}
             >
               Apply sample tag
             </Button>
           </div>
         </Field>
-        <BoundedListLimit
-          id="analytics-sample-limit"
-          label="Sample page limit"
-          paginated
-          value={limit}
-          disabled={loading}
-          onChange={(value) => {
-            setLimit(value);
-            resetPage();
-          }}
-        />
         {loading ? (
           <p role="status">Loading journey samples...</p>
         ) : error ? (
           <Notice tone="warning">
             Journey samples are unavailable.{" "}
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setRevision((value) => value + 1)}
-            >
+            <Button type="button" variant="outline" onClick={() => void pagination.refreshPage()}>
               Retry journey samples
             </Button>
           </Notice>
-        ) : samples?.samples.length === 0 ? (
+        ) : pagination.items?.length === 0 ? (
           <ResourceEmptyState
             icon={RouteIcon}
             title="No retained journey samples"
@@ -150,7 +108,7 @@ export function AnalyticsJourneySamplesCard({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {samples?.samples.map((sample) => (
+              {pagination.items?.map((sample) => (
                 <TableRow key={sample.sample_id}>
                   <TableCell>
                     {sample.has_artifact ? (
@@ -175,33 +133,24 @@ export function AnalyticsJourneySamplesCard({
             </TableBody>
           </Table>
         )}
-        <Pagination aria-label="Journey sample pages">
-          <PaginationContent>
-            <PaginationItem>
-              <PaginationPrevious
-                aria-label="Previous samples"
-                disabled={page === 0 || loading}
-                onClick={() => setPage((value) => value - 1)}
-              />
-            </PaginationItem>
-            <PaginationItem>
-              <span>Page {page + 1}</span>
-            </PaginationItem>
-            <PaginationItem>
-              <PaginationNext
-                aria-label="Next samples"
-                disabled={loading || error || !samples?.next_cursor}
-                onClick={() => {
-                  const next = samples?.next_cursor;
-                  if (!next) return;
-                  setCursors((current) => [...current.slice(0, page + 1), next]);
-                  setPage((value) => value + 1);
-                }}
-              />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
       </CardContent>
+      <TableListFooter
+        id="analytics-samples-page-size"
+        ariaLabel="Retained journey samples rows per page"
+        value={limit}
+        onChange={setLimit}
+        disabled={loading}
+      >
+        <CursorPaginationControls
+          embedded
+          page={pagination.page}
+          totalPages={pagination.totalPages}
+          hasNextPage={pagination.hasNextPage}
+          isLoading={loading}
+          onPreviousPage={pagination.goToPreviousPage}
+          onNextPage={() => void pagination.goToNextPage()}
+        />
+      </TableListFooter>
     </Card>
   );
 }

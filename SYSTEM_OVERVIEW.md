@@ -3,6 +3,20 @@ reviews, with clean skill moderation. ClawHub's verified VirusTotal retirement i
 explicit in receipts; active missing/adverse audits and returned adverse historical
 antivirus evidence still fail closed. Discovery remains a separate release gate.
 
+Local project-table follow-up: Incidents, Improvements and Debug bundles reuse a
+bottom-right row/page/navigation footer and exact filtered title totals. Mobile
+stacks the selector above navigation and preserves bulk-action clearance. Grouped
+deliveries and project Analytics Opportunities, Analytics Bundles and retained
+journey samples reuse the footer; alert rules have no row selector. Single-page
+tables hide page wording/navigation. Bundle/sample counts add opt-in first-page
+metadata to existing authorised reads, with shared CLI/MCP compatibility fallback.
+The same footer/count pattern now covers Dashboard incidents (excluding its
+Projects table), workspace Incidents/Improvements, Weekly reviews and workspace
+Analytics inventories. Weekly reviews pages its complete authorised metadata
+history locally after a bounded read; settings/generation remain explicit. The
+original workspace Improvements selection hint is restored. No migration or
+release is part of this change; API rollout must precede assets.
+
 Dashboard health navigation: a red `!` badge at the right of Health Status reflects
 any accessible enabled, unpaused check's recorded current failure. A protected-shell
 provider reads existing APIs with bounded concurrency, refreshes every minute while
@@ -240,7 +254,9 @@ Billing safety (core 1.19.0): durable organization reservations coordinate Check
 
 Daily queue release guard (2026-10-19): new admission and schedule moves never append to an email already sending or completed; late incidents remain queued for the next daily window. Future policy-only claims still accept incidents. Released in core 1.18.0; see `spec/notification-release-20261019.md` for live verification and distribution limits.
 
-Daily schedule layout (2026-10-19): account/project notifications match weekly reports with a schedule/hour row and full-width timezone. Custom time retains minute precision; project inheritance and interface contracts are unchanged.
+Daily schedule layout (2026-10-19): account/project notifications match weekly project digests with a schedule/hour row and full-width timezone. Custom time retains minute precision; project inheritance and interface contracts are unchanged.
+
+Project settings call the lightweight scheduled email/Slack summary **Weekly project digest**. The separate **Reports** page holds broader saved reports. Public `weekly-report` route, command and tool identifiers remain compatible.
 
 Daily email review (2026-10-19): the local system-email catalog includes a two-project daily incident digest using the worker's shared email renderer. Selecting Daily digest reveals existing local time/timezone controls; account/project schedule parity remains in API, CLI and ordinary MCP.
 
@@ -542,7 +558,7 @@ DebugBundle supports two runtime modes: **local-only** (no cloud account require
 │    Android/Swift emit canonical mobile envelopes, parse indexed │
 │    acknowledgements, own durable delivery, and expose additive  │
 │    RN external-event/probe/policy bridge APIs.                   │
-│  Future expansion: Kotlin server, Rust, and Dart/Flutter        │
+│  Future expansion: Kotlin server and Dart/Flutter              │
 │  See spec/sdk-language-targets.md for full rollout plan         │
 │  Universal interface: init, captureException, captureError,     │
 │  captureLog, captureRequest, captureMessage, setContext, flush, │
@@ -812,7 +828,7 @@ packages/
   — debugbundle-ruby   → github.com/debugbundle/debugbundle-ruby (Ruby SDK: Rails + Rack + Sidekiq; release-ready local standalone repo)
   — debugbundle-go     → github.com/debugbundle/debugbundle-go (published Go SDK with core, secure transports, relay, net/http, Gin, Echo, slog, zap, zerolog, remote config, probes, examples, CI, and release workflow)
   — site               → github.com/debugbundle/site (public docs/blog/marketing site)
-  — Wave 2/3 SDKs → separate repos per `spec/sdk-language-targets.md`; .NET 1.3.0 and the coordinated Android, Swift, and React Native 1.2.0 line are published. These releases implement canonical connected delivery, per-event acknowledgements, universal `beforeSend`, object-wrapped probes, and the native RN event/policy/probe/config boundary. Kotlin server, Rust, and Dart/Flutter remain future work.
+  — Wave 2/3 SDKs → separate repos per `spec/sdk-language-targets.md`; .NET 1.3.0 and the coordinated Android, Swift, and React Native 1.2.0 line are published. These releases implement canonical connected delivery, per-event acknowledgements, universal `beforeSend`, object-wrapped probes, and the native RN event/policy/probe/config boundary. Kotlin server and Dart/Flutter remain future work. Rust `1.0.0` is published; see the audit and release records below.
 
 sdks/                    — Local standalone SDK clone roots managed by `sdks.json` and `scripts/bootstrap-sdks.sh`
   debugbundle-js/        — github.com/debugbundle/debugbundle-js (public standalone repo; cloned on demand for single-workspace development)
@@ -883,6 +899,74 @@ docs/            — Public documentation
 post-v1/         — Deferred future-planning artifacts kept separate from active V1 specs
 scripts/         — Dev/CI utility scripts
 ```
+
+Rust audit: [deep audit and remediation](spec/sdks/rust-sdk-audit.md) records
+seventeen resolved findings, final qualification and public documentation reconciliation.
+The stable SDK is published as `1.0.0` from `a522d783`;
+[release evidence and automation](spec/sdks/rust-sdk-release.md) distinguish
+accepted registry consumers from release automation: the initial Trusted Publisher
+OIDC exchange and temporary-token cleanup now pass (`43575500128`), and the
+obsolete GitHub bootstrap secret is removed. Stable all-eight-job qualification (`43576997485`) and trusted publication
+(`43581543389`) pass, including genuine registry-installed applications.
+Core worker `processor-bundles.ts` checks reservation source ownership before
+rebuilding, so delayed older context jobs cannot erase newer recovery evidence.
+Rust relay replay retains known ACK progress and its one bounded file lease
+through callback/storage contention. `runtime/native.rs` waits on the existing
+callback lane for persistence; exact authenticated retries are idempotent and
+flush/shutdown retain finite deadlines.
+Rust native logging rejects disabled no-sink capture before its record-building
+frame; application tee sinks retain their own filtering and flush semantics.
+Logging and panic-observation guards are acquired only on successful entry, so
+rejected nested calls cannot clear their caller's recursion/suppression state.
+Rust wire protection reduces optional evidence at the combined serialized budget
+before dropping a valid primary or restoring owner-removed hook content. Capture
+and both relay adapters share that helper; ingress validation remains strict.
+Comparable owner-hook budget paths in other SDKs require separate runtime follow-up.
+
+Rust implementation: [implementation plan](spec/sdks/rust-sdk.md) and
+[qualification matrix](spec/sdks/rust-sdk-qualification.md) define the current
+contract baseline, Go/.NET/native-logger lessons, Axum + Actix full integrations
+and release gates. The standalone public repository exists and its local candidate
+is under `sdks/debugbundle-rust`, registered in `sdks.json`. The remote is now
+populated after explicit source-push approval. The pre-audit baseline `244c104`
+passed all eight qualification jobs. Final audit source `eb9e09a` also passes all
+eight jobs in run `43468613263`; that exact archive is now published as an alpha. Capture, delivery,
+operation/probe/recovery ownership, log/tracing composition and Axum/Tower + Actix
+middleware have passing source tests. Shared relay ingress/local arrays,
+low-latency forwarding and native Axum/Actix routes are implemented. Connected
+durable mode persists authenticated credential-scoped per-index state and replays
+on restart, with passing ACK/retention tests. Extracted local crate consumers and
+published Browser 3.2.2 ordinary/beacon/keepalive traffic pass through both relays
+on Linux arm64. Windows private storage cross-checks under Rust 1.89 and passes
+native ACL/runtime/coverage tests. The final crate (`1aed6405…07abd8bc`) passes
+Linux x64/arm64, macOS ARM64 and Windows x64 source/coverage and extracted-crate
+application lanes. Public registry/download checksum and real standalone, Axum
+and Actix applications pass for the published alpha.
+See the
+[implementation record](spec/sdks/rust-sdk-progress.md) for current evidence.
+The CLI's local reader binds absent/null SDK project IDs to the unassigned local
+namespace inside that repository's store, preserving explicit project/environment
+boundaries and the original files. Rust artifact arrays exercise schema,
+fingerprint, graph/execution/recovery readers and deterministic local processing.
+Worker and local CLI bundles now share protected inline-probe projection and
+deduplication in `bundle-engine/probe-data.ts`. Disposable authenticated Rust
+ingestion/worker/bundle retrieval and installed CLI checks pass. Published Browser
+3.2.2 passes through both extracted Rust relay adapters in native Chromium.
+An initial exact local crate passed isolated vanilla, Axum and Actix applications;
+the refreshed numeric/request-correlation artifact run also passes. CLI setup
+now uses bounded Cargo binary/workspace discovery and gives native logging,
+middleware and relay guidance without editing Rust application source.
+The local-file implementation anchors Linux/macOS directory descriptors and uses
+kernel no-replace publication. The Windows backend is implemented with pinned
+ancestors/private native ACLs. Baseline native per-file executable-line coverage
+passes all 53 Linux/macOS and 54 Windows production modules. Twenty-two measured
+capture/framework/pressure cases have checked numerical regression budgets;
+baseline native CI and exact-source/artifact receipts pass. Fresh audit acceptance
+is tracked separately; published-registry acceptance passes for stable `1.0.0`.
+Rust candidates use anchored source/document/fixture include patterns. Package
+creation and native extraction reject development dependencies, hidden metadata
+and unrelated archive members before copying; local workspace noise cannot become
+an accepted candidate. This packaging guard does not authorise a release.
 
 ### User Project Structure (created by `debugbundle setup`)
 

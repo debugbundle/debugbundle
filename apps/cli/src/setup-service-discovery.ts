@@ -1,4 +1,5 @@
 import { basename, join } from "node:path";
+import { discoverRustProjects } from "../../../packages/project-discovery/src/index.js";
 
 export type PackageJsonLike = {
   name?: string;
@@ -99,7 +100,11 @@ function inferRuntimeFromLanguages(primaryLanguages: string[]): string {
   return "unknown";
 }
 
-async function fileContains(filePath: string, matcher: RegExp, readFile: FileReader): Promise<boolean> {
+async function fileContains(
+  filePath: string,
+  matcher: RegExp,
+  readFile: FileReader
+): Promise<boolean> {
   try {
     return matcher.test(await readFile(filePath));
   } catch (error) {
@@ -135,7 +140,9 @@ export function inferFramework(packageJson: PackageJsonLike | null): string {
 
 export function hasRelayScaffoldDependencies(packageJson: PackageJsonLike | null): boolean {
   const dependencyNames = collectDependencyNames(packageJson);
-  return dependencyNames.has("@debugbundle/sdk-browser") && dependencyNames.has("@debugbundle/sdk-node");
+  return (
+    dependencyNames.has("@debugbundle/sdk-browser") && dependencyNames.has("@debugbundle/sdk-node")
+  );
 }
 
 async function inferRuntime(
@@ -156,14 +163,18 @@ async function inferRuntime(
     }
   }
 
-  if (await pathExists(join(rootDirectory, servicePath, "requirements.txt"), stat) || await pathExists(join(rootDirectory, servicePath, "pyproject.toml"), stat) || await pathExists(join(rootDirectory, servicePath, "manage.py"), stat)) {
+  if (
+    (await pathExists(join(rootDirectory, servicePath, "requirements.txt"), stat)) ||
+    (await pathExists(join(rootDirectory, servicePath, "pyproject.toml"), stat)) ||
+    (await pathExists(join(rootDirectory, servicePath, "manage.py"), stat))
+  ) {
     return "Python";
   }
 
   if (
-    await pathExists(join(rootDirectory, servicePath, "composer.json"), stat)
-    || await pathExists(join(rootDirectory, servicePath, "artisan"), stat)
-    || await pathExists(join(rootDirectory, servicePath, "wp-config.php"), stat)
+    (await pathExists(join(rootDirectory, servicePath, "composer.json"), stat)) ||
+    (await pathExists(join(rootDirectory, servicePath, "artisan"), stat)) ||
+    (await pathExists(join(rootDirectory, servicePath, "wp-config.php"), stat))
   ) {
     return "PHP";
   }
@@ -172,14 +183,17 @@ async function inferRuntime(
     return "Go";
   }
 
-  if (await pathExists(join(rootDirectory, servicePath, "Gemfile"), stat) || await pathExists(join(rootDirectory, servicePath, "Gemfile.lock"), stat)) {
+  if (
+    (await pathExists(join(rootDirectory, servicePath, "Gemfile"), stat)) ||
+    (await pathExists(join(rootDirectory, servicePath, "Gemfile.lock"), stat))
+  ) {
     return "Ruby";
   }
 
   if (
-    await pathExists(join(rootDirectory, servicePath, "pom.xml"), stat)
-    || await pathExists(join(rootDirectory, servicePath, "build.gradle"), stat)
-    || await pathExists(join(rootDirectory, servicePath, "build.gradle.kts"), stat)
+    (await pathExists(join(rootDirectory, servicePath, "pom.xml"), stat)) ||
+    (await pathExists(join(rootDirectory, servicePath, "build.gradle"), stat)) ||
+    (await pathExists(join(rootDirectory, servicePath, "build.gradle.kts"), stat))
   ) {
     return "Java";
   }
@@ -191,7 +205,12 @@ async function inferRuntime(
   return allowFallback ? inferRuntimeFromLanguages(primaryLanguages) : "unknown";
 }
 
-async function inferPythonFramework(rootDirectory: string, servicePath: string, readFile: FileReader, stat: StatReader): Promise<string> {
+async function inferPythonFramework(
+  rootDirectory: string,
+  servicePath: string,
+  readFile: FileReader,
+  stat: StatReader
+): Promise<string> {
   if (await pathExists(join(rootDirectory, servicePath, "manage.py"), stat)) {
     return "Django";
   }
@@ -208,7 +227,9 @@ async function inferPythonFramework(rootDirectory: string, servicePath: string, 
         return "Flask";
       }
     } catch (error) {
-      if (!(typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT")) {
+      if (
+        !(typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT")
+      ) {
         throw error;
       }
     }
@@ -217,7 +238,12 @@ async function inferPythonFramework(rootDirectory: string, servicePath: string, 
   return "unknown";
 }
 
-async function inferPhpFramework(rootDirectory: string, servicePath: string, readFile: FileReader, stat: StatReader): Promise<string> {
+async function inferPhpFramework(
+  rootDirectory: string,
+  servicePath: string,
+  readFile: FileReader,
+  stat: StatReader
+): Promise<string> {
   if (await pathExists(join(rootDirectory, servicePath, "artisan"), stat)) {
     return "Laravel";
   }
@@ -226,29 +252,56 @@ async function inferPhpFramework(rootDirectory: string, servicePath: string, rea
     return "WordPress";
   }
 
-  if (await fileContains(join(rootDirectory, servicePath, "composer.json"), /laravel\/framework/iu, readFile)) {
+  if (
+    await fileContains(
+      join(rootDirectory, servicePath, "composer.json"),
+      /laravel\/framework/iu,
+      readFile
+    )
+  ) {
     return "Laravel";
   }
 
-  if (await fileContains(join(rootDirectory, servicePath, "composer.json"), /symfony\/(framework-bundle|http-kernel)/iu, readFile)) {
+  if (
+    await fileContains(
+      join(rootDirectory, servicePath, "composer.json"),
+      /symfony\/(framework-bundle|http-kernel)/iu,
+      readFile
+    )
+  ) {
     return "Symfony";
   }
 
   return "unknown";
 }
 
-async function inferRubyFramework(rootDirectory: string, servicePath: string, readFile: FileReader, stat: StatReader): Promise<string> {
+async function inferRubyFramework(
+  rootDirectory: string,
+  servicePath: string,
+  readFile: FileReader,
+  stat: StatReader
+): Promise<string> {
   if (await pathExists(join(rootDirectory, servicePath, "config", "application.rb"), stat)) {
     return "Rails";
   }
 
-  if (await fileContains(join(rootDirectory, servicePath, "Gemfile"), /gem\s+["']rails["']/iu, readFile)) {
+  if (
+    await fileContains(
+      join(rootDirectory, servicePath, "Gemfile"),
+      /gem\s+["']rails["']/iu,
+      readFile
+    )
+  ) {
     return "Rails";
   }
 
   if (
-    await pathExists(join(rootDirectory, servicePath, "config.ru"), stat)
-    || await fileContains(join(rootDirectory, servicePath, "Gemfile"), /gem\s+["']rack["']/iu, readFile)
+    (await pathExists(join(rootDirectory, servicePath, "config.ru"), stat)) ||
+    (await fileContains(
+      join(rootDirectory, servicePath, "Gemfile"),
+      /gem\s+["']rack["']/iu,
+      readFile
+    ))
   ) {
     return "Rack";
   }
@@ -256,7 +309,12 @@ async function inferRubyFramework(rootDirectory: string, servicePath: string, re
   return "unknown";
 }
 
-async function inferJavaFramework(rootDirectory: string, servicePath: string, readFile: FileReader, stat: StatReader): Promise<string> {
+async function inferJavaFramework(
+  rootDirectory: string,
+  servicePath: string,
+  readFile: FileReader,
+  stat: StatReader
+): Promise<string> {
   for (const fileName of ["pom.xml", "build.gradle", "build.gradle.kts"]) {
     if (await fileContains(join(rootDirectory, servicePath, fileName), /spring-boot/iu, readFile)) {
       return "Spring Boot";
@@ -264,8 +322,11 @@ async function inferJavaFramework(rootDirectory: string, servicePath: string, re
   }
 
   if (
-    await pathExists(join(rootDirectory, servicePath, "src", "main", "webapp"), stat)
-    || await pathExists(join(rootDirectory, servicePath, "src", "main", "webapp", "WEB-INF", "web.xml"), stat)
+    (await pathExists(join(rootDirectory, servicePath, "src", "main", "webapp"), stat)) ||
+    (await pathExists(
+      join(rootDirectory, servicePath, "src", "main", "webapp", "WEB-INF", "web.xml"),
+      stat
+    ))
   ) {
     return "Servlet";
   }
@@ -319,7 +380,12 @@ async function inferServiceFramework(
   return allowFallback ? inferFramework(fallbackPackageJson) : "unknown";
 }
 
-function inferServiceKind(serviceName: string, servicePath: string, framework: string, packageJson: PackageJsonLike | null): "frontend" | "backend" | "worker" {
+function inferServiceKind(
+  serviceName: string,
+  servicePath: string,
+  framework: string,
+  packageJson: PackageJsonLike | null
+): "frontend" | "backend" | "worker" {
   const dependencyNames = collectDependencyNames(packageJson);
   const lowerName = `${serviceName} ${servicePath}`.toLowerCase();
 
@@ -355,14 +421,36 @@ async function buildDetectedService(
   primaryLanguages: string[],
   allowFallback: boolean
 ): Promise<DetectedService | null> {
-  const packageJson = await readJsonFile<PackageJsonLike>(join(rootDirectory, servicePath, "package.json"), readFile);
-  const runtime = await inferRuntime(rootDirectory, servicePath, packageJson, stat, primaryLanguages, allowFallback);
+  const packageJson = await readJsonFile<PackageJsonLike>(
+    join(rootDirectory, servicePath, "package.json"),
+    readFile
+  );
+  const runtime = await inferRuntime(
+    rootDirectory,
+    servicePath,
+    packageJson,
+    stat,
+    primaryLanguages,
+    allowFallback
+  );
+
+  // Cargo deployment targets and workspace inheritance use the bounded parser.
+  if (runtime === "Rust") return null;
 
   if (runtime === "unknown" && !allowFallback) {
     return null;
   }
 
-  const framework = await inferServiceFramework(rootDirectory, servicePath, runtime, packageJson, readFile, stat, fallbackPackageJson, allowFallback);
+  const framework = await inferServiceFramework(
+    rootDirectory,
+    servicePath,
+    runtime,
+    packageJson,
+    readFile,
+    stat,
+    fallbackPackageJson,
+    allowFallback
+  );
   const name = packageJson?.name ?? basename(servicePath);
 
   return {
@@ -376,7 +464,11 @@ async function buildDetectedService(
   };
 }
 
-async function detectRootServicePaths(rootDirectory: string, readdir: DirectoryReader, stat: StatReader): Promise<string[]> {
+async function detectRootServicePaths(
+  rootDirectory: string,
+  readdir: DirectoryReader,
+  stat: StatReader
+): Promise<string[]> {
   const entries = (await readdir(rootDirectory)).sort();
   const servicePaths: string[] = [];
 
@@ -392,20 +484,20 @@ async function detectRootServicePaths(rootDirectory: string, readdir: DirectoryR
     }
 
     if (
-      await pathExists(join(entryPath, "package.json"), stat) ||
-      await pathExists(join(entryPath, "requirements.txt"), stat) ||
-      await pathExists(join(entryPath, "pyproject.toml"), stat) ||
-      await pathExists(join(entryPath, "manage.py"), stat) ||
-      await pathExists(join(entryPath, "composer.json"), stat) ||
-      await pathExists(join(entryPath, "artisan"), stat) ||
-      await pathExists(join(entryPath, "wp-config.php"), stat) ||
-      await pathExists(join(entryPath, "go.mod"), stat) ||
-      await pathExists(join(entryPath, "Gemfile"), stat) ||
-      await pathExists(join(entryPath, "Gemfile.lock"), stat) ||
-      await pathExists(join(entryPath, "pom.xml"), stat) ||
-      await pathExists(join(entryPath, "build.gradle"), stat) ||
-      await pathExists(join(entryPath, "build.gradle.kts"), stat) ||
-      await pathExists(join(entryPath, "Cargo.toml"), stat)
+      (await pathExists(join(entryPath, "package.json"), stat)) ||
+      (await pathExists(join(entryPath, "requirements.txt"), stat)) ||
+      (await pathExists(join(entryPath, "pyproject.toml"), stat)) ||
+      (await pathExists(join(entryPath, "manage.py"), stat)) ||
+      (await pathExists(join(entryPath, "composer.json"), stat)) ||
+      (await pathExists(join(entryPath, "artisan"), stat)) ||
+      (await pathExists(join(entryPath, "wp-config.php"), stat)) ||
+      (await pathExists(join(entryPath, "go.mod"), stat)) ||
+      (await pathExists(join(entryPath, "Gemfile"), stat)) ||
+      (await pathExists(join(entryPath, "Gemfile.lock"), stat)) ||
+      (await pathExists(join(entryPath, "pom.xml"), stat)) ||
+      (await pathExists(join(entryPath, "build.gradle"), stat)) ||
+      (await pathExists(join(entryPath, "build.gradle.kts"), stat)) ||
+      (await pathExists(join(entryPath, "Cargo.toml"), stat))
     ) {
       servicePaths.push(entry);
     }
@@ -466,5 +558,16 @@ export async function detectServices(
     }
   }
 
+  for (const project of await discoverRustProjects(rootDirectory)) {
+    services.push({
+      name: project.name,
+      kind: project.kind,
+      runtime: "Rust",
+      framework: project.framework,
+      paths: [project.path],
+      owns_routes: [],
+      depends_on: []
+    });
+  }
   return services;
 }

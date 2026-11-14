@@ -8,7 +8,8 @@ import {
   WorkspaceAnalyticsFilters,
   createWorkspaceAnalyticsFilters
 } from "../components/system/workspace-analytics-filters.js";
-import { BoundedListLimit } from "../components/system/bounded-list-limit.js";
+import { TableListFooter } from "../components/system/table-list-footer.js";
+import { Card, CardContent } from "../components/ui/card.js";
 import type { AnalyticsOpportunityInventoryQuery } from "../lib/api.js";
 import { AnalyticsSectionHeader } from "../components/system/analytics-section-header.js";
 import { CursorPaginationControls } from "../components/system/cursor-pagination-controls.js";
@@ -111,66 +112,71 @@ export function ProjectAnalyticsOpportunitiesPage(): JSX.Element {
         }
       />
 
-      <BoundedListLimit
-        id="analytics-opportunities-limit"
-        label="Inventory page limit"
-        paginated
-        value={limit}
-        onChange={setLimit}
-        disabled={pagination.isLoading}
-      />
-      {pagination.hasError ? (
-        <Notice title="Could not load project analytics opportunities" tone="destructive">
-          <div className="flex flex-col items-start gap-2">
-            <p>The project opportunity inventory is temporarily unavailable.</p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => void pagination.refreshPage()}
+      <Card className="min-w-0">
+        <CardContent>
+          {pagination.hasError ? (
+            <Notice title="Could not load project analytics opportunities" tone="destructive">
+              <div className="flex flex-col items-start gap-2">
+                <p>The project opportunity inventory is temporarily unavailable.</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void pagination.refreshPage()}
+                >
+                  Retry project analytics opportunities
+                </Button>
+              </div>
+            </Notice>
+          ) : (
+            <ResourceListState
+              items={pagination.items}
+              loading={<InventorySkeleton />}
+              empty={
+                <Empty>
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      <LightbulbIcon />
+                    </EmptyMedia>
+                    <EmptyTitle>No analytics opportunities in this project</EmptyTitle>
+                    <EmptyDescription>
+                      Opportunities appear when aggregate behavior crosses a supported analysis
+                      threshold in the selected window.
+                    </EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              }
             >
-              Retry project analytics opportunities
-            </Button>
-          </div>
-        </Notice>
-      ) : (
-        <ResourceListState
-          items={pagination.items}
-          loading={<InventorySkeleton />}
-          empty={
-            <Empty>
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <LightbulbIcon />
-                </EmptyMedia>
-                <EmptyTitle>No analytics opportunities in this project</EmptyTitle>
-                <EmptyDescription>
-                  Opportunities appear when aggregate behavior crosses a supported analysis
-                  threshold in the selected window.
-                </EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          }
-        >
-          {(opportunities) => (
-            <div className="flex flex-col gap-4">
-              <AnalyticsOpportunitiesTable
-                opportunities={opportunities}
-                ariaLabel="Project analytics opportunities"
-                showProject={false}
-              />
-              <CursorPaginationControls
-                page={pagination.page}
-                totalPages={pagination.totalPages}
-                hasNextPage={pagination.hasNextPage}
-                isLoading={pagination.isLoading}
-                onPreviousPage={pagination.goToPreviousPage}
-                onNextPage={() => void pagination.goToNextPage()}
-              />
-            </div>
+              {(opportunities) => (
+                <div className="flex flex-col gap-4">
+                  <AnalyticsOpportunitiesTable
+                    opportunities={opportunities}
+                    ariaLabel="Project analytics opportunities"
+                    showProject={false}
+                  />
+                </div>
+              )}
+            </ResourceListState>
           )}
-        </ResourceListState>
-      )}
+        </CardContent>
+        <TableListFooter
+          id="analytics-opportunities-page-size"
+          ariaLabel="Analytics opportunities rows per page"
+          value={limit}
+          onChange={setLimit}
+          disabled={pagination.isLoading}
+        >
+          <CursorPaginationControls
+            embedded
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            hasNextPage={pagination.hasNextPage}
+            isLoading={pagination.isLoading}
+            onPreviousPage={pagination.goToPreviousPage}
+            onNextPage={() => void pagination.goToNextPage()}
+          />
+        </TableListFooter>
+      </Card>
     </div>
   );
 }

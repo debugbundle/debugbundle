@@ -51,6 +51,7 @@ describe("release governance baseline", () => {
     expect(ciWorkflow).toContain("BASE_SHA:");
     expect(ciWorkflow).toContain("HEAD_SHA:");
     expect(ciWorkflow).toContain("pnpm build");
+    expect(ciWorkflow).toContain("make rust-core-integration");
     expect(ciWorkflow).toContain("poppler-utils");
     expect(ciWorkflow).toContain('REPORT_PDF_TEXT_CHECK_REQUIRED: "true"');
     expect(ciWorkflow).toContain("tests/packages/smart-reports/report-pdf.test.ts");

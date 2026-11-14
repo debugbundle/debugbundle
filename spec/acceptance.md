@@ -84,6 +84,36 @@ Both actual `@` expressions and dynamically changed `error_reporting()` masks su
 - **Then** its message falls back to the throwable class before hooks and suppression, and its emitted envelope passes the canonical ingestion schema
 - **And** empty request headers/query are JSON objects, and nonempty messages (including `"0"` and whitespace), exception class, stack and handled status retain their existing semantics subject to mandatory redaction
 
+### AC-SDK-RUST: Rust SDK Expansion
+
+Rust expansion additionally requires [the complete Rust qualification matrix](sdks/rust-sdk-qualification.md):
+safe explicit/borrowed error paths, opt-in native panic chaining, composable logs,
+revocable poll-scoped ownership, native Axum/Tower and non-Send Actix behavior,
+two full relays with durable restart/partial-ACK proof, and CLI setup integration.
+Source tests, exact packaged-crate consumers, supported native platforms and
+publication are distinct evidence layers. No Rust release or parity claim is
+accepted while a required gate or applicable SDK-family gap remains unverified.
+
+The deep-audit regressions additionally preserve nested safe cause/aggregate
+graphs within the shared budgets, reject oversized public privacy-key inputs
+before matching, verify real TLS chains/hostnames/expiry and deadlines, and reject
+compressed HTTP responses even when Cargo unifies application reqwest features.
+Rejected/disabled/capacity-exhausted construction must contain custom callback
+field destructor unwinds independently and restore the caller's capture state.
+A delayed older Core context job must not overwrite a newer recovery bundle or
+remove its primary occurrence and diagnostic evidence.
+Common public SDK entry points must link the Rust guide with accurate unpublished
+status until the separately authorised registry release is verified.
+Public SDK labels use "Rust" or "Rust SDK", with publication status shown
+separately. SDK selectors and catalogues place Rust immediately after PHP.
+
+Actual Rust local output without a cloud project ID must pass `process`, preserve
+graph/execution/probe/recovery evidence and event identity, and produce deterministic
+Bundle v1 output. Unassigned/null project IDs use the repository's local-only
+namespace; explicit project IDs and environments remain isolated. Recovery context
+never independently opens or resolves the incident, and processing never rewrites
+the SDK event arrays.
+
 ### AC-SDK-08: Python Vanilla Hooks
 
 - **Given** a vanilla Python application (no framework) with `debugbundle.init()` called
@@ -1529,7 +1559,7 @@ the requested list limit, and expose an incomplete-list error until a read succe
 
 ### AC-EMAIL-05: Daily Incident Email
 
-- Daily schedule controls match the weekly report layout: schedule and hour share a responsive row, timezone spans the width below, and the device-timezone shortcut remains compact. Hourly choices and Custom time preserve saved minute-level values and project inheritance.
+- Editable daily schedule controls match the weekly report layout: schedule and hour share a responsive row, timezone spans the width below, and the device-timezone shortcut remains compact. Hourly choices and Custom time preserve saved minute-level values. Choosing Use account schedule shows the current account time and timezone as a read-only summary beneath the selector; hour, custom time, timezone, device-timezone shortcut and editing guidance are hidden until Custom schedule is selected. Saving inheritance retains `daily: null` for both personal and shared project settings.
 - The local system-email catalog includes a daily digest example with two named projects and valid incident links, rendered through the same daily email helper as delivery. Dashboard, API, CLI and ordinary MCP support the saved local time and IANA timezone; project schedules can inherit or override the account schedule.
 
 - Daily email and live Slack coexist. Availability incidents stay immediate unless explicitly off/paused; pause health exceptions are honoured.
@@ -1715,6 +1745,7 @@ Mapped requirements: FR-PJS-01/04. Explicit roots, secret-free manifest/diff, re
 - **When** the public site is built for production
 - **Then** the output is a fully static export that can be uploaded to S3 and served through CloudFront
 - **And** no Node.js server runtime is required to serve marketing pages, blog content, docs pages, sitemap, robots, or machine-readable documentation artifacts
+- **And** pricing cards, comparison, FAQs and alert guides show Discord alerts on every plan, distinguish Slack's Team/Business availability, and explain shared alert delivery allowances; promotional copy omits delivery-mechanism qualifiers
 
 ### AC-DOC-14: Shared Public Site Route Layouts
 
@@ -2148,9 +2179,11 @@ Mapped requirements: FR-PJS-01/04. Explicit roots, secret-free manifest/diff, re
 
 ---
 
-## 22. Weekly Reporting Acceptance
+## 22. Weekly Project Digest Acceptance
 
-### AC-RPT-01: Weekly Report Delivery
+### AC-RPT-01: Weekly Project Digest Delivery
+
+- The project settings section and setup summary use **Weekly project digest**; email and Slack settings/actions/notices and digest email subjects use digest terminology. The Reports page keeps its existing name and factual/Smart Reports distinction. Existing routes, tool/command names, payloads, schedules and recipient limits remain compatible.
 
 - **Given** a project with incidents generated during the past week
 - **When** the weekly reporting schedule fires
@@ -2579,6 +2612,11 @@ Mapped requirements: FR-PJS-01/04. Explicit roots, secret-free manifest/diff, re
 - Page actions sit in the PageHeader description row rather than the shell header, align right/centre on desktop, wrap on mobile and use the shared default button size.
 - Incident inventory, Improvement inventory, Project inventory and Analytics opportunities show exact filtered totals inline as `(x)`. The total remains stable across cursor navigation and updates on refresh/filter changes; missing/failed reads do not invent a count, while known empty lists show `(0)`.
 - Disabled weekly reviews with an empty inventory show Enable weekly review only to eligible Owners with known settings. It opens the existing project-selection/consent form and performs no write or generation until explicit save.
+- Alert rules expose no row-limit or page-size controls, read up to the API maximum of 100 automatically and preserve save/scope reconciliation. Grouped deliveries place a reusable `Rows per page` selector below the group/member table, aligned right with responsive wrapping and any navigation beside it. Choices are 10/20/50/100, default 20, and apply immediately without a separate button or numeric input. Changing grouped page size resets both cursor chains and page indexes, preserves the inspected group and ignores stale reads. The selector has an accessible name, supports keyboard selection and is disabled during pending reads.
+- Project Incidents, Improvements and Debug bundles use the same footer with the selector, exact `Page N of X` and Previous/Next together. Page labels and navigation appear only when more than one page exists; single-page tables retain only the row selector. Mobile stacks the selector above the wrapping page/navigation row and leaves clearance for sticky selected-row actions. Changing size resets to the first page using the new limit and no old cursor. Each title shows the authorised filtered total `(x)` from the first-page count metadata, remains stable on cursor pages, updates with refresh/filters and shows `(0)` only for a confirmed empty result; partial or failed reads do not invent totals.
+- Project Analytics Opportunities, Generated analytics bundles and Retained journey samples use the same card/footer and filtered title counts. Their old numeric page-limit/Apply forms are absent. Grouped deliveries and every changed table hide page labels and Previous/Next on a single page, including after a size/filter change. Bundle/sample API count metadata is opt-in and first-page-only; legacy/default/false/cursor response keys remain compatible. PostgreSQL tests verify exact project/organisation bundle counts and retained sample scope, tag, environment and expiry counts. Browser/CLI/ordinary MCP consume the same counts; current CLI/MCP readers retry once without the count option on an older server's `400 invalid_query`, without retrying access denials or writes.
+- Dashboard Incidents today, workspace Incidents, Improvement inventory, Weekly reviews and workspace Analytics Opportunities/Bundles reuse the same footer, exact title totals and mobile arrow navigation, hiding page/navigation wording on a single page. Dashboard Projects remains unchanged. Changing size resets to the first page without losing filters; refresh updates totals. Dashboard totals/rows retain the existing local-day attention rules and ten-row default. Weekly review totals count the complete unique authorised metadata history, with bounded/cancelled continuation reads and no partial count on failure/repeated cursors; display paging and size changes perform no settings/generation write. Workspace Improvements shows its original empty-selection hint before Select all visible improvements and retains selected-row feedback and bulk actions.
+- Incident logs use a compact select for All levels, Trace, Debug, Info, Warn, Warning, Error, Fatal and Custom level, with accessible descriptions explaining exact-match filtering and common meanings. Presets apply immediately, All levels omits the query filter, and custom entry preserves trimmed names and casing without querying on every keystroke. Level and page-size changes reset cursors. Rows per page sits in the shared responsive footer with Page N and Previous/Next only for multiple known pages; no total is invented for the cursor-only log endpoint.
 
 - **Given** a filtered incidents, improvements, analytics opportunities, AnalyticsBundle generations, or capture-rules list with multiple pages
 - **When** the member opens its first page or navigates by cursor

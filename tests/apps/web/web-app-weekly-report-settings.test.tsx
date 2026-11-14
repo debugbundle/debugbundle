@@ -80,11 +80,9 @@ describe("weekly report settings", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
-    await openProjectSettingsSection("Weekly reports");
+    await openProjectSettingsSection("Weekly project digest");
 
-    expect(
-      await screen.findByRole("button", { name: /save email weekly report/i })
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /save email digest/i })).toBeInTheDocument();
 
     const enabledSwitches = await screen.findAllByRole("switch", { name: /enabled/i });
     await user.click(enabledSwitches[enabledSwitches.length - 1]!);
@@ -94,7 +92,7 @@ describe("weekly report settings", () => {
       "owner@example.com, team@example.com, ops@example.com, bulk@example.com"
     );
     expect(screen.getByText(/use 3 or fewer recipients/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /save email weekly report/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /save email digest/i })).toBeDisabled();
 
     await user.clear(screen.getByLabelText(/recipients/i));
     await user.type(screen.getByLabelText(/recipients/i), "owner@example.com, team@example.com");
@@ -102,7 +100,7 @@ describe("weekly report settings", () => {
     await chooseSelectOption(user, /^hour$/i, /16:00/i);
     await user.clear(screen.getByLabelText(/timezone/i));
     await user.type(screen.getByLabelText(/timezone/i), "Europe/Ljubljana");
-    await user.click(screen.getByRole("button", { name: /save email weekly report/i }));
+    await user.click(screen.getByRole("button", { name: /save email digest/i }));
 
     await waitFor(() => {
       expect(
@@ -115,7 +113,7 @@ describe("weekly report settings", () => {
     });
   });
 
-  it("creates a Slack weekly report from the project settings page on Team", async () => {
+  it("creates a Slack digest from the project settings page on Team", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
@@ -202,9 +200,9 @@ describe("weekly report settings", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
-    await openProjectSettingsSection("Weekly reports");
+    await openProjectSettingsSection("Weekly project digest");
 
-    const emptyWeeklyReportsTitle = await screen.findByText("No Slack weekly reports yet");
+    const emptyWeeklyReportsTitle = await screen.findByText("No Slack digests yet");
     expect(emptyWeeklyReportsTitle.closest('[data-slot="empty"]')).toHaveClass(
       "min-h-[11rem]",
       "border",
@@ -212,10 +210,8 @@ describe("weekly report settings", () => {
       "border-border/80",
       "bg-background/50"
     );
-    expect(
-      await screen.findByRole("button", { name: /create slack weekly report/i })
-    ).toBeInTheDocument();
-    await user.click(await screen.findByRole("button", { name: /create slack weekly report/i }));
+    expect(await screen.findByRole("button", { name: /create slack digest/i })).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: /create slack digest/i }));
 
     const dialog = await screen.findByRole("dialog");
     const dayTrigger = within(dialog).getByLabelText(/^day$/i);
@@ -230,7 +226,7 @@ describe("weekly report settings", () => {
 
     await user.clear(within(dialog).getByLabelText(/^timezone$/i));
     await user.type(within(dialog).getByLabelText(/^timezone$/i), "America/New_York");
-    await user.click(within(dialog).getByRole("button", { name: /^create slack weekly report$/i }));
+    await user.click(within(dialog).getByRole("button", { name: /^create slack digest$/i }));
 
     await waitFor(() => {
       expect(
@@ -245,7 +241,7 @@ describe("weekly report settings", () => {
     expect(await screen.findByText(/acme workspace - #weekly-reports/i)).toBeInTheDocument();
   });
 
-  it("shows preserved Slack weekly reports as paused on lower tiers", async () => {
+  it("shows preserved Slack digests as paused on lower tiers", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
 
@@ -316,14 +312,12 @@ describe("weekly report settings", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
-    await openProjectSettingsSection("Weekly reports");
+    await openProjectSettingsSection("Weekly project digest");
 
     expect(
-      await screen.findByText(/slack weekly reports are paused on the current plan/i)
+      await screen.findByText(/slack digests are paused on the current plan/i)
     ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /create slack weekly report/i })
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /create slack digest/i })).not.toBeInTheDocument();
     expect(await screen.findByText(/acme workspace - #weekly-reports/i)).toBeInTheDocument();
     expect(screen.getByText(/friday at 16:00 America\/New_York/i)).toBeInTheDocument();
   });

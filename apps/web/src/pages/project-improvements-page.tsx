@@ -3,6 +3,8 @@ import { useMemo, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 
 import { CursorPaginationControls } from "../components/system/cursor-pagination-controls.js";
+import { TableListFooter } from "../components/system/table-list-footer.js";
+import { inventoryTitle } from "../lib/inventory-title.js";
 import { HostedImprovementsUpgradeCallout } from "../components/system/hosted-improvements-upgrade-callout.js";
 import { ResourceListState } from "../components/system/resource-list-state.js";
 import {
@@ -59,6 +61,7 @@ export function ProjectImprovementsPage(): JSX.Element {
   const navigate = useNavigate();
   const { project, projectId } = useOutletContext<ProjectContext>();
   const [statusFilter, setStatusFilter] = useState<ImprovementStatusFilter>("open");
+  const [pageSize, setPageSize] = useState(20);
   const [sort, setSort] = useState<SortState<ImprovementSortField>>({
     field: "last_detected_at",
     direction: "desc"
@@ -70,6 +73,7 @@ export function ProjectImprovementsPage(): JSX.Element {
     isLoading,
     page,
     totalPages,
+    totalCount,
     hasNextPage,
     goToNextPage,
     goToPreviousPage,
@@ -86,17 +90,18 @@ export function ProjectImprovementsPage(): JSX.Element {
 
       const response = await listProjectImprovements(
         projectId,
-        20,
+        pageSize,
         cursor ?? undefined,
         statusFilter === "all" ? undefined : statusFilter
       );
       return {
         items: response.improvements,
         nextCursor: response.nextCursor,
-        totalPages: response.totalPages
+        totalPages: response.totalPages,
+        totalCount: response.totalCount
       };
     },
-    [projectId, statusFilter, hostedImprovementsEnabled]
+    [projectId, statusFilter, hostedImprovementsEnabled, pageSize]
   );
 
   const sortedImprovements = useMemo(() => {
@@ -198,7 +203,7 @@ export function ProjectImprovementsPage(): JSX.Element {
           <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex w-full items-start justify-between gap-3 sm:block sm:w-auto">
               <div className="space-y-1.5">
-                <CardTitle>Project improvements</CardTitle>
+                <CardTitle>{inventoryTitle("Project improvements", totalCount)}</CardTitle>
                 <CardDescription>
                   Deterministic improvement opportunities for this project.
                 </CardDescription>
@@ -246,7 +251,7 @@ export function ProjectImprovementsPage(): JSX.Element {
               </Select>
             </div>
           </CardHeader>
-          <CardContent className={selection.selectedCount > 0 ? "pb-28 sm:pb-6" : undefined}>
+          <CardContent>
             <ResourceListState
               items={improvements}
               loading={
@@ -324,18 +329,28 @@ export function ProjectImprovementsPage(): JSX.Element {
                     }}
                     projectScoped
                   />
-                  <CursorPaginationControls
-                    page={page}
-                    totalPages={totalPages}
-                    hasNextPage={hasNextPage}
-                    isLoading={isLoading}
-                    onPreviousPage={goToPreviousPage}
-                    onNextPage={() => void goToNextPage()}
-                  />
                 </div>
               )}
             </ResourceListState>
           </CardContent>
+          <TableListFooter
+            id="project-improvements-page-size"
+            ariaLabel="Project improvements rows per page"
+            value={pageSize}
+            onChange={setPageSize}
+            disabled={isLoading || bulkAction !== null}
+            className={selection.selectedCount > 0 ? "pb-28 sm:pb-4" : undefined}
+          >
+            <CursorPaginationControls
+              embedded
+              page={page}
+              totalPages={totalPages}
+              hasNextPage={hasNextPage}
+              isLoading={isLoading || bulkAction !== null}
+              onPreviousPage={goToPreviousPage}
+              onNextPage={() => void goToNextPage()}
+            />
+          </TableListFooter>
         </Card>
       )}
       <StickyMobileTableActions

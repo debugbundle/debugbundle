@@ -15,18 +15,20 @@ export type DashboardIncidentsTodayCursor = {
 
 export async function loadDashboardAttentionIncidentPage(
   todayWindow: LocalDayWindow,
-  cursor: string | null
+  cursor: string | null,
+  pageSize = DASHBOARD_INCIDENTS_TODAY_PAGE_SIZE
 ): Promise<{
   items: IncidentRecord[];
   nextCursor: string | null;
   totalPages?: number | undefined;
+  totalCount?: number | undefined;
 }> {
   let scannedMatches = 0;
   let remainingSourceCursor: string | null = null;
   const items: IncidentRecord[] = [];
   let currentCursor = decodeDashboardIncidentsTodayCursor(cursor);
 
-  while (items.length < DASHBOARD_INCIDENTS_TODAY_PAGE_SIZE) {
+  while (items.length < pageSize) {
     const response = await listDashboardAttentionIncidentMatches(
       todayWindow,
       currentCursor.sourceCursor
@@ -37,7 +39,7 @@ export async function loadDashboardAttentionIncidentPage(
         ? null
         : response.nextSourceCursor;
     const availableIncidents = response.matchedIncidents.slice(currentCursor.matchOffset);
-    const remainingPageSize = DASHBOARD_INCIDENTS_TODAY_PAGE_SIZE - items.length;
+    const remainingPageSize = pageSize - items.length;
     const incidentsToTake = availableIncidents.slice(0, remainingPageSize);
 
     items.push(...incidentsToTake);
@@ -72,6 +74,7 @@ export async function loadDashboardAttentionIncidentPage(
     items: IncidentRecord[];
     nextCursor: string | null;
     totalPages?: number;
+    totalCount?: number;
   }> {
     if (cursor !== null) return { items, nextCursor };
     // Continue counting after the source pages already read for this display page.
@@ -82,10 +85,8 @@ export async function loadDashboardAttentionIncidentPage(
     return {
       items,
       nextCursor,
-      totalPages: Math.max(
-        1,
-        Math.ceil((scannedMatches + remainingMatches) / DASHBOARD_INCIDENTS_TODAY_PAGE_SIZE)
-      )
+      totalPages: Math.max(1, Math.ceil((scannedMatches + remainingMatches) / pageSize)),
+      totalCount: scannedMatches + remainingMatches
     };
   }
 }

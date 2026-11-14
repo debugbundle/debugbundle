@@ -1,4 +1,13 @@
 import { EventEnvelopeSchema } from "../../shared-types/src/index.js";
+import type { EventEnvelope } from "../../shared-types/src/index.js";
+
+/** SDKs cannot resolve a cloud project ID from a write-only token. Unconfigured
+ * local arrays share this local-only namespace inside their repository store;
+ * explicit project IDs remain authoritative and never join this namespace. */
+export const UNASSIGNED_LOCAL_PROJECT_ID = "00000000-0000-0000-0000-000000000000";
+export function bindLocalProjectScope(event: EventEnvelope): EventEnvelope {
+  return event.project_id == null ? { ...event, project_id: UNASSIGNED_LOCAL_PROJECT_ID } : event;
+}
 
 export function buildTraceCorrelationKey(
   projectId: string,

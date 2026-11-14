@@ -202,6 +202,25 @@ Every standalone SDK repository must adopt the same release-hardening pattern be
 3. Any package family that is documented as version-aligned must publish as one coherent family and must avoid mixed-version public snippets.
 4. New SDK plans in `spec/sdks/*.md` must describe their release workflow, clean-install smoke path, and publish-time compatibility matrix before implementation starts.
 
+### Rust crates.io releases
+
+`debugbundle/debugbundle-rust` releases through version tags. The planner derives
+source, version and SHA-256 from the latest complete eight-job qualification for
+that exact source; owners do not copy checksums between workflow forms. Tooling
+repairs may reuse a qualified SDK checkout without changing its immutable crate.
+Fresh Cargo publish output is compared before credentials are used. Existing
+matching versions select verification only; uploads are never blindly retried.
+Acceptance includes the public index/download checksum and real registry-installed
+standalone, Axum and Actix applications, then the exact-source GitHub release.
+
+Initial namespace creation uses the bootstrap credential once. Subsequent versions
+require the crates.io Trusted Publisher for owner `debugbundle`, repository
+`debugbundle-rust`, workflow `release.yml`, environment `crates-io`; never fall
+back to the bootstrap token when trusted authentication fails. Confirm that
+registry identity and an actual OIDC exchange before claiming unattended releases
+are operational. [First publication and recovery](../spec/sdks/rust-sdk-release.md)
+records the alpha's acceptance, successful identity check and bootstrap-secret removal.
+
 ### CocoaPods Trunk Transition — Mobile Release Preflight
 
 Before planning an affected release, review the current
@@ -227,12 +246,21 @@ The V1 release train must publish dependency roots before dependent wrappers. Do
 
 1. Publish core-owned shared JS packages from `debugbundle/debugbundle`: `@debugbundle/shared-types` and `@debugbundle/redaction`.
 2. Publish the JS SDK family from `debugbundle/debugbundle-js`: `@debugbundle/sdk-node` and `@debugbundle/sdk-browser` at the same version, after the matching shared-package version is already on npm.
-3. Publish independent backend SDKs and package families whose public artifacts do not bundle another DebugBundle SDK: Python, PHP, Java, Go, Ruby, Android, Swift, .NET, CLI, and MCP. Version-aligned package families must publish coherently as one family.
+3. Publish independent backend SDKs and package families whose public artifacts do not bundle another DebugBundle SDK: Python, PHP, Rust, Java, Go, Ruby, Android, Swift, .NET, CLI, and MCP. Version-aligned package families must publish coherently as one family.
 4. Publish React Native only after the Android Maven package family and the Swift native package it delegates to are available from their supported public sources and smoke-tested through the actual RN consumer path. Apply the CocoaPods transition preflight above; SPM availability alone does not establish RN pod dependency resolution.
 5. Publish WordPress only after the PHP SDK and browser SDK versions it requires are published and smoke-tested; rebuild the bundled browser asset from those exact published versions before assembling the plugin ZIP.
 6. Bump internal dogfooding manifests only after their referenced registry versions exist, then run hosted/source-deploy validation.
 7. Update the Claude Code catalog, plugin manifest, and pinned MCP install command only after that npm MCP version is published and its registry smoke passes. Source package release candidates must not make marketplace installs resolve an unpublished version.
 8. Create the canonical core GitHub release after package-specific release workflows and registry smoke checks are green.
+
+Rust participates whenever its publishable source or packaged documentation changes:
+choose its independent version, qualify the exact archive and publish it through
+`debugbundle-rust/release.yml` before advertising that version. Record the selected
+stable version in `sdks.json` under `releases.rust`; unchanged Rust releases retain
+their current version. `make rust-release-check` and the canonical core workflow
+verify that version's non-yanked crates.io metadata, index checksum and downloaded
+archive before the core release is created. The core release notes report Rust's
+independent version and repository; core pushes never implicitly publish a crate.
 
 ### Internal Dogfooding Version Touchpoints
 

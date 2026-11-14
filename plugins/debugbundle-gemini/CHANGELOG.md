@@ -1,5 +1,9 @@
 # DebugBundle for Gemini CLI changelog
 
+## [1.7.1] - 2026-11-14
+
+- Adopt MCP 1.25.0 with compatible Rust evidence and additive analytics count schemas. Preserve tool permissions, local authentication and existing workflows.
+
 ## [1.7.0] - 2026-11-12
 
 - Adopt MCP 1.24.0 for saved weekly-review plans and align Access token/Reports guidance, preserving scope, consent and existing authentication.

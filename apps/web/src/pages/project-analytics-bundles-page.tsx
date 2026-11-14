@@ -7,7 +7,9 @@ import {
   WorkspaceAnalyticsFilters,
   createWorkspaceAnalyticsFilters
 } from "../components/system/workspace-analytics-filters.js";
-import { BoundedListLimit } from "../components/system/bounded-list-limit.js";
+import { TableListFooter } from "../components/system/table-list-footer.js";
+import { inventoryTitle } from "../lib/inventory-title.js";
+import { Card, CardContent } from "../components/ui/card.js";
 import type { AnalyticsBundleInventoryQuery } from "../lib/api.js";
 import { AnalyticsSectionHeader } from "../components/system/analytics-section-header.js";
 import { CursorPaginationControls } from "../components/system/cursor-pagination-controls.js";
@@ -62,7 +64,8 @@ export function ProjectAnalyticsBundlesPage(): JSX.Element {
       return {
         items: response.bundles,
         nextCursor: response.next_cursor,
-        totalPages: response.total_pages
+        totalPages: response.total_pages,
+        totalCount: response.total_count
       };
     },
     [projectId, queryKey, window, filters, limit]
@@ -71,7 +74,7 @@ export function ProjectAnalyticsBundlesPage(): JSX.Element {
   return (
     <div className="flex flex-col gap-6">
       <AnalyticsSectionHeader
-        title="Generated analytics bundles"
+        title={inventoryTitle("Generated analytics bundles", pagination.totalCount)}
         description="Review ready analysis artifacts and track generations still being processed."
         isLoading={pagination.isLoading}
         onRefresh={pagination.refreshPage}
@@ -103,65 +106,71 @@ export function ProjectAnalyticsBundlesPage(): JSX.Element {
           </>
         }
       />
-      <BoundedListLimit
-        id="analytics-bundles-limit"
-        label="Inventory page limit"
-        paginated
-        value={limit}
-        onChange={setLimit}
-        disabled={pagination.isLoading}
-      />
-      {pagination.hasError ? (
-        <Notice title="Could not load project analytics bundles" tone="destructive">
-          <div className="flex flex-col items-start gap-2">
-            <p>The project analytics bundle inventory is temporarily unavailable.</p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => void pagination.refreshPage()}
+      <Card className="min-w-0">
+        <CardContent>
+          {pagination.hasError ? (
+            <Notice title="Could not load project analytics bundles" tone="destructive">
+              <div className="flex flex-col items-start gap-2">
+                <p>The project analytics bundle inventory is temporarily unavailable.</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void pagination.refreshPage()}
+                >
+                  Retry project analytics bundles
+                </Button>
+              </div>
+            </Notice>
+          ) : (
+            <ResourceListState
+              items={pagination.items}
+              loading={<InventorySkeleton />}
+              empty={
+                <Empty>
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      <PackageIcon />
+                    </EmptyMedia>
+                    <EmptyTitle>No analytics bundles in this project</EmptyTitle>
+                    <EmptyDescription>
+                      Generated, pending, and failed analysis artifacts in this window will appear
+                      here.
+                    </EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              }
             >
-              Retry project analytics bundles
-            </Button>
-          </div>
-        </Notice>
-      ) : (
-        <ResourceListState
-          items={pagination.items}
-          loading={<InventorySkeleton />}
-          empty={
-            <Empty>
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <PackageIcon />
-                </EmptyMedia>
-                <EmptyTitle>No analytics bundles in this project</EmptyTitle>
-                <EmptyDescription>
-                  Generated, pending, and failed analysis artifacts in this window will appear here.
-                </EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          }
-        >
-          {(bundles) => (
-            <div className="flex flex-col gap-4">
-              <AnalyticsBundlesTable
-                bundles={bundles}
-                ariaLabel="Project analytics bundles"
-                showProject={false}
-              />
-              <CursorPaginationControls
-                page={pagination.page}
-                totalPages={pagination.totalPages}
-                hasNextPage={pagination.hasNextPage}
-                isLoading={pagination.isLoading}
-                onPreviousPage={pagination.goToPreviousPage}
-                onNextPage={() => void pagination.goToNextPage()}
-              />
-            </div>
+              {(bundles) => (
+                <div className="flex flex-col gap-4">
+                  <AnalyticsBundlesTable
+                    bundles={bundles}
+                    ariaLabel="Project analytics bundles"
+                    showProject={false}
+                  />
+                </div>
+              )}
+            </ResourceListState>
           )}
-        </ResourceListState>
-      )}
+        </CardContent>
+        <TableListFooter
+          id="analytics-bundles-page-size"
+          ariaLabel="Generated analytics bundles rows per page"
+          value={limit}
+          onChange={setLimit}
+          disabled={pagination.isLoading}
+        >
+          <CursorPaginationControls
+            embedded
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            hasNextPage={pagination.hasNextPage}
+            isLoading={pagination.isLoading}
+            onPreviousPage={pagination.goToPreviousPage}
+            onNextPage={() => void pagination.goToNextPage()}
+          />
+        </TableListFooter>
+      </Card>
       <Outlet context={{ ...context, createTriggerRef } satisfies AnalyticsBundlesOutletContext} />
     </div>
   );

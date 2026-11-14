@@ -15,6 +15,18 @@ const corpus = JSON.parse(
   function: string;
 }>;
 describe("bounded runtime stack locations", () => {
+  it("recognises Rust frame ownership without changing the v1 runtime enum", () => {
+    const stack =
+      "stack backtrace:\n 0: debugbundle::capture\n at /sdk/src/lib.rs:1:1\n 1: axum::handler::dispatch\n at /registry/axum/src/handler.rs:2:2\n 2: checkout::submit\n at /srv/src/checkout.rs:42:7";
+    const result = parseStackFrames(stack, "unknown");
+    expect(result.frames.map((item) => item.classification)).toEqual([
+      "sdk",
+      "framework",
+      "application"
+    ]);
+    expect(selectUsefulFrame(result.frames)?.function).toBe("checkout::submit");
+    expect(parseStackFrames("0: opaque::run", "unknown").frames).toEqual([]);
+  });
   it.each(corpus)("parses $runtime application locations without V8 assumptions", (sample) => {
     const result = parseStackFrames(sample.stack, sample.runtime);
     expect(selectUsefulFrame(result.frames)).toMatchObject({

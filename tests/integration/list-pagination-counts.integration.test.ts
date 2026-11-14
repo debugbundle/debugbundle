@@ -6,6 +6,7 @@ import {
   createPostgresAnalyticsOpportunityStore,
   createPostgresAnalyticsBundleGenerationStore
 } from "../../packages/storage/src/index.js";
+import { createPostgresAnalyticsJourneySampleStore } from "../../packages/storage/src/analytics-journey-sample-store.js";
 import {
   countIncidentsForOrganization,
   countImprovementsForOrganization
@@ -84,6 +85,62 @@ runIntegration("filtered pagination counts", () => {
     expect(
       await countIncidentsForOrganization(db, { ...filters, project_id: otherProjectId })
     ).toBe(0);
+  });
+
+  it("counts retained journey samples with the same scope, tags and expiry as the page", async () => {
+    const store = createPostgresAnalyticsJourneySampleStore(db);
+    const cases = [
+      [projectId, "production", "checkout", "2026-12-01T00:00:00Z"],
+      [projectId, "production", "checkout", "2026-12-01T00:00:00Z"],
+      [projectId, "production", "checkout", "2026-12-01T00:00:00Z"],
+      [projectId, "staging", "checkout", "2026-12-01T00:00:00Z"],
+      [projectId, "production", "other", "2026-12-01T00:00:00Z"],
+      [projectId, "production", "checkout", "2026-11-01T00:00:00Z"],
+      [otherProjectId, "production", "checkout", "2026-12-01T00:00:00Z"]
+    ] as const;
+    for (const [project, environment, tag, expires_at] of cases) {
+      const sample_id = randomUUID();
+      await store.recordAnalyticsJourneySample({
+        sample_id,
+        project_id: project,
+        service: "web",
+        environment,
+        session_id_hash: "a".repeat(64),
+        correlation_session_hash: null,
+        visitor_id_hash: null,
+        analysis_tags: [tag],
+        first_seen_at: occurredAt,
+        last_seen_at: occurredAt,
+        dimensions_summary: {},
+        object_key: `analytics-journeys/${project}/${sample_id}.json.gz`,
+        has_artifact: true,
+        expires_at,
+        created_at: occurredAt
+      });
+    }
+    const filters = {
+      project_id: projectId,
+      service: "web",
+      environment: "production",
+      tag: "checkout",
+      limit: 2,
+      include_total: true,
+      now: "2026-11-12T12:00:00Z"
+    };
+    const first = await store.listAnalyticsJourneySamplesForProject(filters);
+    expect(first.samples).toHaveLength(2);
+    expect(first.total_count).toBe(3);
+    expect(first.total_pages).toBe(2);
+    const last = first.samples.at(-1)!;
+    const second = await store.listAnalyticsJourneySamplesForProject({
+      ...filters,
+      cursor: { last_seen_at: last.last_seen_at, sample_id: last.sample_id }
+    });
+    expect(second.samples).toHaveLength(1);
+    expect(second).not.toHaveProperty("total_count");
+    expect(
+      await store.listAnalyticsJourneySamplesForProject({ ...filters, tag: "missing" })
+    ).toMatchObject({ samples: [], total_count: 0, total_pages: 1 });
   });
 
   it("counts only visible improvement bundles and applies the same effective status as the list", async () => {
@@ -165,6 +222,10 @@ runIntegration("filtered pagination counts", () => {
       (await opportunities.listAnalyticsOpportunitiesForOrganization(filters)).total_pages
     ).toBe(2);
     expect((await bundles.listAnalyticsBundleGenerationsForProject(filters)).total_pages).toBe(2);
+    expect((await bundles.listAnalyticsBundleGenerationsForProject(filters)).total_count).toBe(3);
+    expect(
+      (await bundles.listAnalyticsBundleGenerationsForOrganization!(filters)).total_count
+    ).toBe(3);
     expect(
       (await bundles.listAnalyticsBundleGenerationsForOrganization!(filters)).total_pages
     ).toBe(2);
