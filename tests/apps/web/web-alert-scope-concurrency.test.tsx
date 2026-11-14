@@ -109,9 +109,8 @@ it("keeps an incomplete-list error visible alongside a confirmed creation when b
   expect(screen.queryByText("Could not create alert rule.")).toBeNull();
 });
 
-it("uses the current list limit when a save finishes after the dialog is closed and the limit changes", async () => {
+it("keeps a confirmed creation after closing a pending save without exposing rule row controls", async () => {
   const save = deferredResponse();
-  const largerList = deferredResponse();
   const existing = createAlert({ alert_id: "existing", scope: globalScope() });
   const created = createAlert({ alert_id: "created", config: { to: "created@example.test" } });
   const fallback = mockScopedAlerts([existing]).fetchMock;
@@ -123,7 +122,6 @@ it("uses the current list limit when a save finishes after the dialog is closed 
       if (url.pathname === "/v1/alerts") {
         if (init?.method === "POST") return save.promise;
         limits.push(url.searchParams.get("limit")!);
-        if (limits.length === 2) return largerList.promise;
         return jsonResponse(200, { alerts: [existing] });
       }
       return fallback(input, init);
@@ -139,12 +137,12 @@ it("uses the current list limit when a save finishes after the dialog is closed 
   await user.click(within(dialog).getByRole("button", { name: "Create alert rule" }));
   await within(dialog).findByRole("button", { name: "Saving..." });
   await user.click(within(dialog).getByRole("button", { name: "Close" }));
-  await user.clear(screen.getByLabelText("Alert rule limit"));
-  await user.type(screen.getByLabelText("Alert rule limit"), "50");
-  await user.click(screen.getByRole("button", { name: "Apply alert rule limit" }));
-  await waitFor(() => expect(limits).toEqual(["20", "50"]));
+  const rulesCard = screen.getByText("Alert rules").closest('[data-slot="card"]');
+  expect(rulesCard).not.toBeNull();
+  expect(within(rulesCard as HTMLElement).queryByRole("combobox")).toBeNull();
+  expect(within(rulesCard as HTMLElement).queryByRole("spinbutton")).toBeNull();
+  expect(within(rulesCard as HTMLElement).queryByRole("button", { name: /apply/i })).toBeNull();
   await act(async () => save.resolve(jsonResponse(201, { alert: created })));
-  await waitFor(() => expect(limits).toEqual(["20", "50", "50"]));
-  await act(async () => largerList.resolve(jsonResponse(200, { alerts: [existing] })));
+  await waitFor(() => expect(limits).toEqual(["100", "100"]));
   expect(screen.getByRole("row", { name: /created@example.test/ })).toBeVisible();
 });

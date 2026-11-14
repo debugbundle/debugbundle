@@ -172,7 +172,7 @@ export function ProjectWeeklyReportSettingsCard({
           return;
         }
 
-        setErrorMessage("Could not load weekly report settings.");
+        setErrorMessage("Could not load weekly digest settings.");
       } finally {
         if (isActive) {
           setIsLoading(false);
@@ -225,9 +225,9 @@ export function ProjectWeeklyReportSettingsCard({
   const isEmailDisabled = isLoading || isSavingEmail || isDeletingEmail || !canEdit;
   const emailValidationMessage =
     (settingsDraft.is_enabled || isEmailDirty) && recipients.length === 0
-      ? "Add at least one recipient before enabling weekly reports."
+      ? "Add at least one recipient before enabling weekly digests."
       : recipients.length > maxEmailRecipients
-        ? "Use 3 or fewer recipients for weekly reports."
+        ? "Use 3 or fewer recipients for weekly digests."
         : null;
   const isEmailSaveDisabled = isEmailDisabled || !isEmailDirty || emailValidationMessage !== null;
 
@@ -263,11 +263,11 @@ export function ProjectWeeklyReportSettingsCard({
       const nextDraft = buildEmailDraft(channel);
       setEmailDraft(nextDraft);
       setBaselineEmailDraft(nextDraft);
-      showSuccessToast("Email weekly report settings updated successfully.");
+      showSuccessToast("Email digest settings updated successfully.");
     } catch {
       if (generation.current !== requestGeneration) return;
-      setErrorMessage("Could not save weekly report settings.");
-      showErrorToast("Could not save weekly report settings.");
+      setErrorMessage("Could not save weekly digest settings.");
+      showErrorToast("Could not save weekly digest settings.");
     } finally {
       if (generation.current === requestGeneration) setIsSavingEmail(false);
     }
@@ -283,10 +283,10 @@ export function ProjectWeeklyReportSettingsCard({
       const draft = buildDefaultEmailDraft();
       setEmailDraft(draft);
       setBaselineEmailDraft(draft);
-      showSuccessToast("Email weekly report deleted successfully.");
+      showSuccessToast("Email digest deleted successfully.");
     } catch {
       if (generation.current === requestGeneration)
-        showErrorToast("Could not delete this email weekly report.");
+        showErrorToast("Could not delete this email digest.");
     } finally {
       if (generation.current === requestGeneration) setIsDeletingEmail(false);
     }
@@ -397,7 +397,7 @@ export function ProjectWeeklyReportSettingsCard({
       (slackDraft.destination_mode === "connected" &&
         (!slackEnabled || slackDraft.slack_destination_id.length === 0))
     ) {
-      showErrorToast("Connect Slack and choose a channel for this weekly report.");
+      showErrorToast("Connect Slack and choose a channel for this weekly digest.");
       return;
     }
 
@@ -438,13 +438,13 @@ export function ProjectWeeklyReportSettingsCard({
       setSlackDraft(null);
       showSuccessToast(
         slackDraft.channel_id === null
-          ? "Slack weekly report created successfully."
-          : "Slack weekly report updated successfully."
+          ? "Slack digest created successfully."
+          : "Slack digest updated successfully."
       );
     } catch {
       if (generation.current !== requestGeneration) return;
-      setErrorMessage("Could not save Slack weekly report settings.");
-      showErrorToast("Could not save Slack weekly report settings.");
+      setErrorMessage("Could not save Slack digest settings.");
+      showErrorToast("Could not save Slack digest settings.");
     } finally {
       if (generation.current === requestGeneration) setIsSavingSlack(false);
     }
@@ -458,10 +458,10 @@ export function ProjectWeeklyReportSettingsCard({
       await deleteProjectWeeklyReportChannel(channelId);
       if (generation.current !== requestGeneration) return;
       setSlackChannels((current) => current.filter((channel) => channel.channel_id !== channelId));
-      showSuccessToast("Slack weekly report deleted successfully.");
+      showSuccessToast("Slack digest deleted successfully.");
     } catch {
       if (generation.current !== requestGeneration) return;
-      showErrorToast("Could not delete this Slack weekly report.");
+      showErrorToast("Could not delete this Slack digest.");
     } finally {
       if (generation.current === requestGeneration) setSlackChannelToDelete(null);
     }
@@ -472,13 +472,13 @@ export function ProjectWeeklyReportSettingsCard({
 
   return (
     <CollapsibleCard
-      title="Weekly reports"
-      description="Send a weekly summary for this project when there was reportable activity."
+      title="Weekly project digest"
+      description="Receive a weekly summary of this project's incidents and bundle activity by email or Slack."
       contentClassName="flex flex-col gap-6"
     >
       <BoundedListLimit
         id="weekly-report-limit"
-        label="Weekly report limit"
+        label="Weekly digest limit"
         value={channelLimit}
         onChange={setChannelLimit}
         disabled={isLoading || isSavingEmail || isSavingSlack}
@@ -493,10 +493,9 @@ export function ProjectWeeklyReportSettingsCard({
         <form className="flex flex-col gap-6" onSubmit={(event) => void handleSaveEmail(event)}>
           <div className="space-y-4">
             <div className="space-y-1">
-              <h3 className="text-sm font-semibold text-foreground">Email summary</h3>
+              <h3 className="text-sm font-semibold text-foreground">Email digest</h3>
               <p className="text-sm text-muted-foreground">
-                Keep the default project-wide email summary here. Email weekly reports support up to
-                3 recipients.
+                Send this project's weekly digest to up to 3 email recipients.
               </p>
             </div>
 
@@ -513,7 +512,7 @@ export function ProjectWeeklyReportSettingsCard({
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               {settingsDraft.channel_id === null ? null : (
                 <ResourceDeleteDialog
-                  label="Delete email weekly report"
+                  label="Delete email digest"
                   description="Remove the weekly email delivery for this project. You can create a new email report later."
                   disabled={isEmailDisabled}
                   onConfirm={() => void handleDeleteEmail()}
@@ -529,7 +528,7 @@ export function ProjectWeeklyReportSettingsCard({
                 Reset
               </Button>
               <PendingButton pending={isSavingEmail} type="submit" disabled={isEmailSaveDisabled}>
-                {isSavingEmail ? "Saving..." : "Save email weekly report"}
+                {isSavingEmail ? "Saving..." : "Save email digest"}
               </PendingButton>
             </div>
           </div>
@@ -552,7 +551,7 @@ export function ProjectWeeklyReportSettingsCard({
       <div className="border-t pt-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1">
-            <h3 className="text-sm font-semibold text-foreground">Slack weekly reports</h3>
+            <h3 className="text-sm font-semibold text-foreground">Slack digests</h3>
             <p className="text-sm text-muted-foreground">
               Add project-scoped Slack deliveries that reuse the same connected Slack channels as
               alert rules.
@@ -561,7 +560,7 @@ export function ProjectWeeklyReportSettingsCard({
           {canEdit && slackEnabled && slackChannels.length > 0 ? (
             <Button type="button" onClick={openCreateSlackDialog}>
               <PlusIcon data-icon="inline-start" />
-              Create Slack weekly report
+              Create Slack digest
             </Button>
           ) : null}
         </div>
@@ -576,11 +575,11 @@ export function ProjectWeeklyReportSettingsCard({
               <>
                 <CalloutCard
                   eyebrow="Team or Business"
-                  title="Slack weekly reports are paused on the current plan"
+                  title="Slack digests are paused on the current plan"
                   description={
                     slackChannels.length > 0
-                      ? "Saved Slack weekly reports are preserved and will resume after the owner upgrades to a plan with Slack integration."
-                      : "Upgrade your plan to deliver weekly reports into connected Slack channels."
+                      ? "Saved Slack digests are preserved and will resume after the owner upgrades to a plan with Slack integration."
+                      : "Upgrade your plan to deliver weekly digests into connected Slack channels."
                   }
                   tone="warning"
                 />
@@ -598,18 +597,18 @@ export function ProjectWeeklyReportSettingsCard({
           </div>
         ) : isLoading ? (
           <div className="mt-4 rounded-lg border border-dashed border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-            Loading Slack weekly reports...
+            Loading Slack digests...
           </div>
         ) : slackChannels.length === 0 ? (
           <div className="mt-4">
             <ProjectResourceEmptyState
               icon={BellRingIcon}
-              title="No Slack weekly reports yet"
+              title="No Slack digests yet"
               variant="outlined"
-              description="Create a Slack weekly report when your team wants the weekly summary in a connected channel."
+              description="Create a Slack digest when your team wants the weekly summary in a connected channel."
               {...(canEdit
                 ? {
-                    actionLabel: "Create Slack weekly report",
+                    actionLabel: "Create Slack digest",
                     onAction: openCreateSlackDialog
                   }
                 : {})}
@@ -633,11 +632,7 @@ export function ProjectWeeklyReportSettingsCard({
       <Dialog open={isSlackDialogOpen} onOpenChange={handleSlackDialogOpenChange}>
         {slackDraft === null ? null : (
           <DialogFormContent
-            title={
-              slackDraft.channel_id === null
-                ? "Create Slack weekly report"
-                : "Edit Slack weekly report"
-            }
+            title={slackDraft.channel_id === null ? "Create Slack digest" : "Edit Slack digest"}
             description="Choose a connected Slack channel and schedule for this weekly project summary."
             footer={
               <PendingButton
@@ -654,8 +649,8 @@ export function ProjectWeeklyReportSettingsCard({
                 {isSavingSlack
                   ? "Saving..."
                   : slackDraft.channel_id === null
-                    ? "Create Slack weekly report"
-                    : "Save Slack weekly report"}
+                    ? "Create Slack digest"
+                    : "Save Slack digest"}
               </PendingButton>
             }
             onSubmit={(event) => void handleSaveSlackChannel(event)}
@@ -731,8 +726,8 @@ export function ProjectWeeklyReportSettingsCard({
                   onDeleteSlackDestination={(destinationId) =>
                     void handleDeleteSlackDestination(destinationId)
                   }
-                  emptyManageText="Connect Slack once, choose a channel in Slack, and it will become available for weekly reports here."
-                  emptyReadOnlyText="A project admin needs to connect Slack before this project can send Slack weekly reports."
+                  emptyManageText="Connect Slack once, choose a channel in Slack, and it will become available for weekly digests here."
+                  emptyReadOnlyText="A project admin needs to connect Slack before this project can send Slack digests."
                 />
               )}
 
@@ -745,7 +740,7 @@ export function ProjectWeeklyReportSettingsCard({
                     Enabled
                   </FieldLabel>
                   <FieldDescription>
-                    Send this weekly report to Slack on the saved schedule.
+                    Send this weekly digest to Slack on the saved schedule.
                   </FieldDescription>
                 </div>
                 <Switch

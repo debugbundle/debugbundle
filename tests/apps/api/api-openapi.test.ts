@@ -229,6 +229,7 @@ describe("api openapi spec", () => {
       "from",
       "to",
       "include_total",
+      "include_total_count",
       "cursor",
       "limit"
     ]);

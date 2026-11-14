@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { readAnalyticsInventoryPage } from "./analytics-inventory-read.js";
 
 import {
   AnalyticsBundleAnalysisKindSchema,
@@ -91,7 +92,12 @@ export type AnalyticsBundleResponse =
   | z.infer<typeof AnalyticsBundleFailedResponseSchema>;
 
 function toApiError(status: number, body: unknown, fallback: string): AnalyticsMetricsApiError {
-  if (typeof body === "object" && body !== null && "error" in body && typeof body.error === "string") {
+  if (
+    typeof body === "object" &&
+    body !== null &&
+    "error" in body &&
+    typeof body.error === "string"
+  ) {
     return new AnalyticsMetricsApiError(status, body.error);
   }
 
@@ -101,8 +107,12 @@ function toApiError(status: number, body: unknown, fallback: string): AnalyticsM
 export function createAnalyticsBundleApi(httpClient: {
   request(request: AnalyticsBundleHttpRequest): Promise<AnalyticsBundleHttpResponse>;
 }): {
-  listBundles(input: Omit<AnalyticsBundleListCommandInput, "json">): Promise<AnalyticsBundleGenerationsListResponse>;
-  createBundle(input: Omit<AnalyticsBundleCreateCommandInput, "json">): Promise<AnalyticsBundleResponse>;
+  listBundles(
+    input: Omit<AnalyticsBundleListCommandInput, "json">
+  ): Promise<AnalyticsBundleGenerationsListResponse>;
+  createBundle(
+    input: Omit<AnalyticsBundleCreateCommandInput, "json">
+  ): Promise<AnalyticsBundleResponse>;
   getBundle(input: Omit<AnalyticsBundleGetCommandInput, "json">): Promise<AnalyticsBundleResponse>;
 } {
   return {
@@ -127,10 +137,9 @@ export function createAnalyticsBundleApi(httpClient: {
       if (input.limit !== undefined) {
         params.set("limit", String(input.limit));
       }
-
-      const response = await httpClient.request({
-        method: "GET",
-        path: `/v1/analytics/bundles?${params.toString()}`,
+      const response = await readAnalyticsInventoryPage(httpClient, {
+        path: "/v1/analytics/bundles",
+        params,
         bearerToken: input.bearerToken
       });
       if (response.status !== 200) {
@@ -173,7 +182,9 @@ export function createAnalyticsBundleApi(httpClient: {
   };
 }
 
-function buildCreateBundleBody(input: Omit<AnalyticsBundleCreateCommandInput, "json">): Record<string, unknown> {
+function buildCreateBundleBody(
+  input: Omit<AnalyticsBundleCreateCommandInput, "json">
+): Record<string, unknown> {
   return {
     project_id: input.projectId,
     ...(input.opportunityId === undefined ? {} : { opportunity_id: input.opportunityId }),
@@ -243,25 +254,38 @@ function formatAnalyticsBundleList(response: AnalyticsBundleGenerationsListRespo
   }
 
   return response.bundles
-    .map((bundle) => [
-      bundle.generation_id,
-      bundle.analysis_kind,
-      bundle.status,
-      bundle.project_name ?? bundle.project_id,
-      bundle.created_at,
-      bundle.has_artifact ? "artifact" : "no artifact"
-    ].join("  "))
+    .map((bundle) =>
+      [
+        bundle.generation_id,
+        bundle.analysis_kind,
+        bundle.status,
+        bundle.project_name ?? bundle.project_id,
+        bundle.created_at,
+        bundle.has_artifact ? "artifact" : "no artifact"
+      ].join("  ")
+    )
     .join("\n");
 }
 
 export async function listAnalyticsBundlesCommand(
   input: AnalyticsBundleListCommandInput,
-  api: { listBundles(input: Omit<AnalyticsBundleListCommandInput, "json">): Promise<AnalyticsBundleGenerationsListResponse> }
+  api: {
+    listBundles(
+      input: Omit<AnalyticsBundleListCommandInput, "json">
+    ): Promise<AnalyticsBundleGenerationsListResponse>;
+  }
 ): Promise<CliCommandResult> {
-  if (input.status !== undefined && input.status !== "all" && !AnalyticsBundleGenerationStatusSchema.safeParse(input.status).success) {
+  if (
+    input.status !== undefined &&
+    input.status !== "all" &&
+    !AnalyticsBundleGenerationStatusSchema.safeParse(input.status).success
+  ) {
     return { exitCode: 4, output: "Invalid value for --status." };
   }
-  if (input.kind !== undefined && !AnalyticsBundleAnalysisKindSchema.safeParse(input.kind).success) {
+  if (
+    input.kind !== undefined &&
+    !AnalyticsBundleAnalysisKindSchema.safeParse(input.kind).success
+  ) {
     return { exitCode: 4, output: "Invalid value for --kind." };
   }
 
@@ -293,7 +317,11 @@ export async function listAnalyticsBundlesCommand(
 
 export async function createAnalyticsBundleCommand(
   input: AnalyticsBundleCreateCommandInput,
-  api: { createBundle(input: Omit<AnalyticsBundleCreateCommandInput, "json">): Promise<AnalyticsBundleResponse> }
+  api: {
+    createBundle(
+      input: Omit<AnalyticsBundleCreateCommandInput, "json">
+    ): Promise<AnalyticsBundleResponse>;
+  }
 ): Promise<CliCommandResult> {
   if (!AnalyticsBundleAnalysisKindSchema.safeParse(input.analysisKind).success) {
     return { exitCode: 4, output: "Invalid value for --kind." };
@@ -329,7 +357,11 @@ export async function createAnalyticsBundleCommand(
 
 export async function getAnalyticsBundleCommand(
   input: AnalyticsBundleGetCommandInput,
-  api: { getBundle(input: Omit<AnalyticsBundleGetCommandInput, "json">): Promise<AnalyticsBundleResponse> }
+  api: {
+    getBundle(
+      input: Omit<AnalyticsBundleGetCommandInput, "json">
+    ): Promise<AnalyticsBundleResponse>;
+  }
 ): Promise<CliCommandResult> {
   try {
     const response = await api.getBundle({
@@ -354,9 +386,9 @@ async function createAuthenticatedAnalyticsBundleApi(
   input: { authFilePath?: string },
   dependencies?: {
     readAuthState?: (input: { authFilePath?: string }) => Promise<CliAuthState>;
-    createHttpClient?: (input: {
-      baseUrl: string;
-    }) => { request(request: AnalyticsBundleHttpRequest): Promise<AnalyticsBundleHttpResponse> };
+    createHttpClient?: (input: { baseUrl: string }) => {
+      request(request: AnalyticsBundleHttpRequest): Promise<AnalyticsBundleHttpResponse>;
+    };
     createApi?: typeof createAnalyticsBundleApi;
     fetchImpl?: typeof fetch;
   }
@@ -368,14 +400,16 @@ async function createAuthenticatedAnalyticsBundleApi(
   }
 
   const authState = await readAuthState(authStateInput);
-  const createHttpClient = dependencies?.createHttpClient ?? ((clientInput: { baseUrl: string }) => {
-    const httpClientDependencies: { fetchImpl?: typeof fetch } = {};
-    if (dependencies?.fetchImpl !== undefined) {
-      httpClientDependencies.fetchImpl = dependencies.fetchImpl;
-    }
+  const createHttpClient =
+    dependencies?.createHttpClient ??
+    ((clientInput: { baseUrl: string }) => {
+      const httpClientDependencies: { fetchImpl?: typeof fetch } = {};
+      if (dependencies?.fetchImpl !== undefined) {
+        httpClientDependencies.fetchImpl = dependencies.fetchImpl;
+      }
 
-    return createCliHttpClient(clientInput, httpClientDependencies);
-  });
+      return createCliHttpClient(clientInput, httpClientDependencies);
+    });
   const httpClient = createHttpClient({ baseUrl: authState.base_url });
   const createApi = dependencies?.createApi ?? createAnalyticsBundleApi;
 
@@ -385,9 +419,15 @@ async function createAuthenticatedAnalyticsBundleApi(
   };
 }
 
-type AnalyticsBundleListWithAuthInput = Omit<AnalyticsBundleListCommandInput, "bearerToken"> & { authFilePath?: string };
-type AnalyticsBundleCreateWithAuthInput = Omit<AnalyticsBundleCreateCommandInput, "bearerToken"> & { authFilePath?: string };
-type AnalyticsBundleGetWithAuthInput = Omit<AnalyticsBundleGetCommandInput, "bearerToken"> & { authFilePath?: string };
+type AnalyticsBundleListWithAuthInput = Omit<AnalyticsBundleListCommandInput, "bearerToken"> & {
+  authFilePath?: string;
+};
+type AnalyticsBundleCreateWithAuthInput = Omit<AnalyticsBundleCreateCommandInput, "bearerToken"> & {
+  authFilePath?: string;
+};
+type AnalyticsBundleGetWithAuthInput = Omit<AnalyticsBundleGetCommandInput, "bearerToken"> & {
+  authFilePath?: string;
+};
 
 export async function listAnalyticsBundlesWithAuthCommand(
   input: AnalyticsBundleListWithAuthInput,

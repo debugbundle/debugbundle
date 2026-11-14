@@ -121,7 +121,7 @@ export function IncidentDetailPage(): JSX.Element {
                 {formatIncidentMatchedFields(incident.matched_fields)}
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
               {canMutate && incident.status !== "resolved" ? (
                 <Button
                   type="button"
@@ -159,8 +159,10 @@ export function IncidentDetailPage(): JSX.Element {
                   Reduce noise
                 </Button>
               ) : null}
-              <Badge variant={severityVariantMap[incident.severity]}>{incident.severity}</Badge>
-              <Badge variant={statusVariantMap[incident.status]}>{incident.status}</Badge>
+              <div className="flex shrink-0 items-center gap-2">
+                <Badge variant={severityVariantMap[incident.severity]}>{incident.severity}</Badge>
+                <Badge variant={statusVariantMap[incident.status]}>{incident.status}</Badge>
+              </div>
             </div>
           </div>
 

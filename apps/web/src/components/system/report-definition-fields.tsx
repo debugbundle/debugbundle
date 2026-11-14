@@ -225,7 +225,7 @@ export function ReportDefinitionFields({
           />
           <div>
             <FieldLabel htmlFor={`${id}-overlap`}>
-              Keep the existing weekly digest alongside this report
+              Keep the existing weekly project digest alongside this report
             </FieldLabel>
             <FieldDescription>
               Required when an existing digest is enabled. Its settings and recipients remain

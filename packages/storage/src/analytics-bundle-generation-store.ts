@@ -76,6 +76,7 @@ export interface AnalyticsBundleGenerationStore {
     bundles: AnalyticsBundleGenerationRecord[];
     next_cursor: string | null;
     total_pages?: number;
+    total_count?: number;
   }>;
   listAnalyticsBundleGenerationsForOrganization?(
     input: AnalyticsBundleGenerationListFilters & {
@@ -87,6 +88,7 @@ export interface AnalyticsBundleGenerationStore {
     bundles: AnalyticsBundleGenerationInventoryRecord[];
     next_cursor: string | null;
     total_pages?: number;
+    total_count?: number;
   }>;
   getAnalyticsBundleGenerationForProject(input: {
     project_id: string;
@@ -328,7 +330,8 @@ export function createPostgresAnalyticsBundleGenerationStore(
         input.cursor === undefined &&
         (result.rows.length === 0 || result.rows[0]?.total_count !== undefined)
           ? {
-              total_pages: Math.max(1, Math.ceil(Number(result.rows[0]?.total_count ?? 0) / limit))
+              total_pages: Math.max(1, Math.ceil(Number(result.rows[0]?.total_count ?? 0) / limit)),
+              total_count: Number(result.rows[0]?.total_count ?? 0)
             }
           : {})
       };
@@ -374,7 +377,8 @@ export function createPostgresAnalyticsBundleGenerationStore(
         input.cursor === undefined &&
         (result.rows.length === 0 || result.rows[0]?.total_count !== undefined)
           ? {
-              total_pages: Math.max(1, Math.ceil(Number(result.rows[0]?.total_count ?? 0) / limit))
+              total_pages: Math.max(1, Math.ceil(Number(result.rows[0]?.total_count ?? 0) / limit)),
+              total_count: Number(result.rows[0]?.total_count ?? 0)
             }
           : {})
       };

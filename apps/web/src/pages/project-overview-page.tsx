@@ -13,6 +13,8 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate, useOutletContext } from "react-router-dom";
 
 import { CursorPaginationControls } from "../components/system/cursor-pagination-controls.js";
+import { TableListFooter } from "../components/system/table-list-footer.js";
+import { inventoryTitle } from "../lib/inventory-title.js";
 import { BoundedTableTitle } from "../components/system/bounded-table-title.js";
 import { ResourceListState } from "../components/system/resource-list-state.js";
 import {
@@ -75,6 +77,7 @@ export function ProjectIncidentsPage(): JSX.Element {
   const navigate = useNavigate();
   const { projectId } = useOutletContext<ProjectContext>();
   const [statusFilter, setStatusFilter] = useState<ProjectIncidentStatusFilter>("active");
+  const [pageSize, setPageSize] = useState(20);
   const [sort, setSort] = useState<SortState<ProjectIncidentSortField>>({
     field: "last_seen_at",
     direction: "desc"
@@ -85,6 +88,7 @@ export function ProjectIncidentsPage(): JSX.Element {
     isLoading,
     page,
     totalPages,
+    totalCount,
     hasNextPage,
     goToNextPage,
     goToPreviousPage,
@@ -93,17 +97,18 @@ export function ProjectIncidentsPage(): JSX.Element {
     async (cursor) => {
       const response = await listProjectIncidents(
         projectId,
-        20,
+        pageSize,
         cursor ?? undefined,
         statusFilter === "all" ? undefined : statusFilter
       );
       return {
         items: response.incidents,
         nextCursor: response.nextCursor,
-        totalPages: response.totalPages
+        totalPages: response.totalPages,
+        totalCount: response.totalCount
       };
     },
-    [projectId, statusFilter]
+    [projectId, statusFilter, pageSize]
   );
   const sortedIncidents = useMemo(() => sortProjectIncidents(incidents, sort), [incidents, sort]);
   const emptyState = getProjectIncidentEmptyState(statusFilter);
@@ -153,7 +158,7 @@ export function ProjectIncidentsPage(): JSX.Element {
         <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex w-full items-start justify-between gap-3 sm:block sm:w-auto">
             <div className="space-y-1.5">
-              <CardTitle>Project incidents</CardTitle>
+              <CardTitle>{inventoryTitle("Project incidents", totalCount)}</CardTitle>
               <CardDescription>Grouped failures for this project.</CardDescription>
             </div>
             <TableRefreshButton
@@ -199,7 +204,7 @@ export function ProjectIncidentsPage(): JSX.Element {
             </Select>
           </div>
         </CardHeader>
-        <CardContent className={selection.selectedCount > 0 ? "pb-28 sm:pb-6" : undefined}>
+        <CardContent>
           <ResourceListState
             items={incidents}
             loading={
@@ -271,18 +276,28 @@ export function ProjectIncidentsPage(): JSX.Element {
                     );
                   }}
                 />
-                <CursorPaginationControls
-                  page={page}
-                  totalPages={totalPages}
-                  hasNextPage={hasNextPage}
-                  isLoading={isLoading}
-                  onPreviousPage={goToPreviousPage}
-                  onNextPage={() => void goToNextPage()}
-                />
               </div>
             )}
           </ResourceListState>
         </CardContent>
+        <TableListFooter
+          id="project-incidents-page-size"
+          ariaLabel="Project incidents rows per page"
+          value={pageSize}
+          onChange={setPageSize}
+          disabled={isLoading || bulkAction !== null}
+          className={selection.selectedCount > 0 ? "pb-28 sm:pb-4" : undefined}
+        >
+          <CursorPaginationControls
+            embedded
+            page={page}
+            totalPages={totalPages}
+            hasNextPage={hasNextPage}
+            isLoading={isLoading || bulkAction !== null}
+            onPreviousPage={goToPreviousPage}
+            onNextPage={() => void goToNextPage()}
+          />
+        </TableListFooter>
       </Card>
 
       {incidents !== null && incidents.length > 0 ? (
@@ -325,6 +340,7 @@ export function ProjectIncidentsPage(): JSX.Element {
 export function ProjectBundlesPage(): JSX.Element {
   const { projectId } = useOutletContext<ProjectContext>();
   const [statusFilter, setStatusFilter] = useState<ProjectIncidentStatusFilter>("active");
+  const [pageSize, setPageSize] = useState(20);
   const [sort, setSort] = useState<SortState<ProjectBundleSortField>>({
     field: "last_seen_at",
     direction: "desc"
@@ -334,6 +350,7 @@ export function ProjectBundlesPage(): JSX.Element {
     isLoading,
     page,
     totalPages,
+    totalCount,
     hasNextPage,
     goToNextPage,
     goToPreviousPage,
@@ -342,17 +359,18 @@ export function ProjectBundlesPage(): JSX.Element {
     async (cursor) => {
       const response = await listProjectIncidents(
         projectId,
-        20,
+        pageSize,
         cursor ?? undefined,
         statusFilter === "all" ? undefined : statusFilter
       );
       return {
         items: response.incidents,
         nextCursor: response.nextCursor,
-        totalPages: response.totalPages
+        totalPages: response.totalPages,
+        totalCount: response.totalCount
       };
     },
-    [projectId, statusFilter]
+    [projectId, statusFilter, pageSize]
   );
   const sortedIncidents = useMemo(() => sortProjectBundles(incidents, sort), [incidents, sort]);
   const emptyState = getProjectBundleEmptyState(statusFilter);
@@ -363,7 +381,7 @@ export function ProjectBundlesPage(): JSX.Element {
         <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex w-full items-start justify-between gap-3 sm:block sm:w-auto">
             <div className="space-y-1.5">
-              <CardTitle>Debug bundles</CardTitle>
+              <CardTitle>{inventoryTitle("Debug bundles", totalCount)}</CardTitle>
               <CardDescription>
                 Open or download bundles for incidents in this project.
               </CardDescription>
@@ -508,18 +526,27 @@ export function ProjectBundlesPage(): JSX.Element {
                     ))}
                   </TableBody>
                 </Table>
-                <CursorPaginationControls
-                  page={page}
-                  totalPages={totalPages}
-                  hasNextPage={hasNextPage}
-                  isLoading={isLoading}
-                  onPreviousPage={goToPreviousPage}
-                  onNextPage={() => void goToNextPage()}
-                />
               </div>
             )}
           </ResourceListState>
         </CardContent>
+        <TableListFooter
+          id="project-bundles-page-size"
+          ariaLabel="Debug bundles rows per page"
+          value={pageSize}
+          onChange={setPageSize}
+          disabled={isLoading}
+        >
+          <CursorPaginationControls
+            embedded
+            page={page}
+            totalPages={totalPages}
+            hasNextPage={hasNextPage}
+            isLoading={isLoading}
+            onPreviousPage={goToPreviousPage}
+            onNextPage={() => void goToNextPage()}
+          />
+        </TableListFooter>
       </Card>
     </div>
   );

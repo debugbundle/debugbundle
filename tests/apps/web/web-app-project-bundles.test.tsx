@@ -131,7 +131,9 @@ describe("web app — project bundles", () => {
       }
 
       if (
-        url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=active`) &&
+        url.endsWith(
+          `/v1/incidents?project_id=${project.project_id}&limit=20&status=active&include_total_count=true`
+        ) &&
         init?.method === undefined
       ) {
         return jsonResponse(200, {
@@ -141,7 +143,9 @@ describe("web app — project bundles", () => {
       }
 
       if (
-        url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=resolved`) &&
+        url.endsWith(
+          `/v1/incidents?project_id=${project.project_id}&limit=20&status=resolved&include_total_count=true`
+        ) &&
         init?.method === undefined
       ) {
         return jsonResponse(200, { incidents: [resolvedIncident], next_cursor: null });
@@ -191,7 +195,9 @@ describe("web app — project bundles", () => {
       }
 
       if (
-        url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=active`) &&
+        url.endsWith(
+          `/v1/incidents?project_id=${project.project_id}&limit=20&status=active&include_total_count=true`
+        ) &&
         init?.method === undefined
       ) {
         projectBundleRequests += 1;
@@ -324,7 +330,9 @@ describe("web app — project bundles", () => {
       }
 
       if (
-        url.endsWith(`/v1/incidents?project_id=${project.project_id}&limit=20&status=active`) &&
+        url.endsWith(
+          `/v1/incidents?project_id=${project.project_id}&limit=20&status=active&include_total_count=true`
+        ) &&
         init?.method === undefined
       ) {
         return jsonResponse(200, {

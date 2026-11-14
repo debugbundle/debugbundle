@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from "vitest";
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { MemoryRouter } from "../../../node_modules/.pnpm/node_modules/react-router-dom/dist/index.js";
 import { ImprovementReviewSection } from "../../../apps/web/src/components/system/improvement-review-section.js";
@@ -8,6 +8,8 @@ import { createSession, createProject } from "./web-test-helpers.js";
 import * as api from "../../../apps/web/src/lib/api.js";
 import * as notify from "../../../apps/web/src/lib/notify.js";
 import { reviewFactsFixture, reviewPlanningFixture } from "../../helpers/improvement-reviews.js";
+import { chooseSelectOption } from "./helpers/management-ui.js";
+import { loadImprovementReviewInventory } from "../../../apps/web/src/lib/improvement-review-inventory.js";
 import {
   reviewPriorities,
   type ReviewSettings,
@@ -83,6 +85,88 @@ function setup(): {
   ]);
   return { session, review, settings };
 }
+it("counts all authorised review pages and uses the same footer without generating work", async () => {
+  const f = setup();
+  const records = Array.from({ length: 25 }, (_, index) => ({
+    ...f.review,
+    id: `review-${index}`,
+    project_name: `Review project ${index}`
+  }));
+  calls.list
+    .mockResolvedValueOnce({ reviews: records.slice(0, 20), next_cursor: "older" })
+    .mockResolvedValueOnce({ reviews: records.slice(20), next_cursor: null });
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <ImprovementReviewSection session={f.session} />
+    </MemoryRouter>
+  );
+  await screen.findByRole("heading", { name: "Weekly reviews (25)" });
+  expect(screen.getAllByRole("row")).toHaveLength(11);
+  const select = screen.getByRole("combobox", { name: "Weekly reviews rows per page" });
+  const footer = select.closest('[data-slot="card-footer"]') as HTMLElement;
+  await chooseSelectOption(user, "Weekly reviews rows per page", "20");
+  expect(within(footer).getByText("Page 1 of 2")).toBeInTheDocument();
+  await user.click(within(footer).getByRole("button", { name: "Go to next page" }));
+  expect(screen.getAllByRole("row")).toHaveLength(6);
+  expect(screen.getByText("Review project 20")).toBeInTheDocument();
+  await chooseSelectOption(user, "Weekly reviews rows per page", "100");
+  expect(screen.getAllByRole("row")).toHaveLength(26);
+  expect(within(footer).queryByRole("navigation")).toBeNull();
+  expect(calls.list).toHaveBeenCalledTimes(2);
+  expect(calls.list.mock.calls[0]?.[0].query.limit).toBe(50);
+  expect(calls.list.mock.calls[1]?.[0].query.cursor).toBe("older");
+  expect(calls.update).not.toHaveBeenCalled();
+  expect(calls.plan).not.toHaveBeenCalled();
+});
+
+it("fails the review inventory closed on a repeated continuation cursor instead of inventing a total", async () => {
+  const f = setup();
+  calls.list.mockResolvedValue({ reviews: [f.review], next_cursor: "repeated" });
+  render(
+    <MemoryRouter>
+      <ImprovementReviewSection session={f.session} />
+    </MemoryRouter>
+  );
+  await screen.findByText("Weekly reviews unavailable");
+  expect(screen.getByRole("heading", { name: "Weekly reviews" })).toBeInTheDocument();
+  expect(screen.queryByRole("table")).toBeNull();
+  expect(calls.list).toHaveBeenCalledTimes(2);
+});
+
+it("does not start or continue history reads after their view is no longer current", async () => {
+  const f = setup();
+  await expect(
+    loadImprovementReviewInventory(f.session.organization_id, undefined, () => false)
+  ).rejects.toThrow("review_inventory_cancelled");
+  expect(calls.list).not.toHaveBeenCalled();
+  let finish!: (value: { reviews: ReviewRecord[]; next_cursor: string }) => void;
+  calls.list.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+  );
+  const view = render(
+    <MemoryRouter>
+      <ImprovementReviewSection session={f.session} />
+    </MemoryRouter>
+  );
+  await waitFor(() => expect(calls.list).toHaveBeenCalledTimes(1));
+  view.unmount();
+  await act(async () => finish({ reviews: [f.review], next_cursor: "next" }));
+  expect(calls.list).toHaveBeenCalledTimes(1);
+});
+
+it("bounds unique history continuation requests before exposing an incomplete count", async () => {
+  const f = setup();
+  let count = 0;
+  calls.list.mockImplementation(async () => ({ reviews: [], next_cursor: `next-${++count}` }));
+  await expect(
+    loadImprovementReviewInventory(f.session.organization_id, undefined, () => true)
+  ).rejects.toThrow("review_inventory_read_limit");
+  expect(count).toBe(100);
+});
 it("offers eligible owners an enable action in the empty state and opens explicit settings without enabling anything", async () => {
   const f = setup();
   calls.list.mockResolvedValue({ reviews: [], next_cursor: null });

@@ -18,8 +18,8 @@ import {
 const PROJECT_TABS = [
   { value: "overview", label: "Overview", suffix: "" },
   { value: "incidents", label: "Incidents", suffix: "/incidents" },
-  { value: "health", label: "Health", suffix: "/health" },
   { value: "improvements", label: "Improvements", suffix: "/improvements" },
+  { value: "health", label: "Health", suffix: "/health" },
   { value: "analytics", label: "Analytics", suffix: "/analytics" },
   { value: "bundles", label: "Bundles", suffix: "/bundles" },
   { value: "alerts", label: "Alerts", suffix: "/alerts" },

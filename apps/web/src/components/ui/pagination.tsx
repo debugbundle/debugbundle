@@ -4,6 +4,8 @@ import { ChevronLeftIcon, ChevronRightIcon, MoreHorizontalIcon } from "lucide-re
 import { cn } from "../../lib/utils.js";
 import { Button } from "./button.js";
 
+const COMPACT_MOBILE_BUTTON = "size-8 p-0 sm:w-auto sm:px-2.5 [&>span]:hidden sm:[&>span]:inline";
+
 function Pagination({ className, ...props }: React.ComponentProps<"nav">): JSX.Element {
   return (
     <nav
@@ -45,13 +47,14 @@ function PaginationLink({
 function PaginationPrevious({
   className,
   children = "Previous",
+  compactOnMobile = false,
   ...props
-}: React.ComponentProps<typeof PaginationLink>): JSX.Element {
+}: React.ComponentProps<typeof PaginationLink> & { compactOnMobile?: boolean }): JSX.Element {
   return (
     <PaginationLink
       aria-label="Go to previous page"
       size="default"
-      className={cn("gap-1 px-2.5 sm:pl-2.5", className)}
+      className={cn("gap-1 px-2.5 sm:pl-2.5", compactOnMobile && COMPACT_MOBILE_BUTTON, className)}
       {...props}
     >
       <ChevronLeftIcon data-icon="inline-start" />
@@ -63,13 +66,14 @@ function PaginationPrevious({
 function PaginationNext({
   className,
   children = "Next",
+  compactOnMobile = false,
   ...props
-}: React.ComponentProps<typeof PaginationLink>): JSX.Element {
+}: React.ComponentProps<typeof PaginationLink> & { compactOnMobile?: boolean }): JSX.Element {
   return (
     <PaginationLink
       aria-label="Go to next page"
       size="default"
-      className={cn("gap-1 px-2.5 sm:pr-2.5", className)}
+      className={cn("gap-1 px-2.5 sm:pr-2.5", compactOnMobile && COMPACT_MOBILE_BUTTON, className)}
       {...props}
     >
       <span>{children}</span>

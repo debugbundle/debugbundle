@@ -77,7 +77,7 @@ const messages: Record<string, string> = {
   report_definition_limit_reached:
     "This workspace already has the maximum number of report definitions.",
   weekly_overlap_confirmation_required:
-    "Confirm that the existing weekly digest should continue alongside this report.",
+    "Confirm that the existing weekly project digest should continue alongside this report.",
   invalid_report_recipient:
     "Each recipient must be verified and have current read access to every selected project.",
   forbidden: "You do not currently have access to the entire report scope.",

@@ -29,8 +29,8 @@ export function WeeklyReportSlackChannels({
   return channels.length === 0 ? (
     <ResourceEmptyState
       icon={CalendarDaysIcon}
-      title="No Slack weekly reports yet"
-      description="Configured Slack report schedules will appear here."
+      title="No Slack digests yet"
+      description="Configured Slack digest schedules will appear here."
     />
   ) : (
     <div className="flex flex-col gap-3">
@@ -61,8 +61,8 @@ export function WeeklyReportSlackChannels({
                 ) : null}
                 <ResourceDeleteDialog
                   variant="ghost"
-                  label="Delete Slack weekly report"
-                  description={`Remove ${formatSlackWeeklyReportDestination(channel, destinations)} from this project's weekly report deliveries. The Slack destination remains connected.`}
+                  label="Delete Slack digest"
+                  description={`Remove ${formatSlackWeeklyReportDestination(channel, destinations)} from this project's weekly digest deliveries. The Slack destination remains connected.`}
                   disabled={deletingId === channel.channel_id}
                   onConfirm={() => onDelete(channel.channel_id)}
                 />

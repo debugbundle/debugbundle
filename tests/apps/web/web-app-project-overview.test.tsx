@@ -84,8 +84,8 @@ describe("web app - project overview", () => {
     expect((await screen.findAllByRole("tab")).map((tab) => tab.textContent)).toEqual([
       "Overview",
       "Incidents",
-      "Health",
       "Improvements",
+      "Health",
       "Analytics",
       "Bundles",
       "Alerts",
@@ -117,7 +117,7 @@ describe("web app - project overview", () => {
       "Analytics",
       "Health checks",
       "Improvement bundles",
-      "Weekly reports",
+      "Weekly project digest",
       "Capture policy",
       "Probes",
       "Webhooks",

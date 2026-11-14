@@ -65,7 +65,7 @@ function show(canEdit = true, plan: "free" | "team" = "team") {
       />
     </MemoryRouter>
   );
-  fireEvent.click(screen.getByRole("button", { name: "Weekly reports" }));
+  fireEvent.click(screen.getByRole("button", { name: "Weekly project digest" }));
   return view;
 }
 it.each([false, true])(
@@ -102,7 +102,7 @@ it.each([false, true])(
     vi.stubGlobal("fetch", fetchMock);
     show();
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Create Slack weekly report" }));
+    await user.click(await screen.findByRole("button", { name: "Create Slack digest" }));
     await user.click(await screen.findByRole("button", { name: "Send test message" }));
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Send test message" })).toBeEnabled()
@@ -144,7 +144,7 @@ it.each([false, true])(
     show();
     const user = userEvent.setup();
     try {
-      await user.click(await screen.findByRole("button", { name: "Create Slack weekly report" }));
+      await user.click(await screen.findByRole("button", { name: "Create Slack digest" }));
       await user.click(await screen.findByRole("button", { name: "Connect Slack" }));
       await waitFor(() =>
         expect(
@@ -167,9 +167,9 @@ it("applies the supported weekly channel bound without claiming a total", async 
   const fetchMock = mockChannels();
   show();
   const user = userEvent.setup();
-  const limit = await screen.findByLabelText("Weekly report limit");
+  const limit = await screen.findByLabelText("Weekly digest limit");
   fireEvent.change(limit, { target: { value: "100" } });
-  await user.click(screen.getByRole("button", { name: "Apply weekly report limit" }));
+  await user.click(screen.getByRole("button", { name: "Apply weekly digest limit" }));
   await waitFor(() =>
     expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).includes("limit=100"))).toBe(
       true
@@ -180,11 +180,11 @@ it("confirms email channel deletion and permits recreating the default channel",
   const fetchMock = mockChannels();
   show();
   const user = userEvent.setup();
-  await user.click(await screen.findByRole("button", { name: "Delete email weekly report" }));
+  await user.click(await screen.findByRole("button", { name: "Delete email digest" }));
   expect(fetchMock.mock.calls.some(([, init]) => init?.method === "DELETE")).toBe(false);
   await user.click(
     within(screen.getByRole("alertdialog")).getByRole("button", {
-      name: "Delete email weekly report"
+      name: "Delete email digest"
     })
   );
   await waitFor(() =>
@@ -194,7 +194,7 @@ it("confirms email channel deletion and permits recreating the default channel",
       )
     ).toBe(true)
   );
-  expect(screen.queryByRole("button", { name: "Delete email weekly report" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Delete email digest" })).toBeNull();
 });
 it("edits a saved direct webhook without replacing it with a connected Slack destination", async () => {
   const fetchMock = mockChannels(true);
@@ -205,7 +205,7 @@ it("edits a saved direct webhook without replacing it with a connected Slack des
     "https://hooks.slack.com/services/saved"
   );
   await user.click(
-    within(screen.getByRole("dialog")).getByRole("button", { name: "Save Slack weekly report" })
+    within(screen.getByRole("dialog")).getByRole("button", { name: "Save Slack digest" })
   );
   await waitFor(() =>
     expect(fetchMock.mock.calls.some(([, init]) => init?.method === "PATCH")).toBe(true)
@@ -220,19 +220,19 @@ it("keeps read-only callers from deleting channels", async () => {
   mockChannels();
   show(false);
   await screen.findByText("Email report");
-  expect(screen.queryByRole("button", { name: "Delete email weekly report" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Delete email digest" })).toBeNull();
 });
 
 it("confirms preserved Slack weekly-report cleanup after downgrade", async () => {
   const fetchMock = mockChannels(true);
   show(true, "free");
   const user = userEvent.setup();
-  await user.click(await screen.findByRole("button", { name: "Delete Slack weekly report" }));
+  await user.click(await screen.findByRole("button", { name: "Delete Slack digest" }));
   expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
   expect(fetchMock.mock.calls.some(([, init]) => init?.method === "DELETE")).toBe(false);
   await user.click(
     within(screen.getByRole("alertdialog")).getByRole("button", {
-      name: "Delete Slack weekly report"
+      name: "Delete Slack digest"
     })
   );
   await waitFor(() =>

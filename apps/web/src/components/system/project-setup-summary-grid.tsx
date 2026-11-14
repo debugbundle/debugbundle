@@ -586,10 +586,10 @@ function renderWeeklyReportsSummaryBlock(
   if (summary.status === "loading") {
     return (
       <SetupSummaryBlock
-        label="Weekly reports"
+        label="Weekly project digest"
         value="Loading..."
         badge={{ label: "Loading", variant: "outline" }}
-        description="Loading weekly report status."
+        description="Loading weekly digest status."
       />
     );
   }
@@ -597,10 +597,10 @@ function renderWeeklyReportsSummaryBlock(
   if (summary.status === "error") {
     return (
       <SetupSummaryBlock
-        label="Weekly reports"
+        label="Weekly project digest"
         value="Unavailable"
         badge={{ label: "Could not load", variant: "outline" }}
-        description="Weekly report channel status could not be loaded."
+        description="Weekly digest channel status could not be loaded."
       />
     );
   }
@@ -612,17 +612,17 @@ function renderWeeklyReportsSummaryBlock(
   if (emailChannel === null) {
     return (
       <SetupSummaryBlock
-        label="Weekly reports"
+        label="Weekly project digest"
         value="Not configured"
         badge={{ label: "Off", variant: "secondary" }}
-        description="No weekly report schedule has been saved yet."
+        description="No weekly digest schedule has been saved yet."
       />
     );
   }
 
   return (
     <SetupSummaryBlock
-      label="Weekly reports"
+      label="Weekly project digest"
       value={emailChannel.is_enabled ? "Enabled" : "Off"}
       badge={{
         label:

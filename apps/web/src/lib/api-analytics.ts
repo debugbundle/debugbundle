@@ -298,7 +298,10 @@ export async function listAnalyticsBundles(
   query: AnalyticsBundleInventoryQuery
 ): Promise<AnalyticsBundleGenerationsListResponse> {
   const searchParams = buildAnalyticsInventorySearchParams(query);
-  if (query.cursor === undefined) searchParams.set("include_total", "true");
+  if (query.cursor === undefined) {
+    searchParams.set("include_total", "true");
+    searchParams.set("include_total_count", "true");
+  }
   return readJson<AnalyticsBundleGenerationsListResponse>(
     await fetch(`${API_BASE}/v1/analytics/bundles?${searchParams.toString()}`, {
       credentials: "include"
@@ -372,6 +375,7 @@ export async function listProjectAnalyticsJourneySamples(
   const params = new URLSearchParams({ project_id: projectId, limit: String(options.limit ?? 20) });
   for (const key of ["service", "environment", "tag", "cursor"] as const)
     if (options[key] !== undefined) params.set(key, options[key]);
+  if (options.cursor === undefined) params.set("include_total_count", "true");
   return AnalyticsJourneySamplesListResponseSchema.parse(
     await readJson(
       await fetch(`${API_BASE}/v1/analytics/journey-samples?${params.toString()}`, {

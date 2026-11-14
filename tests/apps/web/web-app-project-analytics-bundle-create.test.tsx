@@ -170,9 +170,7 @@ describe("web app - project AnalyticsBundle generation", () => {
     const state = installCreateFetch();
     render(<App initialEntries={[`/projects/${PROJECT_ID}/analytics/bundles`]} />);
     await screen.findByText("No analytics bundles in this project");
-    const limit = screen.getByLabelText("Inventory page limit");
-    fireEvent.change(limit, { target: { value: "40" } });
-    await user.click(screen.getByRole("button", { name: "Apply inventory page limit" }));
+    await chooseSelectOption(user, "Generated analytics bundles rows per page", "50");
     await user.click(screen.getByRole("button", { name: "Filters" }));
     await chooseSelectOption(user, "Status", "Failed");
     await user.click(screen.getByRole("button", { name: "Apply filters" }));
@@ -186,7 +184,9 @@ describe("web app - project AnalyticsBundle generation", () => {
     expect(within(dialog).queryByRole("link", { name: "Back to analytics bundles" })).toBeNull();
     await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(screen.getByLabelText("Inventory page limit")).toHaveValue(40);
+    expect(
+      screen.getByRole("combobox", { name: "Generated analytics bundles rows per page" })
+    ).toHaveTextContent("50");
     expect(screen.getByLabelText("1 active filters")).toBeInTheDocument();
     await waitFor(() => expect(trigger).toHaveFocus());
     expect(state.createBodies()).toHaveLength(0);

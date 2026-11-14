@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 import { MemoryRouter } from "../../../node_modules/.pnpm/node_modules/react-router-dom/dist/index.js";
 import { AlertGroupsCard } from "../../../apps/web/src/components/system/alert-groups-card.js";
 import { jsonResponse, requestUrl } from "./web-test-helpers.js";
+import { chooseSelectOption } from "./helpers/management-ui.js";
 const project = "11111111-1111-4111-8111-111111111111";
 const first = "22222222-2222-4222-8222-222222222222";
 const second = "33333333-3333-4333-8333-333333333333";
@@ -109,16 +110,24 @@ it("shows a retryable unavailable state and ignores reads after unmount", async 
   await waitFor(() => expect(screen.queryByRole("table")).toBeNull());
 });
 
-it("applies the supported group and member page limit", async () => {
+it("applies the footer page size immediately and resets group and member cursors", async () => {
   const requests: string[] = [];
   vi.stubGlobal(
     "fetch",
     vi.fn((input: RequestInfo | URL) => {
       const url = requestUrl(input);
       requests.push(url);
+      const params = new URL(url, "https://example.com").searchParams;
       return url.includes(`/direct/${first}`)
-        ? jsonResponse(200, { group: summary(first), members: [], next_cursor: null })
-        : jsonResponse(200, { groups: [summary(first)], next_cursor: null });
+        ? jsonResponse(200, {
+            group: summary(first),
+            members: [],
+            next_cursor: params.has("cursor") ? null : "member-next"
+          })
+        : jsonResponse(200, {
+            groups: [summary(params.has("cursor") ? second : first)],
+            next_cursor: params.has("cursor") ? null : "group-next"
+          });
     })
   );
   const user = userEvent.setup();
@@ -128,12 +137,32 @@ it("applies the supported group and member page limit", async () => {
     </MemoryRouter>
   );
   await screen.findByRole("button", { name: `Inspect group ${first}` });
-  fireEvent.change(screen.getByLabelText("Grouped delivery page limit"), {
-    target: { value: "100" }
-  });
-  await user.click(screen.getByRole("button", { name: "Apply grouped delivery page limit" }));
+  const rowsSelect = screen.getByRole("combobox", { name: "Grouped deliveries rows per page" });
+  expect(
+    screen.getByRole("table").compareDocumentPosition(rowsSelect) & Node.DOCUMENT_POSITION_FOLLOWING
+  ).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Apply grouped delivery page limit" })).toBeNull();
+  await user.click(screen.getByRole("button", { name: "Next groups" }));
+  await screen.findByRole("button", { name: `Inspect group ${second}` });
+  expect(screen.getByText("Page 2")).toBeInTheDocument();
+  await chooseSelectOption(user, "Grouped deliveries rows per page", "100");
   await waitFor(() => expect(requests.at(-1)).toContain("limit=100"));
+  expect(requests.at(-1)).not.toContain("cursor=");
+  await screen.findByRole("button", { name: `Inspect group ${first}` });
+  expect(screen.getByText("Page 1")).toBeInTheDocument();
   await user.click(await screen.findByRole("button", { name: `Inspect group ${first}` }));
   await waitFor(() => expect(requests.at(-1)).toContain(`/direct/${first}`));
   expect(requests.at(-1)).toContain("limit=100");
+  await user.click(await screen.findByRole("button", { name: "Next members" }));
+  await waitFor(() => expect(requests.at(-1)).toContain("cursor=member-next"));
+  await screen.findByText("Page 2");
+  await chooseSelectOption(user, "Grouped deliveries rows per page", "50");
+  await waitFor(() => expect(requests.at(-1)).toContain("limit=50"));
+  expect(requests.at(-1)).toContain(`/direct/${first}`);
+  expect(requests.at(-1)).not.toContain("cursor=");
+  await screen.findByText("Page 1");
+  await user.click(screen.getByRole("button", { name: "Back to groups" }));
+  await screen.findByRole("button", { name: `Inspect group ${first}` });
+  expect(requests.at(-1)).toContain("limit=50");
+  expect(requests.at(-1)).not.toContain("cursor=");
 });

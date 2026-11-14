@@ -289,6 +289,7 @@ export interface AnalyticsBundleGenerationsListResponse {
   bundles: AnalyticsBundleGenerationRecord[];
   next_cursor: string | null;
   total_pages?: number;
+  total_count?: number;
 }
 
 export interface AnalyticsBundleInventoryQuery {

@@ -33,7 +33,7 @@ it("keeps an API-configured digest window when the recipient is edited in the da
       if (url.endsWith("/v1/auth/session")) return jsonResponse(200, { session: createSession() });
       if (url.endsWith("/v1/projects"))
         return jsonResponse(200, { projects: [createProject({ organization_plan: "team" })] });
-      if (url.endsWith("/v1/alerts?project_id=proj_123&limit=20&include_scope=true"))
+      if (url.endsWith("/v1/alerts?project_id=proj_123&limit=100&include_scope=true"))
         return jsonResponse(200, { alerts: [alert] });
       if (url.endsWith("/v1/alerts/alert_123?project_id=proj_123") && init?.method === "PATCH") {
         if (typeof init.body !== "string") throw new Error("Expected JSON request body");

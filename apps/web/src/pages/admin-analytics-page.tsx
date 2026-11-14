@@ -407,7 +407,7 @@ export function AdminAnalyticsPage(): JSX.Element {
             value={summary.health.capture_rule_rejections_this_month}
           />
           <DetailRow
-            label="Weekly report failures"
+            label="Weekly digest failures"
             value={summary.health.weekly_reports_failed_this_month}
           />
           <DetailRow

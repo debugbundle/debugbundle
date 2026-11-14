@@ -5,6 +5,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { getTierCapabilities } from "../../../../packages/shared-types/src/index.js";
 
 import { CursorPaginationControls } from "../components/system/cursor-pagination-controls.js";
+import { TableListFooter } from "../components/system/table-list-footer.js";
 import { ImprovementReviewSection } from "../components/system/improvement-review-section.js";
 import { BoundedTableTitle } from "../components/system/bounded-table-title.js";
 import { ProjectColorTagDot } from "../components/system/project-color-tag-dot.js";
@@ -69,6 +70,7 @@ export function ImprovementsPage(): JSX.Element {
   const activeView = location.pathname.endsWith("/reviews") ? "reviews" : "opportunities";
   const { session } = useSession();
   const [statusFilter, setStatusFilter] = useState<ImprovementStatusFilter>("open");
+  const [pageSize, setPageSize] = useState(20);
   const [sort, setSort] = useState<SortState<ImprovementSortField>>({
     field: "last_detected_at",
     direction: "desc"
@@ -98,7 +100,7 @@ export function ImprovementsPage(): JSX.Element {
       }
 
       const response = await listImprovements({
-        limit: 20,
+        limit: pageSize,
         ...(cursor === null ? {} : { cursor }),
         ...(statusFilter === "all" ? {} : { status: statusFilter })
       });
@@ -109,7 +111,7 @@ export function ImprovementsPage(): JSX.Element {
         totalCount: response.totalCount
       };
     },
-    [statusFilter, hostedImprovementsEnabled]
+    [statusFilter, hostedImprovementsEnabled, pageSize]
   );
 
   const sortedImprovements = useMemo(
@@ -240,7 +242,7 @@ export function ImprovementsPage(): JSX.Element {
                   </Select>
                 </div>
               </CardHeader>
-              <CardContent className={selection.selectedCount > 0 ? "pb-28 sm:pb-6" : undefined}>
+              <CardContent>
                 <ResourceListState
                   items={improvements}
                   loading={
@@ -274,7 +276,6 @@ export function ImprovementsPage(): JSX.Element {
                       <div className="hidden sm:block">
                         <SelectableTableActions
                           itemLabel="improvement"
-                          showEmptySelectionHint={false}
                           totalCount={sortedImprovements.length}
                           selectedCount={selection.selectedCount}
                           allSelected={selection.allSelected}
@@ -327,18 +328,28 @@ export function ImprovementsPage(): JSX.Element {
                           );
                         }}
                       />
-                      <CursorPaginationControls
-                        page={page}
-                        totalPages={totalPages}
-                        hasNextPage={hasNextPage}
-                        isLoading={isLoading}
-                        onPreviousPage={goToPreviousPage}
-                        onNextPage={() => void goToNextPage()}
-                      />
                     </div>
                   )}
                 </ResourceListState>
               </CardContent>
+              <TableListFooter
+                id="workspace-improvements-page-size"
+                ariaLabel="Improvement inventory rows per page"
+                value={pageSize}
+                onChange={setPageSize}
+                disabled={isLoading || bulkAction !== null}
+                className={selection.selectedCount > 0 ? "pb-28 sm:pb-4" : undefined}
+              >
+                <CursorPaginationControls
+                  embedded
+                  page={page}
+                  totalPages={totalPages}
+                  hasNextPage={hasNextPage}
+                  isLoading={isLoading || bulkAction !== null}
+                  onPreviousPage={goToPreviousPage}
+                  onNextPage={() => void goToNextPage()}
+                />
+              </TableListFooter>
             </Card>
           )}
           <StickyMobileTableActions

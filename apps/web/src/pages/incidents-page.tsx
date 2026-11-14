@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { CursorPaginationControls } from "../components/system/cursor-pagination-controls.js";
+import { TableListFooter } from "../components/system/table-list-footer.js";
 import { BoundedTableTitle } from "../components/system/bounded-table-title.js";
 import { ProjectColorTagDot } from "../components/system/project-color-tag-dot.js";
 import { PageHeader } from "../components/system/page-header.js";
@@ -61,6 +62,7 @@ import { useCursorPagination } from "../lib/use-cursor-pagination.js";
 export function IncidentsPage(): JSX.Element {
   const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState<IncidentStatusFilter>("active");
+  const [pageSize, setPageSize] = useState(20);
   const [sort, setSort] = useState<SortState<IncidentSortField>>({
     field: "last_seen_at",
     direction: "desc"
@@ -79,7 +81,7 @@ export function IncidentsPage(): JSX.Element {
   } = useCursorPagination(
     async (cursor) => {
       const response = await listIncidents({
-        limit: 20,
+        limit: pageSize,
         ...(cursor === null ? {} : { cursor }),
         ...(statusFilter === "all" ? {} : { status: statusFilter })
       });
@@ -90,7 +92,7 @@ export function IncidentsPage(): JSX.Element {
         totalCount: response.totalCount
       };
     },
-    [statusFilter]
+    [statusFilter, pageSize]
   );
 
   const sortedIncidents = useMemo(() => sortIncidents(incidents, sort), [incidents, sort]);
@@ -186,7 +188,7 @@ export function IncidentsPage(): JSX.Element {
             </Select>
           </div>
         </CardHeader>
-        <CardContent className={selection.selectedCount > 0 ? "pb-28 sm:pb-6" : undefined}>
+        <CardContent>
           <ResourceListState
             items={incidents}
             loading={
@@ -388,19 +390,28 @@ export function IncidentsPage(): JSX.Element {
                     ))}
                   </TableBody>
                 </Table>
-
-                <CursorPaginationControls
-                  page={page}
-                  totalPages={totalPages}
-                  hasNextPage={hasNextPage}
-                  isLoading={isLoading}
-                  onPreviousPage={goToPreviousPage}
-                  onNextPage={() => void goToNextPage()}
-                />
               </div>
             )}
           </ResourceListState>
         </CardContent>
+        <TableListFooter
+          id="workspace-incidents-page-size"
+          ariaLabel="Incident inventory rows per page"
+          value={pageSize}
+          onChange={setPageSize}
+          disabled={isLoading || bulkAction !== null}
+          className={selection.selectedCount > 0 ? "pb-28 sm:pb-4" : undefined}
+        >
+          <CursorPaginationControls
+            embedded
+            page={page}
+            totalPages={totalPages}
+            hasNextPage={hasNextPage}
+            isLoading={isLoading || bulkAction !== null}
+            onPreviousPage={goToPreviousPage}
+            onNextPage={() => void goToNextPage()}
+          />
+        </TableListFooter>
       </Card>
 
       <StickyMobileTableActions

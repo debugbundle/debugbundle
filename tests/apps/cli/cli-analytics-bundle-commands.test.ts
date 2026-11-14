@@ -1,8 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  AnalyticsMetricsApiError
-} from "../../../apps/cli/src/analytics-metrics-commands.js";
+import { AnalyticsMetricsApiError } from "../../../apps/cli/src/analytics-metrics-commands.js";
 import {
   createAnalyticsBundleApi,
   createAnalyticsBundleCommand,
@@ -26,22 +24,24 @@ const bundlePendingResponse = {
 } as const;
 
 const bundleListResponse = {
-  bundles: [{
-    generation_id: BUNDLE_GENERATION_ID,
-    project_id: PROJECT_ID,
-    opportunity_id: null,
-    requested_by_user_id: null,
-    analysis_kind: "usage_summary",
-    analysis_spec: { from: FROM, to: TO },
-    input_fingerprint: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    status: "completed",
-    has_artifact: true,
-    failure_reason: null,
-    created_at: FROM,
-    claimed_at: FROM,
-    completed_at: TO,
-    updated_at: TO
-  }],
+  bundles: [
+    {
+      generation_id: BUNDLE_GENERATION_ID,
+      project_id: PROJECT_ID,
+      opportunity_id: null,
+      requested_by_user_id: null,
+      analysis_kind: "usage_summary",
+      analysis_spec: { from: FROM, to: TO },
+      input_fingerprint: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      status: "completed",
+      has_artifact: true,
+      failure_reason: null,
+      created_at: FROM,
+      claimed_at: FROM,
+      completed_at: TO,
+      updated_at: TO
+    }
+  ],
   next_cursor: null
 } as const;
 
@@ -69,7 +69,9 @@ const completedBundleResponse = buildAnalyticsBundle({
     affected_sessions: 3
   },
   segments: [],
-  journey_patterns: [{ from_route_key: "/pricing", to_route_key: "/checkout", transition_count: 4 }],
+  journey_patterns: [
+    { from_route_key: "/pricing", to_route_key: "/checkout", transition_count: 4 }
+  ],
   representative_journeys: [],
   linked_incidents: [],
   linked_deploys: [],
@@ -83,7 +85,12 @@ const completedBundleResponse = buildAnalyticsBundle({
 describe("cli analytics bundle commands", () => {
   it("renders analytics bundle lists in human and json mode", async () => {
     const listed = await listAnalyticsBundlesCommand(
-      { bearerToken: "dbundle_mem_x", projectId: PROJECT_ID, status: "completed", kind: "usage_summary" },
+      {
+        bearerToken: "dbundle_mem_x",
+        projectId: PROJECT_ID,
+        status: "completed",
+        kind: "usage_summary"
+      },
       { listBundles: vi.fn().mockResolvedValue(bundleListResponse) }
     );
     const empty = await listAnalyticsBundlesCommand(
@@ -116,7 +123,7 @@ describe("cli analytics bundle commands", () => {
 
     expect(request).toHaveBeenCalledWith({
       method: "GET",
-      path: "/v1/analytics/bundles?status=completed&limit=5",
+      path: "/v1/analytics/bundles?status=completed&limit=5&include_total_count=true",
       bearerToken: "dbundle_mem_x"
     });
   });
@@ -134,11 +141,19 @@ describe("cli analytics bundle commands", () => {
       { createBundle: vi.fn().mockResolvedValue(bundlePendingResponse) }
     );
     const pending = await getAnalyticsBundleCommand(
-      { bearerToken: "dbundle_mem_x", projectId: PROJECT_ID, bundleGenerationId: BUNDLE_GENERATION_ID },
+      {
+        bearerToken: "dbundle_mem_x",
+        projectId: PROJECT_ID,
+        bundleGenerationId: BUNDLE_GENERATION_ID
+      },
       { getBundle: vi.fn().mockResolvedValue(bundlePendingResponse) }
     );
     const completed = await getAnalyticsBundleCommand(
-      { bearerToken: "dbundle_mem_x", projectId: PROJECT_ID, bundleGenerationId: BUNDLE_GENERATION_ID },
+      {
+        bearerToken: "dbundle_mem_x",
+        projectId: PROJECT_ID,
+        bundleGenerationId: BUNDLE_GENERATION_ID
+      },
       { getBundle: vi.fn().mockResolvedValue(completedBundleResponse) }
     );
     const json = await createAnalyticsBundleCommand(
@@ -250,7 +265,8 @@ describe("cli analytics bundle commands", () => {
   });
 
   it("builds HTTP requests against the analytics bundle API", async () => {
-    const request = vi.fn()
+    const request = vi
+      .fn()
       .mockResolvedValueOnce({ status: 200, body: bundleListResponse })
       .mockResolvedValueOnce({ status: 200, body: bundlePendingResponse })
       .mockResolvedValueOnce({ status: 200, body: bundlePendingResponse });
@@ -320,16 +336,36 @@ describe("cli analytics bundle commands", () => {
       { createBundle: vi.fn().mockRejectedValue(new Error("boom")) }
     );
     const unauthorized = await getAnalyticsBundleCommand(
-      { bearerToken: "dbundle_mem_x", projectId: PROJECT_ID, bundleGenerationId: BUNDLE_GENERATION_ID },
-      { getBundle: vi.fn().mockRejectedValue(new AnalyticsMetricsApiError(401, "invalid_member_token")) }
+      {
+        bearerToken: "dbundle_mem_x",
+        projectId: PROJECT_ID,
+        bundleGenerationId: BUNDLE_GENERATION_ID
+      },
+      {
+        getBundle: vi
+          .fn()
+          .mockRejectedValue(new AnalyticsMetricsApiError(401, "invalid_member_token"))
+      }
     );
     const missing = await getAnalyticsBundleCommand(
-      { bearerToken: "dbundle_mem_x", projectId: PROJECT_ID, bundleGenerationId: BUNDLE_GENERATION_ID },
-      { getBundle: vi.fn().mockRejectedValue(new AnalyticsMetricsApiError(404, "analytics_bundle_not_found")) }
+      {
+        bearerToken: "dbundle_mem_x",
+        projectId: PROJECT_ID,
+        bundleGenerationId: BUNDLE_GENERATION_ID
+      },
+      {
+        getBundle: vi
+          .fn()
+          .mockRejectedValue(new AnalyticsMetricsApiError(404, "analytics_bundle_not_found"))
+      }
     );
     const forbidden = await createAnalyticsBundleCommand(
       { bearerToken: "dbundle_mem_x", projectId: PROJECT_ID, analysisKind: "usage_summary" },
-      { createBundle: vi.fn().mockRejectedValue(new AnalyticsMetricsApiError(403, "analytics_disabled")) }
+      {
+        createBundle: vi
+          .fn()
+          .mockRejectedValue(new AnalyticsMetricsApiError(403, "analytics_disabled"))
+      }
     );
     const server = await createAnalyticsBundleCommand(
       { bearerToken: "dbundle_mem_x", projectId: PROJECT_ID, analysisKind: "usage_summary" },
@@ -350,10 +386,16 @@ describe("cli analytics bundle commands", () => {
   });
 
   it("maps HTTP error and malformed bundle responses", async () => {
-    const bodyErrorRequest = vi.fn().mockResolvedValue({ status: 403, body: { error: "analytics_disabled" } });
+    const bodyErrorRequest = vi
+      .fn()
+      .mockResolvedValue({ status: 403, body: { error: "analytics_disabled" } });
     const fallbackErrorRequest = vi.fn().mockResolvedValue({ status: 500, body: null });
-    const invalidResponseRequest = vi.fn().mockResolvedValue({ status: 200, body: { status: "unknown" } });
-    const invalidListResponseRequest = vi.fn().mockResolvedValue({ status: 200, body: { bundles: [{}] } });
+    const invalidResponseRequest = vi
+      .fn()
+      .mockResolvedValue({ status: 200, body: { status: "unknown" } });
+    const invalidListResponseRequest = vi
+      .fn()
+      .mockResolvedValue({ status: 200, body: { bundles: [{}] } });
 
     await expect(
       createAnalyticsBundleApi({ request: bodyErrorRequest }).createBundle({

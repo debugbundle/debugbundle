@@ -5,6 +5,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { App } from "../../../apps/web/src/app.js";
 import { resetBrowserSessionClientState } from "../../../apps/web/src/lib/api.js";
 import { buildIncidentContextRecord } from "../../../packages/storage/src/incident-context.js";
+import { chooseSelectOption } from "./helpers/management-ui.js";
 import {
   createIncident,
   createProject,
@@ -84,10 +85,22 @@ it("pages incident log metadata and resets cursors when filtering level", async 
   expect(await screen.findByText("event_2")).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Previous logs" }));
   expect(await screen.findByText("event_1")).toBeInTheDocument();
-  fireEvent.change(screen.getByLabelText("Log level"), { target: { value: "warn" } });
-  await user.click(screen.getByRole("button", { name: "Apply log level" }));
+  await user.click(screen.getByRole("button", { name: "Next logs" }));
+  await screen.findByText("event_2");
+  const level = screen.getByRole("combobox", { name: "Log level" });
+  expect(level).toHaveClass("max-w-48");
+  expect(level).toHaveAccessibleDescription(/Filters this table only/);
+  expect(screen.queryByRole("button", { name: "Apply log level" })).not.toBeInTheDocument();
+  await chooseSelectOption(user, "Log level", "Warn");
   await waitFor(() => expect(requests.at(-1)).toContain("level=warn"));
   expect(requests.at(-1)).not.toContain("cursor=");
+  expect(await screen.findByText("event_1")).toBeInTheDocument();
+  expect(screen.queryByText("Page 1")).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Next logs" })).not.toBeInTheDocument();
+  await chooseSelectOption(user, "Log level", "All levels");
+  await waitFor(() => expect(requests.at(-1)).not.toContain("level="));
+  expect(requests.at(-1)).not.toContain("cursor=");
+  expect(await screen.findByText("Page 1")).toBeInTheDocument();
   expect(
     requests
       .filter((url) => url.includes("/v1/logs?"))
@@ -105,11 +118,44 @@ it("recovers log inventory after a server failure and resets paging when its lim
   await screen.findByText("event_1");
   await user.click(screen.getByRole("button", { name: "Next logs" }));
   await screen.findByText("event_2");
-  fireEvent.change(screen.getByLabelText("Log page limit"), { target: { value: "100" } });
-  await user.click(screen.getByRole("button", { name: "Apply log page limit" }));
+  const rows = screen.getByRole("combobox", { name: "Log page limit" });
+  expect(rows.closest('[data-slot="card-footer"]')).toContainElement(
+    screen.getByRole("button", { name: "Next logs" })
+  );
+  await chooseSelectOption(user, "Log page limit", "100");
   await waitFor(() => expect(requests.at(-1)).toContain("limit=100"));
   expect(requests.at(-1)).not.toContain("cursor=");
   expect(await screen.findByText("event_1")).toBeInTheDocument();
+});
+it("supports standard log levels and preserves exact custom logger levels", async () => {
+  const { incident, requests } = setup();
+  const user = userEvent.setup();
+  render(<App initialEntries={[`/incidents/${incident.incident_id}`]} />);
+  await user.click(await screen.findByRole("tab", { name: "Logs" }));
+  await screen.findByText("event_1");
+  for (const [label, value] of [
+    ["Trace", "trace"],
+    ["Debug", "debug"],
+    ["Info", "info"],
+    ["Warn", "warn"],
+    ["Warning", "warning"],
+    ["Error", "error"],
+    ["Fatal", "fatal"]
+  ] as const) {
+    await chooseSelectOption(user, "Log level", label);
+    await waitFor(() => expect(requests.at(-1)).toContain(`level=${value}`));
+    await screen.findByText("event_1");
+  }
+  await chooseSelectOption(user, "Log level", "Custom level…");
+  const beforeTyping = requests.filter((url) => url.includes("/v1/logs?")).length;
+  expect(screen.getByRole("button", { name: "Apply custom log level" })).toBeEnabled();
+  fireEvent.change(screen.getByLabelText("Custom log level"), { target: { value: "" } });
+  expect(screen.getByRole("button", { name: "Apply custom log level" })).toBeDisabled();
+  await user.type(screen.getByLabelText("Custom log level"), " CRITICAL ");
+  expect(requests.filter((url) => url.includes("/v1/logs?"))).toHaveLength(beforeTyping);
+  await user.click(screen.getByRole("button", { name: "Apply custom log level" }));
+  await waitFor(() => expect(requests.at(-1)).toContain("level=CRITICAL"));
+  expect(requests.at(-1)).not.toContain("cursor=");
 });
 it("offers retry when context is unavailable without displaying an internal error", async () => {
   const { incident } = setup(true);

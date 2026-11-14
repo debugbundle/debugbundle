@@ -4,7 +4,7 @@ export function getSlackDestinationErrorMessage(error: unknown, action: "test" |
   const code = error instanceof Error ? error.message : String(error);
 
   if (code === "slack_destination_in_use") {
-    return "Disconnect any alert rules or weekly reports using this Slack channel before removing it.";
+    return "Disconnect any alert rules or weekly project digests using this Slack channel before removing it.";
   }
   if (code === "slack_destination_unavailable" || code === "slack_destination_forbidden") {
     return action === "test"

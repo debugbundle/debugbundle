@@ -68,9 +68,19 @@ function setup(actionsFailOnce = false, emptyActions = false) {
         return jsonResponse(200, response);
       }
       if (url.includes("/analytics/bundles?"))
-        return jsonResponse(200, { bundles: [], next_cursor: null, total_pages: 1 });
+        return jsonResponse(200, {
+          bundles: [],
+          next_cursor: null,
+          total_pages: 1,
+          total_count: 0
+        });
       if (url.includes("/analytics/opportunities?"))
-        return jsonResponse(200, { opportunities: [], next_cursor: null, total_pages: 1 });
+        return jsonResponse(200, {
+          opportunities: [],
+          next_cursor: null,
+          total_pages: 1,
+          total_count: 0
+        });
       if (url.includes("/analytics/actions?")) {
         actionRequests += 1;
         if (actionsFailOnce && actionRequests === 1)
@@ -110,13 +120,40 @@ function setup(actionsFailOnce = false, emptyActions = false) {
               created_at: "2026-10-07T00:00:00.000Z"
             }
           ],
-          next_cursor: url.includes("cursor=") ? null : "next-sample"
+          next_cursor: url.includes("cursor=") ? null : "next-sample",
+          ...(url.includes("cursor=")
+            ? {}
+            : {
+                total_count: 37,
+                total_pages: Math.ceil(
+                  37 / Number(new URL(url, "http://localhost").searchParams.get("limit"))
+                )
+              })
         });
       return jsonResponse(404, { error: "not_found" });
     })
   );
   return requests;
 }
+it.each([
+  ["opportunities", "Analytics opportunities"],
+  ["bundles", "Generated analytics bundles"]
+])("uses the shared footer and exact empty title count for analytics %s", async (route, title) => {
+  const requests = setup();
+  const user = userEvent.setup();
+  render(<App initialEntries={[`/projects/${projectId}/analytics/${route}`]} />);
+  await screen.findByRole("heading", { name: `${title} (0)` });
+  const select = screen.getByRole("combobox", { name: `${title} rows per page` });
+  const footer = select.closest('[data-slot="card-footer"]') as HTMLElement;
+  expect(footer).toHaveClass("flex-col", "sm:flex-row");
+  expect(within(footer).queryByRole("navigation")).toBeNull();
+  expect(screen.queryByLabelText("Inventory page limit")).toBeNull();
+  await chooseSelectOption(user, `${title} rows per page`, "50");
+  await waitFor(() => expect(requests.at(-1)).toContain("limit=50"));
+  expect(requests.at(-1)).toContain("include_total_count=true");
+  expect(requests.at(-1)).not.toContain("cursor=");
+});
+
 it("adds action metrics within existing analytics navigation", async () => {
   const requests = setup();
   render(<App initialEntries={[`/projects/${projectId}/analytics/actions`]} />);
@@ -147,7 +184,8 @@ it.each(["Opportunities", "Bundles"])(
       })
     );
     await screen.findByRole("heading", {
-      name: section === "Bundles" ? "Generated analytics bundles" : "Analytics opportunities (0)"
+      name:
+        section === "Bundles" ? "Generated analytics bundles (0)" : "Analytics opportunities (0)"
     });
     expect(screen.queryByRole("button", { name: "Remove Device type: Mobile filter" })).toBeNull();
     await user.click(screen.getByRole("button", { name: "More filters" }));
@@ -254,15 +292,19 @@ it("lists retained journey samples independently of aggregate pattern selection 
     "href",
     `/projects/${projectId}/analytics/journeys/${sampleId}`
   );
-  await user.click(screen.getByRole("button", { name: "Next samples" }));
+  expect(
+    screen.getByRole("heading", { name: "Retained journey samples (37)" })
+  ).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Go to next page" }));
   await waitFor(() =>
     expect(requests.some((url) => url.includes("cursor=next-sample"))).toBe(true)
   );
-  await user.click(screen.getByRole("button", { name: "Previous samples" }));
-  await waitFor(() => expect(requests.at(-1)).not.toContain("cursor="));
-  fireEvent.change(screen.getByLabelText("Sample page limit"), { target: { value: "100" } });
-  await user.click(screen.getByRole("button", { name: "Apply sample page limit" }));
+  await user.click(screen.getByRole("button", { name: "Go to previous page" }));
+  expect(screen.getByText("Page 1 of 2")).toBeInTheDocument();
+  await chooseSelectOption(user, "Retained journey samples rows per page", "100");
   await waitFor(() => expect(requests.at(-1)).toContain("limit=100"));
+  expect(requests.at(-1)).not.toContain("cursor=");
+  expect(screen.queryByRole("navigation", { name: "Pagination" })).toBeNull();
   fireEvent.change(screen.getByLabelText("Sample tag"), { target: { value: "loop" } });
   await user.click(screen.getByRole("button", { name: "Apply sample tag" }));
   await waitFor(() => expect(requests.at(-1)).toContain("tag=loop"));
@@ -273,7 +315,7 @@ it("uses inventory kind/status controls and bounded page limits within the appli
   const requests = setup();
   const user = userEvent.setup();
   render(<App initialEntries={[`/projects/${projectId}/analytics/bundles`]} />);
-  await screen.findByRole("heading", { name: "Generated analytics bundles" });
+  await screen.findByRole("heading", { name: /^Generated analytics bundles/ });
   await chooseSelectOption(user, "Time window", "Custom range");
   fireEvent.change(screen.getByLabelText("From (UTC)"), { target: { value: window.from } });
   fireEvent.change(screen.getByLabelText("To (UTC)"), { target: { value: window.to } });
@@ -285,8 +327,7 @@ it("uses inventory kind/status controls and bounded page limits within the appli
     within(screen.getByRole("dialog")).getByRole("button", { name: "Apply filters" })
   );
   await waitFor(() => expect(requests.some((url) => url.includes("status=failed"))).toBe(true));
-  fireEvent.change(screen.getByLabelText("Inventory page limit"), { target: { value: "100" } });
-  await user.click(screen.getByRole("button", { name: "Apply inventory page limit" }));
+  await chooseSelectOption(user, "Generated analytics bundles rows per page", "100");
   await waitFor(() => expect(requests.at(-1)).toContain("limit=100"));
   const params = new URL(requests.at(-1)!, "https://example.com").searchParams;
   expect(params.get("kind")).toBe("route_health");

@@ -26,10 +26,16 @@ export interface AnalyticsJourneySampleStore {
     service?: string | undefined;
     environment?: string | undefined;
     tag?: string | undefined;
+    include_total?: boolean | undefined;
     cursor?: AnalyticsJourneySamplesCursor | undefined;
     limit: number;
     now: string;
-  }): Promise<{ samples: AnalyticsJourneySampleRecord[]; next_cursor: string | null }>;
+  }): Promise<{
+    samples: AnalyticsJourneySampleRecord[];
+    next_cursor: string | null;
+    total_pages?: number;
+    total_count?: number;
+  }>;
   getAnalyticsJourneySampleForProject(input: {
     project_id: string;
     origin_project_ids?: string[];
@@ -39,6 +45,7 @@ export interface AnalyticsJourneySampleStore {
 }
 
 type AnalyticsJourneySampleRow = {
+  total_count?: unknown;
   sample_id: string;
   project_id: string;
   service: string;
@@ -99,10 +106,16 @@ export function createPostgresAnalyticsJourneySampleStore(
     service?: string | undefined;
     environment?: string | undefined;
     tag?: string | undefined;
+    include_total?: boolean | undefined;
     cursor?: AnalyticsJourneySamplesCursor | undefined;
     limit: number;
     now: string;
-  }): Promise<{ samples: AnalyticsJourneySampleRecord[]; next_cursor: string | null }> {
+  }): Promise<{
+    samples: AnalyticsJourneySampleRecord[];
+    next_cursor: string | null;
+    total_pages?: number;
+    total_count?: number;
+  }> {
     const params: unknown[] = [input.project_id, input.now];
     const where = [
       "project_id=ANY(debugbundle_project_origins($1::uuid))",
@@ -133,6 +146,7 @@ export function createPostgresAnalyticsJourneySampleStore(
     const result = await db.query<AnalyticsJourneySampleRow>(
       `
         SELECT
+          ${input.include_total === true && input.cursor === undefined ? "COUNT(*) OVER() AS total_count," : ""}
           id::text AS sample_id,
           project_id::text AS project_id,
           service,
@@ -169,7 +183,18 @@ export function createPostgresAnalyticsJourneySampleStore(
           : buildAnalyticsJourneySamplesCursor({
               last_seen_at: lastVisible.last_seen_at,
               sample_id: lastVisible.sample_id
-            })
+            }),
+      ...(input.include_total === true &&
+      input.cursor === undefined &&
+      (result.rows.length === 0 || result.rows[0]?.total_count !== undefined)
+        ? {
+            total_count: Number(result.rows[0]?.total_count ?? 0),
+            total_pages: Math.max(
+              1,
+              Math.ceil(Number(result.rows[0]?.total_count ?? 0) / input.limit)
+            )
+          }
+        : {})
     };
   }
 

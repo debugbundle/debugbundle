@@ -1,13 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { sesSendMock, sesClientConfigSpy, sendEmailCommandSpy, emailCommandCapture } = vi.hoisted(() => ({
-  sesSendMock: vi.fn(),
-  sesClientConfigSpy: vi.fn(),
-  sendEmailCommandSpy: vi.fn(),
-  emailCommandCapture: {
-    lastInput: undefined as unknown
-  }
-}));
+const { sesSendMock, sesClientConfigSpy, sendEmailCommandSpy, emailCommandCapture } = vi.hoisted(
+  () => ({
+    sesSendMock: vi.fn(),
+    sesClientConfigSpy: vi.fn(),
+    sendEmailCommandSpy: vi.fn(),
+    emailCommandCapture: {
+      lastInput: undefined as unknown
+    }
+  })
+);
 
 vi.mock("@aws-sdk/client-sesv2", () => ({
   SESv2Client: vi.fn().mockImplementation(function (config: unknown) {
@@ -105,18 +107,22 @@ describe("email package", () => {
       ]
     });
 
-    expect(rendered.subject).toContain("2 projects");
+    expect(rendered.subject).toBe("DebugBundle weekly project digest for 2 projects");
     expect(rendered.text).toContain("Window: March 9, 2026 to March 16, 2026");
-    expect(rendered.text).toContain("Across 2 projects, you closed 2 of the 3 incidents opened this week.");
+    expect(rendered.text).toContain(
+      "Across 2 projects, you closed 2 of the 3 incidents opened this week."
+    );
     expect(rendered.text).toContain("Project: Checkout <API>");
     expect(rendered.text).toContain("Top spiking incidents:\nNone");
     expect(rendered.html).toContain(
       "2 projects: 3 new incidents, 3 resolved incidents, 3 failure bundles, 1 improvement bundle, 1 regression for March 9, 2026 to March 16, 2026."
     );
-    expect(rendered.html.indexOf("2 projects: 3 new incidents")).toBeLessThan(rendered.html.indexOf('class="db-email-frame"'));
+    expect(rendered.html.indexOf("2 projects: 3 new incidents")).toBeLessThan(
+      rendered.html.indexOf('class="db-email-frame"')
+    );
     expect(rendered.html).toContain("Checkout &lt;API&gt;");
     expect(rendered.html).toContain(">Project<");
-    expect(rendered.html).toContain("DebugBundle weekly report");
+    expect(rendered.html).toContain("DebugBundle weekly project digest");
     expect(rendered.html).toContain("March 9, 2026 to March 16, 2026");
     expect(rendered.html).toContain(">None</p>");
   });
@@ -142,7 +148,9 @@ describe("email package", () => {
     expect(emailCode.text).toContain("12<3456>");
     expect(emailCode.text).toContain("https://debugbundle.test/login?next=<dashboard>");
     expect(emailCode.html).toContain("Your sign-in code expires in 10 minutes.");
-    expect(emailCode.html.indexOf("Your sign-in code expires")).toBeLessThan(emailCode.html.indexOf('class="db-email-frame"'));
+    expect(emailCode.html.indexOf("Your sign-in code expires")).toBeLessThan(
+      emailCode.html.indexOf('class="db-email-frame"')
+    );
     expect(emailCode.html).toContain("12&lt;3456&gt;");
     expect(emailCode.html).toContain("&lt;dashboard&gt;");
     expect(emailCode.html).toContain('src="https://debugbundle.test/email/debugbundle-mark.png"');
@@ -181,11 +189,15 @@ describe("email package", () => {
     expect(rendered.html).toContain(
       "Checkout &lt;API&gt;: High new incident for checkout-&lt;api&gt; in production at May 13, 2026, 8:33 AM UTC."
     );
-    expect(rendered.html.indexOf("High new incident")).toBeLessThan(rendered.html.indexOf('class="db-email-frame"'));
+    expect(rendered.html.indexOf("High new incident")).toBeLessThan(
+      rendered.html.indexOf('class="db-email-frame"')
+    );
     expect(rendered.text).toContain("Project: Checkout <API>");
     expect(rendered.text).toContain("Service: checkout-<api>");
     expect(rendered.text).toContain("Detected at: May 13, 2026, 8:33 AM UTC");
-    expect(rendered.text).toContain("Open incident: https://app.debugbundle.com/incidents/inc_<123>");
+    expect(rendered.text).toContain(
+      "Open incident: https://app.debugbundle.com/incidents/inc_<123>"
+    );
     expect(rendered.html).toContain(">Project<");
     expect(rendered.html).toContain("Checkout &lt;API&gt;");
     expect(rendered.html).toContain("checkout-&lt;api&gt;");
@@ -224,33 +236,48 @@ describe("email package", () => {
     expect(JSON.stringify(withoutIncidentLinks)).not.toContain(input.groupUrl);
   });
 
-  it.each(["Checkout <API>", undefined, null])("separates Slack metadata rows with optional project names (%s)", (projectName) => {
-    const rendered = renderAlertSlackMessage({
-      conditionType: "new_incident",
-      incidentId: "inc_<123>",
-      ...(projectName === undefined ? {} : { projectName }),
-      occurredAt: "2026-05-13T08:33:56.774Z",
-      serviceName: "checkout <api> & worker",
-      environment: "staging",
-      severity: "high"
-    });
-    const alert = "*Alert*\nNew incident";
-    const severity = "*Severity*\nHigh";
-    const service = "*Service*\ncheckout &lt;api&gt; &amp; worker";
-    const environment = "*Environment*\nstaging";
-    const incidentId = "*Incident ID*\ninc_&lt;123&gt;";
-    const detectedAt = "*Detected at*\n2026-05-13T08:33:56.774Z";
-    const expectedRows = projectName === undefined || projectName === null
-      ? [[alert, severity], [service, environment], [incidentId, detectedAt]]
-      : [[alert, "*Project*\nCheckout &lt;API&gt;"], [severity, service], [environment, incidentId], [detectedAt]];
+  it.each(["Checkout <API>", undefined, null])(
+    "separates Slack metadata rows with optional project names (%s)",
+    (projectName) => {
+      const rendered = renderAlertSlackMessage({
+        conditionType: "new_incident",
+        incidentId: "inc_<123>",
+        ...(projectName === undefined ? {} : { projectName }),
+        occurredAt: "2026-05-13T08:33:56.774Z",
+        serviceName: "checkout <api> & worker",
+        environment: "staging",
+        severity: "high"
+      });
+      const alert = "*Alert*\nNew incident";
+      const severity = "*Severity*\nHigh";
+      const service = "*Service*\ncheckout &lt;api&gt; &amp; worker";
+      const environment = "*Environment*\nstaging";
+      const incidentId = "*Incident ID*\ninc_&lt;123&gt;";
+      const detectedAt = "*Detected at*\n2026-05-13T08:33:56.774Z";
+      const expectedRows =
+        projectName === undefined || projectName === null
+          ? [
+              [alert, severity],
+              [service, environment],
+              [incidentId, detectedAt]
+            ]
+          : [
+              [alert, "*Project*\nCheckout &lt;API&gt;"],
+              [severity, service],
+              [environment, incidentId],
+              [detectedAt]
+            ];
 
-    expect(rendered.blocks.slice(1)).toEqual(expectedRows.map((row) => ({
-      type: "section",
-      fields: row.map((text) => ({ type: "mrkdwn", text }))
-    })));
-    expect(rendered.text).toContain("Service: checkout <api> & worker");
-    expect(rendered.text).toContain("Detected at: 2026-05-13T08:33:56.774Z");
-  });
+      expect(rendered.blocks.slice(1)).toEqual(
+        expectedRows.map((row) => ({
+          type: "section",
+          fields: row.map((text) => ({ type: "mrkdwn", text }))
+        }))
+      );
+      expect(rendered.text).toContain("Service: checkout <api> & worker");
+      expect(rendered.text).toContain("Detected at: 2026-05-13T08:33:56.774Z");
+    }
+  );
 
   it("bounds historical incident titles in Slack messages and keeps missing titles optional", () => {
     const input = {
@@ -271,8 +298,12 @@ describe("email package", () => {
     expect(rendered.blocks[0]?.["text"]).toMatchObject({ text: expect.stringContaining(title) });
 
     const missingTitle = renderAlertSlackMessage({ ...input, summary: " \n " });
-    expect(missingTitle.text.split("\n")[0]).toBe("[DebugBundle Alert] A new incident was detected");
-    expect(missingTitle.blocks[0]?.["text"]).not.toMatchObject({ text: expect.stringContaining("*Incident:*") });
+    expect(missingTitle.text.split("\n")[0]).toBe(
+      "[DebugBundle Alert] A new incident was detected"
+    );
+    expect(missingTitle.blocks[0]?.["text"]).not.toMatchObject({
+      text: expect.stringContaining("*Incident:*")
+    });
   });
 
   it("renders alert digest emails with grouped incidents", () => {
@@ -309,7 +340,9 @@ describe("email package", () => {
     expect(rendered.html).toContain(
       "Checkout &lt;API&gt;: 1 incident matched alerts. First: High Checkout crash on checkout-&lt;api&gt; in production."
     );
-    expect(rendered.html.indexOf("1 incident matched alerts")).toBeLessThan(rendered.html.indexOf('class="db-email-frame"'));
+    expect(rendered.html.indexOf("1 incident matched alerts")).toBeLessThan(
+      rendered.html.indexOf('class="db-email-frame"')
+    );
     expect(rendered.text).toContain("Project: Checkout <API>");
     expect(rendered.text).toContain("Alerts: New incident, Severity threshold reached");
     expect(rendered.text).toContain("Detected at: May 17, 2026, 10:00 AM UTC");
@@ -327,9 +360,12 @@ describe("email package", () => {
       totalIncidentCount: 100,
       allIncidentsUrl: "https://app.debugbundle.com/projects/proj_123/incidents",
       alerts: Array.from({ length: 100 }, (_, index) => ({
-        conditionType: "new_incident", incidentId: `inc_${index}`,
-        occurredAt: "2026-05-17T10:00:00.000Z", serviceName: "checkout-api",
-        environment: "production", severity: "high" as const,
+        conditionType: "new_incident",
+        incidentId: `inc_${index}`,
+        occurredAt: "2026-05-17T10:00:00.000Z",
+        serviceName: "checkout-api",
+        environment: "production",
+        severity: "high" as const,
         summary: `Failure ${index}`
       }))
     });
@@ -342,12 +378,20 @@ describe("email package", () => {
   });
 
   it("keeps every matched condition label on a sampled incident", () => {
-    const rendered = renderAlertDigestEmail({ alerts: [{
-      conditionType: "new_incident", conditionTypes: ["new_incident", "error_spike"],
-      incidentId: "inc_1", occurredAt: "2026-05-17T10:00:00.000Z",
-      serviceName: "checkout-api", environment: "production", severity: "critical",
-      summary: "Checkout root failure"
-    }] });
+    const rendered = renderAlertDigestEmail({
+      alerts: [
+        {
+          conditionType: "new_incident",
+          conditionTypes: ["new_incident", "error_spike"],
+          incidentId: "inc_1",
+          occurredAt: "2026-05-17T10:00:00.000Z",
+          serviceName: "checkout-api",
+          environment: "production",
+          severity: "critical",
+          summary: "Checkout root failure"
+        }
+      ]
+    });
     expect(rendered.text).toContain("Alerts: New incident, Error spike");
   });
 
@@ -381,14 +425,16 @@ describe("email package", () => {
     expect(alert.html).toContain('class="db-email-kv-list db-email-kv-list-fixed"');
     expect(alert.html).toContain("table-layout:fixed;");
     expect(digest.html).toContain('class="db-email-alert-summary"');
-    expect(digest.html).toContain("word-wrap:break-word;word-break:break-word;overflow-wrap:anywhere;");
+    expect(digest.html).toContain(
+      "word-wrap:break-word;word-break:break-word;overflow-wrap:anywhere;"
+    );
     expect(digest.html).toContain(longSummary);
   });
 
   it("renders webhook auto-disabled emails with escaped content and management links", () => {
     const rendered = renderWebhookAutoDisabledEmail({
-      organizationName: 'Acme <Prod>',
-      projectName: 'checkout-<api>',
+      organizationName: "Acme <Prod>",
+      projectName: "checkout-<api>",
       webhookId: "wh_<123>",
       targetUrl: "https://hooks.example.test/<danger>",
       webhooksUrl: "https://app.debugbundle.test/projects/proj_123/webhooks?filter=<all>"
@@ -398,11 +444,13 @@ describe("email package", () => {
     expect(rendered.html).toContain(
       "Webhook wh_&lt;123&gt; for checkout-&lt;api&gt; was disabled after 50 delivery failures."
     );
-    expect(rendered.text).toContain('Acme <Prod>');
+    expect(rendered.text).toContain("Acme <Prod>");
     expect(rendered.text).toContain("Project: checkout-<api>");
     expect(rendered.text).toContain("Webhook ID: wh_<123>");
     expect(rendered.text).toContain("https://hooks.example.test/<danger>");
-    expect(rendered.text).toContain("Manage project webhooks: https://app.debugbundle.test/projects/proj_123/webhooks?filter=<all>");
+    expect(rendered.text).toContain(
+      "Manage project webhooks: https://app.debugbundle.test/projects/proj_123/webhooks?filter=<all>"
+    );
     expect(rendered.html).toContain("Acme &lt;Prod&gt;");
     expect(rendered.html).toContain("checkout-&lt;api&gt;");
     expect(rendered.html).toContain("wh_&lt;123&gt;");
@@ -423,22 +471,40 @@ describe("email package", () => {
 
     expect(rendered.html).toContain("<!DOCTYPE html>");
     expect(rendered.html).toContain("<head>");
-    expect(rendered.html).toContain('<meta name="viewport" content="width=device-width, initial-scale=1.0" />');
+    expect(rendered.html).toContain(
+      '<meta name="viewport" content="width=device-width, initial-scale=1.0" />'
+    );
     expect(rendered.html).toContain("<style>");
     expect(rendered.html).toContain("@media only screen and (max-width: 480px)");
-    expect(rendered.html).toContain(".db-email-shell { padding-top:20px !important; padding-right:12px !important; padding-bottom:20px !important; padding-left:12px !important; }");
-    expect(rendered.html).toContain(".db-email-title { font-size:24px !important; line-height:30px !important; }");
-    expect(rendered.html).toContain(".db-email-kv-label, .db-email-kv-value { display:block !important; width:100% !important; text-align:left !important; }");
+    expect(rendered.html).toContain(
+      ".db-email-shell { padding-top:20px !important; padding-right:12px !important; padding-bottom:20px !important; padding-left:12px !important; }"
+    );
+    expect(rendered.html).toContain(
+      ".db-email-title { font-size:24px !important; line-height:30px !important; }"
+    );
+    expect(rendered.html).toContain(
+      ".db-email-kv-label, .db-email-kv-value { display:block !important; width:100% !important; text-align:left !important; }"
+    );
     expect(rendered.html).not.toContain("@media only screen and (min-width:");
     expect(rendered.html).not.toContain(".db-email-card {");
     expect(rendered.html).not.toContain(".db-email-card-shell {");
     expect(rendered.html).not.toContain(".db-email-card-content {");
     expect(rendered.html).not.toContain("max-width: 640px");
-    expect(rendered.html).toContain('<body bgcolor="#f5f5f4" style="margin:0;padding:0;background-color:#f5f5f4;font-family:Arial,Helvetica,sans-serif;">');
-    expect(rendered.html).toContain('class="db-email-root" style="margin:0;padding:0;background-color:#f5f5f4;font-family:Arial,Helvetica,sans-serif;"');
-    expect(rendered.html).toContain('class="db-email-frame" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f5f5f4" style="width:100%;border-collapse:collapse;background-color:#f5f5f4;"');
-    expect(rendered.html).toContain('class="db-email-shell" style="padding-top:32px;padding-right:16px;padding-bottom:32px;padding-left:16px;"');
-    expect(rendered.html).toContain('class="db-email-card-shell" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="width:100%;border-collapse:separate;background-color:#ffffff;border:1px solid #e7e5e4;border-radius:16px;');
+    expect(rendered.html).toContain(
+      '<body bgcolor="#f5f5f4" style="margin:0;padding:0;background-color:#f5f5f4;font-family:Arial,Helvetica,sans-serif;">'
+    );
+    expect(rendered.html).toContain(
+      'class="db-email-root" style="margin:0;padding:0;background-color:#f5f5f4;font-family:Arial,Helvetica,sans-serif;"'
+    );
+    expect(rendered.html).toContain(
+      'class="db-email-frame" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f5f5f4" style="width:100%;border-collapse:collapse;background-color:#f5f5f4;"'
+    );
+    expect(rendered.html).toContain(
+      'class="db-email-shell" style="padding-top:32px;padding-right:16px;padding-bottom:32px;padding-left:16px;"'
+    );
+    expect(rendered.html).toContain(
+      'class="db-email-card-shell" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="width:100%;border-collapse:separate;background-color:#ffffff;border:1px solid #e7e5e4;border-radius:16px;'
+    );
     expect(rendered.html).toContain(
       'class="db-email-card-top-space" height="32" style="height:32px;line-height:32px;font-size:1px;mso-line-height-rule:exactly;">&nbsp;</td>'
     );
@@ -448,13 +514,19 @@ describe("email package", () => {
     expect(rendered.html).toContain(
       'class="db-email-card-bottom-space" height="32" style="height:32px;line-height:32px;font-size:1px;mso-line-height-rule:exactly;">&nbsp;</td>'
     );
-    expect(rendered.html).not.toContain('class="db-email-card-shell" bgcolor="#ffffff" style="background-color:#ffffff;border:1px solid #e7e5e4;border-radius:16px;overflow:hidden;"');
+    expect(rendered.html).not.toContain(
+      'class="db-email-card-shell" bgcolor="#ffffff" style="background-color:#ffffff;border:1px solid #e7e5e4;border-radius:16px;overflow:hidden;"'
+    );
     expect(rendered.html).not.toContain('class="db-email-card" bgcolor="#ffffff"');
     expect(rendered.html).not.toContain("db-email-card-side-space");
     expect(rendered.html).not.toContain("<svg");
-    expect(rendered.html).toContain('src="https://app.debugbundle.test/email/debugbundle-mark.png"');
+    expect(rendered.html).toContain(
+      'src="https://app.debugbundle.test/email/debugbundle-mark.png"'
+    );
     expect(rendered.html).toContain('style="display:table-cell;width:34%;padding:0 12px 0 0;');
-    expect(rendered.html).toContain('style="display:table-cell;width:66%;padding:0;vertical-align:top;color:#1c1917;font-size:15px;line-height:22px;text-align:right;"');
+    expect(rendered.html).toContain(
+      'style="display:table-cell;width:66%;padding:0;vertical-align:top;color:#1c1917;font-size:15px;line-height:22px;text-align:right;"'
+    );
     expect(rendered.html).toContain("word-break:break-word;overflow-wrap:anywhere;");
     expect(rendered.html).toContain("text-align:right;");
     expect(rendered.html).not.toContain('class="db-email-kv-list db-email-kv-list-fixed"');
@@ -471,8 +543,12 @@ describe("email package", () => {
     expect(secondPreview).toBeDefined();
     expect(firstPreview).not.toBe(secondPreview);
     expect(firstPreview?.html).toContain("@media only screen and (max-width: 480px)");
-    expect(firstPreview?.html).toContain('class="db-email-card-content" style="padding-left:28px;padding-right:28px;vertical-align:top;">');
-    expect(firstPreview?.html).toContain('src="https://app.debugbundle.local/email/debugbundle-mark.png"');
+    expect(firstPreview?.html).toContain(
+      'class="db-email-card-content" style="padding-left:28px;padding-right:28px;vertical-align:top;">'
+    );
+    expect(firstPreview?.html).toContain(
+      'src="https://app.debugbundle.local/email/debugbundle-mark.png"'
+    );
   });
 
   it("includes no-card trial lifecycle entries in the shared system email review inventory", () => {
@@ -521,7 +597,9 @@ describe("email package", () => {
     expect(reminder.subject).toContain("7 day(s) left");
     expect(reminder.text).toContain("ends in 7 day(s)");
     expect(reminder.text).toContain("DebugBundle will pause:");
-    expect(reminder.text).toContain("Slack destinations plus Slack alert and weekly report channels");
+    expect(reminder.text).toContain(
+      "Slack destinations plus Slack alert and weekly digest channels"
+    );
     expect(reminder.html).toContain("Days remaining");
     expect(reminder.html).toContain("Project collaborators and pending invites");
     expect(reminder.html).toContain("Convert to paid");
@@ -556,7 +634,8 @@ describe("email package", () => {
       meterLabel: "Lifecycle webhook deliveries",
       used: 750,
       limit: 750,
-      currentBehavior: "new lifecycle webhook deliveries and synthetic test deliveries are suppressed until the usage window resets",
+      currentBehavior:
+        "new lifecycle webhook deliveries and synthetic test deliveries are suppressed until the usage window resets",
       usageWindowEndsAt: "2026-06-01T00:00:00.000Z",
       billingUrl: "https://app.debugbundle.test/billing?view=<usage>"
     });
@@ -571,8 +650,12 @@ describe("email package", () => {
     expect(warning.subject).toContain("80%");
     expect(warning.text).toContain("Usage: 8400 of 10500");
     expect(warning.text).toContain("Usage window ends: June 1, 2026");
-    expect(warning.text).toContain("Increasing capacity units from billing raises this allowance immediately.");
-    expect(warning.text).toContain("Open billing to increase capacity units: https://app.debugbundle.test/billing?view=<usage>");
+    expect(warning.text).toContain(
+      "Increasing capacity units from billing raises this allowance immediately."
+    );
+    expect(warning.text).toContain(
+      "Open billing to increase capacity units: https://app.debugbundle.test/billing?view=<usage>"
+    );
     expect(warning.html).toContain("Acme &lt;Prod&gt;");
     expect(warning.html).toContain("checkout-&lt;api&gt;");
     expect(warning.html).toContain("June 1, 2026");
@@ -582,19 +665,29 @@ describe("email package", () => {
     expect(limit.text).toContain("Usage window ends: June 1, 2026");
     expect(limit.html).toContain("suppressed until the usage window resets");
     expect(limit.html).toContain("June 1, 2026");
-    expect(limit.html).toContain("Increasing capacity units from billing raises this allowance immediately.");
+    expect(limit.html).toContain(
+      "Increasing capacity units from billing raises this allowance immediately."
+    );
     expect(limit.html).toContain("Open billing to increase capacity");
     expect(retention.subject).toContain("rotated out");
     expect(retention.text).toContain("Rotated bundle owners: 3");
-    expect(retention.text).toContain("Increasing capacity units from billing raises the retained bundle cap immediately.");
-    expect(retention.text).toContain("Open billing to increase capacity units: https://app.debugbundle.test/billing?view=<usage>");
+    expect(retention.text).toContain(
+      "Increasing capacity units from billing raises the retained bundle cap immediately."
+    );
+    expect(retention.text).toContain(
+      "Open billing to increase capacity units: https://app.debugbundle.test/billing?view=<usage>"
+    );
     expect(retention.html).toContain("Retention cap");
     expect(retention.html).toContain(">450<");
   });
 
   it("formats the product from email with a DebugBundle display name", () => {
-    expect(formatProductFromEmail("noreply@debugbundle.com")).toBe("DebugBundle <noreply@debugbundle.com>");
-    expect(formatProductFromEmail("DebugBundle <noreply@debugbundle.com>")).toBe("DebugBundle <noreply@debugbundle.com>");
+    expect(formatProductFromEmail("noreply@debugbundle.com")).toBe(
+      "DebugBundle <noreply@debugbundle.com>"
+    );
+    expect(formatProductFromEmail("DebugBundle <noreply@debugbundle.com>")).toBe(
+      "DebugBundle <noreply@debugbundle.com>"
+    );
   });
 
   it("sends ses requests and maps http, timeout, and transport failures", async () => {
@@ -644,7 +737,9 @@ describe("email package", () => {
       text: "hello",
       html: "<p>hello</p>"
     });
-    const timeoutExpectation = expect(timeoutPromise).rejects.toEqual(new EmailDeliveryError("email_timeout"));
+    const timeoutExpectation = expect(timeoutPromise).rejects.toEqual(
+      new EmailDeliveryError("email_timeout")
+    );
     await vi.advanceTimersByTimeAsync(20);
     await timeoutExpectation;
 

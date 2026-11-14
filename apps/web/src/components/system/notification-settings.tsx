@@ -173,6 +173,7 @@ function NotificationEditor({
   const channels = audience === "personal" ? (["email"] as const) : NOTIFICATION_CHANNELS;
   const disabled = saving || !data.can_manage;
   const schedule = draft.daily ?? data.account.daily ?? { time: "09:00", timezone: "UTC" };
+  const inheritSchedule = projectId !== undefined && draft.daily === null;
   const daily =
     draft.channels.email === "daily" ||
     (draft.channels.email === "inherit" && data.account.channels.email === "daily");
@@ -262,15 +263,17 @@ function NotificationEditor({
               <DailyNotificationScheduleFields
                 id={id}
                 value={schedule}
-                {...(projectId === undefined ? {} : { inherit: draft.daily === null })}
+                {...(projectId === undefined ? {} : { inherit: inheritSchedule })}
                 disabled={disabled}
                 invalid={!validation.success}
                 onChange={(daily) => setDraft({ ...draft, daily })}
               />
-              <FieldDescription>
-                New or reopened incidents still unresolved at delivery are grouped by project. Empty
-                digests are skipped.
-              </FieldDescription>
+              {!inheritSchedule && (
+                <FieldDescription>
+                  New or reopened incidents still unresolved at delivery are grouped by project.
+                  Empty digests are skipped.
+                </FieldDescription>
+              )}
             </>
           )}
           {error && <p role="alert">{error}</p>}
@@ -297,9 +300,9 @@ function NotificationEditor({
           onResume={(selected) => apply("resume", { channels: selected })}
         />
         <FieldDescription>
-          Monitoring continues. Pauses also apply to optional weekly reports. Sign-in, security,
-          billing and mandatory account notices remain enabled. Suppressed alerts are not replayed
-          on resume.
+          Monitoring continues. Pauses also apply to optional weekly digests and report emails.
+          Sign-in, security, billing and mandatory account notices remain enabled. Suppressed alerts
+          are not replayed on resume.
         </FieldDescription>
       </FieldGroup>
     </>

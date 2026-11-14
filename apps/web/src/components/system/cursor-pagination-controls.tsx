@@ -1,3 +1,4 @@
+import { cn } from "../../lib/utils.js";
 import {
   Pagination,
   PaginationContent,
@@ -13,6 +14,7 @@ export interface CursorPaginationControlsProps {
   isLoading: boolean;
   onPreviousPage: () => void;
   onNextPage: () => void;
+  embedded?: boolean;
 }
 
 export function CursorPaginationControls({
@@ -21,21 +23,23 @@ export function CursorPaginationControls({
   hasNextPage,
   isLoading,
   onPreviousPage,
-  onNextPage
+  onNextPage,
+  embedded = false
 }: CursorPaginationControlsProps): JSX.Element | null {
   if (page === 1 && !hasNextPage) {
     return null;
   }
 
-  return (
-    <div className="flex flex-wrap items-center gap-3 border-t pt-4">
-      <p className="text-sm text-muted-foreground">
+  const controls = (
+    <>
+      <p className="text-sm text-muted-foreground whitespace-nowrap">
         Page {page} of {totalPages}
       </p>
-      <Pagination className="mx-0 ml-auto w-auto shrink-0 justify-end">
+      <Pagination className={cn("mx-0 w-auto shrink-0 justify-end", !embedded && "ml-auto")}>
         <PaginationContent>
           <PaginationItem>
             <PaginationPrevious
+              compactOnMobile={embedded}
               type="button"
               onClick={onPreviousPage}
               disabled={page === 1 || isLoading}
@@ -43,6 +47,7 @@ export function CursorPaginationControls({
           </PaginationItem>
           <PaginationItem>
             <PaginationNext
+              compactOnMobile={embedded}
               type="button"
               onClick={onNextPage}
               disabled={!hasNextPage || isLoading}
@@ -50,6 +55,11 @@ export function CursorPaginationControls({
           </PaginationItem>
         </PaginationContent>
       </Pagination>
-    </div>
+    </>
+  );
+  return embedded ? (
+    controls
+  ) : (
+    <div className="flex flex-wrap items-center gap-3 border-t pt-4">{controls}</div>
   );
 }

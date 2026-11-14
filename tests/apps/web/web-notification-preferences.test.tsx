@@ -169,7 +169,8 @@ it("edits a shared project schedule with inheritance and validates time zones", 
   await user.click(screen.getByRole("combobox", { name: "Who these settings affect" }));
   await user.click(screen.getByRole("option", { name: "Shared destinations — affects the team" }));
   await screen.findByLabelText("Slack delivery");
-  expect(screen.getByRole("combobox", { name: "Hour" })).toBeDisabled();
+  expect(screen.getByText("Account schedule: Every day at 09:00 (UTC).")).toBeInTheDocument();
+  expect(screen.queryByRole("combobox", { name: "Hour" })).not.toBeInTheDocument();
   await user.click(screen.getByRole("combobox", { name: "Daily schedule" }));
   await user.click(screen.getByRole("option", { name: "Custom schedule" }));
   fireEvent.change(screen.getByLabelText("Timezone"), { target: { value: "Mars" } });
@@ -189,6 +190,78 @@ it("edits a shared project schedule with inheritance and validates time zones", 
     )
   );
 });
+it.each(["personal", "shared"] as const)(
+  "shows only the current %s account schedule while a project inherits it",
+  async (audience) => {
+    const schedules = {
+      personal: { time: "08:17", timezone: "Europe/Ljubljana" },
+      shared: { time: "18:45", timezone: "America/New_York" }
+    };
+    request.mockImplementation(async (scope: { audience: keyof typeof schedules }) => {
+      const value = response();
+      value.account.channels.email = "daily";
+      value.account.daily = schedules[scope.audience];
+      return {
+        ...value,
+        audience: scope.audience,
+        project_id: "project",
+        settings: defaultNotificationPreferences(true)
+      };
+    });
+    const user = userEvent.setup();
+    render(<NotificationSettings projectId="project" />);
+    await user.click(screen.getByRole("button", { name: "Notifications" }));
+    await screen.findByLabelText("Email delivery");
+    if (audience === "shared") {
+      await user.click(screen.getByRole("combobox", { name: "Who these settings affect" }));
+      await user.click(
+        screen.getByRole("option", { name: "Shared destinations — affects the team" })
+      );
+      await screen.findByLabelText("Slack delivery");
+    }
+    const schedule = schedules[audience];
+    const summary = `Account schedule: Every day at ${schedule.time} (${schedule.timezone}).`;
+    expect(screen.getByText(summary)).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Daily schedule" })).toHaveTextContent(
+      "Use account schedule"
+    );
+    expect(screen.getByRole("combobox", { name: "Daily schedule" })).toHaveAccessibleDescription(
+      summary
+    );
+    expect(screen.queryByRole("combobox", { name: "Hour" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Custom time")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Timezone")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Use device time zone" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Use an IANA timezone/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/New or reopened incidents still unresolved/)
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("combobox", { name: "Daily schedule" }));
+    await user.click(screen.getByRole("option", { name: "Custom schedule" }));
+    expect(screen.queryByText(summary)).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Custom time")).toHaveValue(schedule.time);
+    expect(screen.getByLabelText("Timezone")).toHaveValue(schedule.timezone);
+    expect(screen.getByRole("button", { name: "Use device time zone" })).toBeEnabled();
+    expect(screen.getByText(/New or reopened incidents still unresolved/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Custom time"), { target: { value: "10:31" } });
+    fireEvent.change(screen.getByLabelText("Timezone"), { target: { value: "UTC" } });
+
+    await user.click(screen.getByRole("combobox", { name: "Daily schedule" }));
+    await user.click(screen.getByRole("option", { name: "Use account schedule" }));
+    expect(screen.getByText(summary)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Custom time")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Timezone")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save notification settings" }));
+    await waitFor(() =>
+      expect(request).toHaveBeenLastCalledWith(
+        { audience, projectId: "project" },
+        "update",
+        expect.objectContaining({ daily: null })
+      )
+    );
+  }
+);
 it("supports selective, weekly, indefinite and custom pauses and resumes", async () => {
   const { NotificationPauseFields } =
     await import("../../../apps/web/src/components/system/notification-pause-fields.js");

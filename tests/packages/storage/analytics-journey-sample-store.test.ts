@@ -31,6 +31,38 @@ const sampleRow = {
 };
 
 describe("analytics journey sample store", () => {
+  it("counts only the opted-in first page using the retained-sample filters", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ ...sampleRow, total_count: "21" }] });
+    const store = createPostgresAnalyticsJourneySampleStore(createDb(query));
+    const input = {
+      project_id: PROJECT_ID,
+      limit: 10,
+      now: NOW,
+      service: "web",
+      environment: "production",
+      tag: "loop",
+      include_total: true
+    };
+    const first = await store.listAnalyticsJourneySamplesForProject(input);
+    expect(first.total_count).toBe(21);
+    expect(first.total_pages).toBe(3);
+    expect(query.mock.lastCall?.[0]).toContain("COUNT(*) OVER() AS total_count");
+    expect(query.mock.lastCall?.[0]).toContain("expires_at > $2::timestamptz");
+    expect(query.mock.lastCall?.[0]).toContain("has_artifact = true");
+    await store.listAnalyticsJourneySamplesForProject({
+      ...input,
+      cursor: { last_seen_at: NOW, sample_id: SAMPLE_ID }
+    });
+    expect(query.mock.lastCall?.[0]).not.toContain("COUNT(*) OVER()");
+    query.mockResolvedValue({ rows: [] });
+    expect(await store.listAnalyticsJourneySamplesForProject(input)).toMatchObject({
+      total_count: 0,
+      total_pages: 1
+    });
+    expect(
+      await store.listAnalyticsJourneySamplesForProject({ ...input, include_total: false })
+    ).not.toHaveProperty("total_count");
+  });
   it("reserves new retained sample metadata without updating existing rows", async (): Promise<void> => {
     const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
       expect(sqlText).toContain("INSERT INTO analytics_journey_samples");

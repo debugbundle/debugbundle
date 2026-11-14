@@ -549,7 +549,7 @@ describe("web page helper coverage", () => {
     expect(formatAlertCooldown(900)).toBe("15 minutes");
     expect(
       getSlackDestinationErrorMessage(new Error("slack_destination_in_use"), "delete")
-    ).toMatch(/weekly reports/i);
+    ).toMatch(/weekly project digests/i);
     expect(getSlackDestinationErrorMessage(new Error("slack_rate_limited"), "test")).toMatch(
       /slow down/i
     );

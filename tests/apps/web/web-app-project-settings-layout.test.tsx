@@ -39,7 +39,7 @@ describe("web app - project settings layout", () => {
       fetchMock.mock.calls.some(([request]) => requestUrl(request).includes(`project_id=${source}`))
     ).toBe(true);
   });
-  it("renders reusable collapsed settings sections and places weekly reports before project details", async () => {
+  it("renders reusable collapsed settings sections and places weekly digests before project details", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn((request: RequestInfo | URL, init?: RequestInit) => {
@@ -65,7 +65,7 @@ describe("web app - project settings layout", () => {
       "Capture rules",
       "Improvement bundles",
       "Product analytics",
-      "Weekly reports",
+      "Weekly project digest",
       "Notifications"
     ];
     const triggers = await Promise.all(
@@ -94,7 +94,7 @@ describe("web app - project settings layout", () => {
     });
     const weeklyReportsTrigger = triggers[4];
     if (weeklyReportsTrigger === undefined) {
-      throw new Error("Expected the Weekly reports settings section to be present.");
+      throw new Error("Expected the Weekly project digest settings section to be present.");
     }
     expect(
       weeklyReportsTrigger.compareDocumentPosition(projectDetails) &

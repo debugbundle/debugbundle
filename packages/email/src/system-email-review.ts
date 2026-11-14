@@ -410,10 +410,10 @@ export const SYSTEM_EMAIL_REVIEW_ENTRIES: readonly SystemEmailReviewEntry[] = [
   },
   {
     id: "weekly-report",
-    title: "Weekly report",
+    title: "Weekly project digest",
     category: "operational",
-    recipient: "Configured report channel recipient",
-    trigger: "Scheduled weekly-report delivery",
+    recipient: "Configured digest recipient",
+    trigger: "Scheduled weekly project digest delivery",
     requiredInV1: true,
     implementationStatus: "implemented",
     get preview() {

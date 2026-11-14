@@ -4,10 +4,50 @@ import {
   createAnalyticsBundleGeneration,
   createAnalyticsBundlesDependency,
   createAnalyticsOpportunitiesDependency,
+  createAnalyticsJourneySamplesDependency,
+  createJourneySample,
   createDependencies
 } from "../../helpers/analytics-route-fixtures.js";
 
 describe("analytics pagination compatibility", () => {
+  it.each(["bundles", "journey-samples"])(
+    "returns exact %s counts only for an opted-in first page",
+    async (resource) => {
+      const app = createDependencies({
+        analyticsBundles: createAnalyticsBundlesDependency({
+          listAnalyticsBundleGenerationsForProject: vi
+            .fn()
+            .mockResolvedValue({ bundles: [], next_cursor: null, total_pages: 3, total_count: 21 })
+        }),
+        analyticsJourneySamples: createAnalyticsJourneySamplesDependency({
+          listAnalyticsJourneySamplesForProject: vi.fn().mockResolvedValue({
+            samples: [createJourneySample()],
+            next_cursor: null,
+            total_pages: 3,
+            total_count: 21
+          })
+        })
+      });
+      for (const query of [
+        "",
+        "&include_total_count=false",
+        "&include_total_count=true",
+        `&include_total_count=true&cursor=${encodeURIComponent("2026-07-08T10:00:00.000Z|33333333-3333-4333-8333-333333333333")}`
+      ]) {
+        const response = await app.inject({
+          method: "GET",
+          url: `/v1/analytics/${resource}?project_id=${PROJECT_ID}${query}`,
+          headers: { authorization: "Bearer dbundle_mem_test_token" }
+        });
+        expect(response.statusCode).toBe(200);
+        if (query === "&include_total_count=true") {
+          expect(response.json().total_count).toBe(21);
+          expect(response.json().total_pages).toBe(3);
+        } else expect(response.json()).not.toHaveProperty("total_count");
+      }
+      await app.close();
+    }
+  );
   it("returns the exact opportunity count only for the new first-page count opt-in", async () => {
     const analyticsOpportunities = createAnalyticsOpportunitiesDependency({
       listAnalyticsOpportunitiesForProject: vi.fn().mockResolvedValue({
