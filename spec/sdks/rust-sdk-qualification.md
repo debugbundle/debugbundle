@@ -1,10 +1,18 @@
 # Rust SDK qualification and source baseline
 
-The 15 November [cross-SDK hook re-audit](before-send-budget-audit.md) adds a local,
-unpublished Rust correction for malformed evidence combined with byte overflow.
-Its shared corpus, ordinary source/packaged suites, coverage and extracted
-consumers pass. This does not supersede the immutable release records below or
-establish a new native-platform/registry release qualification.
+## Rust 1.0.2 — published 15 November 2026
+
+The [cross-SDK hook re-audit](before-send-budget-audit.md) and subsequent
+[deep audit](sdk-deep-audit-20261115.md) corrections are published in Rust 1.0.2.
+Source/tag `6a584c46e579585a0293345995dc9c0142af2493` passes all eight
+[qualification jobs](https://github.com/debugbundle/debugbundle-rust/actions/runs/43742036641).
+[Trusted publication and registry consumers](https://github.com/debugbundle/debugbundle-rust/actions/runs/43746276898)
+pass; public metadata, index and archive agree on SHA-256
+`f65d5da5b8b67f493a28899633609f9ea1838bbaf11794d5000c7edd9b0489c8`.
+The [coordinated SDK safety release](../sdk-safety-release-20261115.md) records
+all thirteen capture surfaces and completed core/site production acceptance.
+The earlier immutable releases and qualification checkpoints below remain
+historical evidence; they do not describe the current publication status.
 
 ## Stable 1.0.0 - published 14 November 2026
 
