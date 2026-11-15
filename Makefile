@@ -350,6 +350,13 @@ test-focused:
 	$(NODE_RUN) "apk add --no-cache git >/dev/null && corepack enable && corepack pnpm vitest run $(TEST_FILES)"
 
 .PHONY: sdk-documentation-check
+.PHONY: sdk-hook-budget-fixtures sdk-hook-budget-fixtures-check
+sdk-hook-budget-fixtures:
+	python3 scripts/sync-hook-budget-fixtures.py
+
+sdk-hook-budget-fixtures-check:
+	python3 scripts/sync-hook-budget-fixtures.py --check
+
 sdk-documentation-check:
 	$(NODE_RUN) "DEBUGBUNDLE_REQUIRE_SDK_DOCS=1 node_modules/.bin/vitest run tests/contracts/sdk-documentation.test.ts tests/contracts/rust-sdk-public-docs.test.ts"
 

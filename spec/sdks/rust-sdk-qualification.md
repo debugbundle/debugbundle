@@ -1,5 +1,11 @@
 # Rust SDK qualification and source baseline
 
+The 15 November [cross-SDK hook re-audit](before-send-budget-audit.md) adds a local,
+unpublished Rust correction for malformed evidence combined with byte overflow.
+Its shared corpus, ordinary source/packaged suites, coverage and extracted
+consumers pass. This does not supersede the immutable release records below or
+establish a new native-platform/registry release qualification.
+
 ## Stable 1.0.0 - published 14 November 2026
 
 Stable source `a522d78385f3a4ae332dab330399625b15e26fa9` and tag `v1.0.0`
@@ -164,11 +170,13 @@ recorded separately. The same published artifact now passes opted-in analytics,
 mixed debug/analytics batches, native beacon and declined-beacon keepalive through
 both relays. Current Rust candidate native execution/coverage and exact-crate
 consumers pass on Linux x64/arm64, macOS and Windows, as recorded in the execution
-record. The Rust audit is qualified; registry acceptance and the explicit
-cross-SDK owner-hook follow-up remain open. This is not a family-wide
-parity-complete claim.
+record. This paragraph records pre-publication qualification. Stable 1.0.0 registry
+acceptance is recorded at the top of this file. The cross-SDK owner-hook follow-up
+is locally complete in [the hook-budget audit](before-send-budget-audit.md), with
+the final ownership correction in [the deep audit](sdk-deep-audit-20261115.md).
+New corrected package publication remains a separate gate.
 
-| Surface and adapters/wrappers                                          | Applicability / implementation disposition                                                     | Regression evidence boundary                                                                        |
+| Surface and adapters/wrappers                                          | Applicability / implementation disposition                                               | Regression evidence boundary                                                                                          |
 | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | Node; maintained HTTP/framework adapters, loggers and full relays      | Existing evidence/privacy/wire semantics are baseline; shared parser/fixtures applicable | Existing JS core/Node contracts, native logger cases, relay and installed-package fixture consumers                   |
 | Browser; maintained framework adapters, direct/relay transports        | Shared reader/negotiation/privacy applicable; Rust relay is a new downstream path        | Current browser artifact → Axum and Actix, mixed debug/analytics, proof downgrade and no browser token                |

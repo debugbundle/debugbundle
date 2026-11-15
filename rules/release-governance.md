@@ -1,7 +1,7 @@
 # Release & Open-Source Governance — DebugBundle
 
 Version: v1
-Last updated: 2026-11-02
+Last updated: 2026-11-15
 
 ---
 
@@ -24,6 +24,39 @@ Report consumer adoption requirements without executing them. Disclose any
 unauthorized consumer action; do not compound it with an unapproved rollback or
 additional changes. These boundaries apply before every cross-repository or
 production mutation and take precedence over release-train follow-through.
+
+---
+
+## Package Release Eligibility
+
+Apply this gate before choosing versions, creating distribution tags/releases or
+dispatching package publication workflows, including for SDKs, CLI/MCP, shared
+libraries and developer plugins. For each distribution, record **Publish** or
+**Retain**, with the concrete reason in the release plan.
+
+- Publish only when shipped code or installed behaviour changes, or there is a
+  concrete distribution need: an installation/compatibility repair, required
+  security/license/signing metadata correction, or a necessary version-aligned
+  package-family/dependency change. Record the specific need; a changed file alone
+  is not a release justification.
+- README, setup-example, guide, blog, copy and formatting changes alone retain
+  existing official package versions and artifacts. Update repository documentation
+  and deploy the site when appropriate. A README being bundled in an immutable
+  published archive does not itself require a new package release; its refreshed
+  copy can ship with the next otherwise necessary release.
+- Executable skill/prompt instructions that change what an installed agent does
+  count as installed behaviour, even when the source file is Markdown. Ordinary
+  explanatory documentation does not.
+- Version constants, changelogs, release-only lockfile edits and dependency-pin
+  changes created solely to publish documentation do not establish eligibility.
+  Do not cascade wrapper, native or dogfooding dependency bumps merely to adopt
+  an upstream documentation-only patch. Retain compatible published dependencies
+  unless an actual installation or runtime need requires their replacement.
+- General instructions to "release everything" select all eligible changes;
+  they do not require publishing every repository with modified documentation.
+  Apply this gate before expanding the release train. Required compatibility
+  checks of retained published artifacts still apply; all normal qualification,
+  exact-artifact and registry-consumer gates remain mandatory for selected releases.
 
 ---
 
@@ -65,12 +98,13 @@ The public repository must contain these root-level files:
 4. Publish `@debugbundle/cli` to npm
 5. Smoke-test a clean install from the registry
 
-CLI package qualification must also verify the portable skill's exact CLI installer
-pin. Stage unpublished installer pins on a release branch until registry
-installation passes. A changed portable folder needs its own fresh ClawHub patch
-and post-publication security verification, even when a CLI change only corrects
-documentation. Retain unchanged MCP/plugin/developer versions only after checking
-their bundled artifacts; do not bypass a stale installer-pin test.
+An eligible CLI package release must also verify the portable skill's exact CLI
+installer pin. Stage unpublished installer pins on a release branch until registry
+installation passes. A required change to the portable skill's installer pin or
+installed instructions needs its own fresh ClawHub patch and post-publication
+security verification. Ordinary README corrections do not trigger CLI or skill
+releases. Retain unchanged MCP/plugin/developer versions after checking applicable
+compatibility; do not bypass a stale installer-pin test for a selected release.
 
 **release-mcp-package.yml** — Runs on `mcp-v*` tags or manual dispatch:
 
@@ -121,7 +155,7 @@ Public CI must NEVER contain deployment config, cloud credentials, or infrastruc
 
 ### Codex Developer Plugin
 
-The repository marketplace at `.agents/plugins/marketplace.json` distributes `plugins/debugbundle-codex` with independent plugin semver and an exact published `@debugbundle/mcp` pin. Keep its MCP config, package README, public Codex guide, and package contract test aligned when releasing MCP. Changes to the package or its pinned dependency require a plugin version/changelog update. `make codex-plugin-check` preserves existing client contracts; `make codex-plugin-smoke` builds and tests the candidate tarball through a pinned real Codex client in a disposable container with local synthetic auth and no model turn or customer API call.
+The repository marketplace at `.agents/plugins/marketplace.json` distributes `plugins/debugbundle-codex` with independent plugin semver and an exact published `@debugbundle/mcp` pin. Keep its MCP config, package README, public Codex guide, and package contract test aligned when releasing MCP. Changes that meet the package release eligibility gate require a plugin version/changelog update; ordinary documentation changes retain the published version. `make codex-plugin-check` preserves existing client contracts; `make codex-plugin-smoke` builds and tests the candidate tarball through a pinned real Codex client in a disposable container with local synthetic auth and no model turn or customer API call.
 
 `make codex-plugin-smoke-published` repeats the clean native-client test against the exact MCP version in `apps/mcp/package.json` after publication, independently of the older marketplace pin. It updates only the disposable test marketplace; public GitHub installation tests must retain the real published marketplace pin. The MCP release workflow gates publication on the candidate test and checks the registry artifact afterward. Publish MCP 1.9.0 before advertising this initial plugin, then complete the existing MCP ecosystem follow-through below.
 
@@ -204,7 +238,7 @@ Any SDK or package published to an external registry must satisfy these minimum 
 
 Every standalone SDK repository must adopt the same release-hardening pattern before it counts as release-ready:
 
-1. Package-level documentation must be shipped inside the published artifact and must cover configuration source precedence, runtime support labels, install examples for every claimed setup mode, service naming guidance, safe startup/status semantics, and first-event verification.
+1. At each eligible package release, documentation must be shipped inside the published artifact and must cover configuration source precedence, runtime support labels, install examples for every claimed setup mode, service naming guidance, safe startup/status semantics, and first-event verification. This artifact requirement does not trigger documentation-only releases.
 2. Release workflows must validate the staged artifact before publish and rerun an application-driven clean-install smoke from the target registry after publish.
 3. Any package family that is documented as version-aligned must publish as one coherent family and must avoid mixed-version public snippets.
 4. New SDK plans in `spec/sdks/*.md` must describe their release workflow, clean-install smoke path, and publish-time compatibility matrix before implementation starts.
@@ -249,7 +283,12 @@ package releases remain separately qualified.
 
 ### V1 Release Train Order
 
-The V1 release train must publish dependency roots before dependent wrappers. Do not publish a package that embeds, pins, wraps, or documents another DebugBundle package until that prerequisite version is visible from the target registry and its published-artifact smoke has passed.
+Apply the package release eligibility gate first; only selected distributions
+participate in this order. Retain other published versions. The V1 release train
+must publish dependency roots before dependent wrappers. Do not publish a package
+that embeds, pins, wraps, or documents another DebugBundle package until that
+prerequisite version is visible from the target registry and its published-artifact
+smoke has passed.
 
 1. Publish core-owned shared JS packages from `debugbundle/debugbundle`: `@debugbundle/shared-types` and `@debugbundle/redaction`.
 2. Publish the JS SDK family from `debugbundle/debugbundle-js`: `@debugbundle/sdk-node` and `@debugbundle/sdk-browser` at the same version, after the matching shared-package version is already on npm.
@@ -260,8 +299,9 @@ The V1 release train must publish dependency roots before dependent wrappers. Do
 7. Update the Claude Code catalog, plugin manifest, and pinned MCP install command only after that npm MCP version is published and its registry smoke passes. Source package release candidates must not make marketplace installs resolve an unpublished version.
 8. Create the canonical core GitHub release after package-specific release workflows and registry smoke checks are green.
 
-Rust participates whenever its publishable source or packaged documentation changes:
-choose its independent version, qualify the exact archive and publish it through
+Rust participates when a change meets the package release eligibility gate;
+README or packaged-documentation changes alone retain its current version.
+For an eligible release, choose its independent version, qualify the exact archive and publish it through
 `debugbundle-rust/release.yml` before advertising that version. Record the selected
 stable version in `sdks.json` under `releases.rust`; unchanged Rust releases retain
 their current version. `make rust-release-check` and the canonical core workflow
@@ -271,7 +311,11 @@ independent version and repository; core pushes never implicitly publish a crate
 
 ### Internal Dogfooding Version Touchpoints
 
-Our own source-deployed surfaces intentionally dogfood the published JS packages instead of workspace-linking them implicitly. After a successful registry publish, bump these manifests in the same release-prep slice before hosted validation:
+Our own source-deployed surfaces intentionally dogfood the published JS packages
+instead of workspace-linking them implicitly. When a surface needs a newly
+published dependency for an eligible code/compatibility change, update its manifest
+in the same release-prep slice before hosted validation. An upstream documentation-only
+patch does not require dependency adoption or another release. Applicable manifests:
 
 - Root `package.json`: `@debugbundle/shared-types`, `@debugbundle/redaction`, `@debugbundle/sdk-node`
 - Hosted app `apps/web/package.json`: `@debugbundle/sdk-browser`

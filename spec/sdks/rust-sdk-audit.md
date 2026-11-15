@@ -17,7 +17,9 @@ Only Rust SDK source was committed/pushed, under the existing approval.
 passed all eight jobs. All seventeen findings have remediation and verification
 evidence. The last correction adds manual-capture regression fixtures; production
 Rust bytes are unchanged from `072cc5f`. Core/spec/site changes remain local.
-The cross-SDK owner-hook follow-up below remains separate and unverified.
+The cross-SDK owner-hook follow-up was separate and unverified at this Rust
+checkpoint. Its later local fixes and qualification are recorded in the
+[15 November cross-SDK audit](before-send-budget-audit.md).
 
 ## Scope and method
 
@@ -297,14 +299,24 @@ with all 54 native production modules above their unchanged floor.
 
 ### Cross-SDK follow-up from the combined-budget review
 
-The owner-hook budget case applies across maintained SDKs. Source review found
+**15 November follow-up:** the suspected fallback was reproduced and corrected
+across the affected maintained hook owners, with packaged WordPress and native
+bridge checks. Rust already handled valid overflow, but the requested second
+audit also found malformed-plus-oversized evidence could bypass invalid-return
+fallback. Rust now carries that additional correction and the same shared corpus.
+See the [complete local audit](before-send-budget-audit.md)
+for per-SDK changes, shared byte-boundary regressions and release limitations.
+These changes are local; no other SDK publication or consumer adoption is implied.
+
+At the original Rust checkpoint, source review found
 similar "semantic rejection returns the protected original" paths in Go
 (`before_send.go` + `internal/evidence/wire.go`) and .NET (`BeforeSendProcessor.cs`
 + `EvidenceWire.cs`), and identified the corresponding Node/Browser, Python, PHP,
 Ruby, Java, Android, Swift and React Native hook owners. WordPress inherits its
-bundled PHP/Browser boundaries. These source paths need separate runtime
-reproduction and qualification; they are not verified equivalent to the Rust fix.
-No other SDK repository was changed, and no family-wide parity closure is claimed.
+bundled PHP/Browser boundaries. These source paths needed separate runtime
+reproduction and qualification; they were not then verified equivalent to the Rust fix.
+No other SDK repository was changed during that Rust task, and that checkpoint
+did not claim family-wide parity closure.
 The Rust scope includes the core and both framework/relay adapters, all of which
 use the corrected wire/hook owners. This follow-up does not represent an observed
 production incident or a Rust-induced regression in those unchanged repositories.

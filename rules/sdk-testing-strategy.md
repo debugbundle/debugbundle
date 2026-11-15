@@ -1,7 +1,7 @@
 # SDK Testing Strategy — DebugBundle
 
 Version: v1
-Last updated: 2026-05-28
+Last updated: 2026-11-15
 
 ---
 
@@ -17,28 +17,30 @@ Each SDK is tested **independently in its own repository**. SDKs do not depend o
 
 Every SDK must unit-test the following behaviors by **mocking the HTTP transport** (no real network calls):
 
-| Category | What to test |
-|----------|-------------|
-| Initialization | Valid config initializes; invalid/missing config degrades silently (no crash) |
-| Universal interface | All 9 methods present and callable: `init`, `captureException`, `captureError`, `captureLog`, `captureRequest`, `captureMessage`, `setContext`, `flush`, `probe` |
-| Batching | Events accumulate up to `batchSize`; flush triggers on interval or explicit `flush()` |
-| Deduplication | Same error within suppression window is not sent twice |
-| Loop protection | SDK errors do not trigger recursive capture |
-| Redaction | Default and custom sensitive fields are scrubbed before send |
-| Retry + backoff | 429/5xx → bounded retry with exponential backoff; 4xx (non-429) → drop |
-| Safe degradation | Network timeout → buffer, no crash; invalid server response → ignore |
-| Event envelope shape | Emitted envelopes conform to the `EventEnvelope` schema from `contracts/data-schemas.md`, with arbitrary app context only in envelope `context` and strict event-type payloads |
-| Vanilla hooks | Language-native error/exception hooks capture correctly |
-| Log capture | Logger integration captures at configured level; auto-detection works |
-| Framework integrations | Middleware/handlers capture request metadata, unhandled errors, response status |
-| Browser relay handlers | Server SDK relay handlers validate origin, content type, body size, event type, trust fields, rate limits, local-only file writes, connected durable spool, connected cloud forwarding, and credential isolation per `contracts/sdk-interface.md` §13 |
-| Mobile lifecycle and trace | Android/iOS SDKs capture lifecycle breadcrumbs, inject `X-DebugBundle-Trace-Id` only through explicit native HTTP instrumentation, and preserve trace IDs in event envelopes per `contracts/sdk-interface.md` §10.1 |
-| Mobile offline queue | Android/iOS SDKs redact before queue persistence, preserve original capture timestamps, enforce queue size/TTL bounds, survive app restart, and retry on connectivity restoration |
-| Probes | Always-on probe buffers in ring buffer, flushes with errors; heavy probe dormant until remote activation |
-| Config refresh (paid tiers) | Backend SDKs poll `/v1/sdk/config`; browser/mobile SDKs use session-start checks plus ingestion-response piggybacking; all cache with ETag/304 where applicable and deactivate expired remote probes |
-| Capture policy | Respects `GET /v1/sdk/config` capture-policy directives (mode, overrides) per `contracts/sdk-interface.md` §12 |
+| Category                    | What to test                                                                                                                                                                                                                                          |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Initialization              | Valid config initializes; invalid/missing config degrades silently (no crash)                                                                                                                                                                         |
+| Universal interface         | All 9 methods present and callable: `init`, `captureException`, `captureError`, `captureLog`, `captureRequest`, `captureMessage`, `setContext`, `flush`, `probe`                                                                                      |
+| Batching                    | Events accumulate up to `batchSize`; flush triggers on interval or explicit `flush()`                                                                                                                                                                 |
+| Deduplication               | Same error within suppression window is not sent twice                                                                                                                                                                                                |
+| Loop protection             | SDK errors and internal diagnostic output do not trigger recursive capture; assert no unexpected outbound request or transported internal event                                                                                                       |
+| Internal diagnostics        | Optional sinks contain throws, native Promise rejection, hostile error formatting and storage failure; honour custom privacy fields and byte/rate/worker bounds; test stalled callbacks, reinitialisation/disposal and unrelated application logs     |
+| Redaction                   | Default and custom sensitive fields are scrubbed before send                                                                                                                                                                                          |
+| Retry + backoff             | 429/5xx → bounded retry with exponential backoff; 4xx (non-429) → drop                                                                                                                                                                                |
+| Safe degradation            | Network timeout → buffer, no crash; invalid server response → ignore                                                                                                                                                                                  |
+| Event envelope shape        | Emitted envelopes conform to the `EventEnvelope` schema from `contracts/data-schemas.md`, with arbitrary app context only in envelope `context` and strict event-type payloads                                                                        |
+| Vanilla hooks               | Language-native error/exception hooks capture correctly                                                                                                                                                                                               |
+| Log capture                 | Logger integration captures at configured level; auto-detection works                                                                                                                                                                                 |
+| Framework integrations      | Middleware/handlers capture request metadata, unhandled errors, response status                                                                                                                                                                       |
+| Browser relay handlers      | Server SDK relay handlers validate origin, content type, body size, event type, trust fields, rate limits, local-only file writes, connected durable spool, connected cloud forwarding, and credential isolation per `contracts/sdk-interface.md` §13 |
+| Mobile lifecycle and trace  | Android/iOS SDKs capture lifecycle breadcrumbs, inject `X-DebugBundle-Trace-Id` only through explicit native HTTP instrumentation, and preserve trace IDs in event envelopes per `contracts/sdk-interface.md` §10.1                                   |
+| Mobile offline queue        | Android/iOS SDKs redact before queue persistence, preserve original capture timestamps, enforce queue size/TTL bounds, survive app restart, and retry on connectivity restoration                                                                     |
+| Probes                      | Always-on probe buffers in ring buffer, flushes with errors; heavy probe dormant until remote activation                                                                                                                                              |
+| Config refresh (paid tiers) | Backend SDKs poll `/v1/sdk/config`; browser/mobile SDKs use session-start checks plus ingestion-response piggybacking; all cache with ETag/304 where applicable and deactivate expired remote probes                                                  |
+| Capture policy              | Respects `GET /v1/sdk/config` capture-policy directives (mode, overrides) per `contracts/sdk-interface.md` §12                                                                                                                                        |
 
 **Transport mock pattern:** Each SDK should provide a test utility that intercepts outbound HTTP calls and captures the payloads for assertion. Examples:
+
 - **JS:** Replace `fetch`/`http.request` with a spy
 - **Python:** `unittest.mock.patch` on `requests.Session.post` or `httpx.Client.post`
 - **PHP:** Guzzle mock handler stack
@@ -91,16 +93,16 @@ Every SDK release must include at least one minimal application-level smoke test
 
 ## 3. Test Runner Per Language
 
-| Language | Runner | Coverage tool |
-|----------|--------|--------------|
-| TypeScript (JS SDK monorepo) | Vitest | V8 via vitest |
-| Python | pytest | coverage.py / pytest-cov |
-| PHP | PHPUnit | Xdebug / PCOV |
-| Go | `go test` | `go test -cover` |
-| Ruby | RSpec | SimpleCov |
-| Rust | `cargo test`, extracted-crate framework/relay consumers, bounded sanitizer fuzzing | `cargo llvm-cov`, per-file Linux/macOS/Windows gates |
-| Kotlin Android | JUnit, Robolectric, Android instrumented tests | JaCoCo / Gradle coverage |
-| Swift iOS | XCTest or Swift Testing plus simulator tests | Xcode coverage / SwiftPM coverage where available |
+| Language                     | Runner                                                                             | Coverage tool                                        |
+| ---------------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| TypeScript (JS SDK monorepo) | Vitest                                                                             | V8 via vitest                                        |
+| Python                       | pytest                                                                             | coverage.py / pytest-cov                             |
+| PHP                          | PHPUnit                                                                            | Xdebug / PCOV                                        |
+| Go                           | `go test`                                                                          | `go test -cover`                                     |
+| Ruby                         | RSpec                                                                              | SimpleCov                                            |
+| Rust                         | `cargo test`, extracted-crate framework/relay consumers, bounded sanitizer fuzzing | `cargo llvm-cov`, per-file Linux/macOS/Windows gates |
+| Kotlin Android               | JUnit, Robolectric, Android instrumented tests                                     | JaCoCo / Gradle coverage                             |
+| Swift iOS                    | XCTest or Swift Testing plus simulator tests                                       | Xcode coverage / SwiftPM coverage where available    |
 
 ---
 
@@ -143,11 +145,11 @@ These gates are cross-SDK requirements. Language-specific plans may add stricter
 
 The core monorepo publishes golden fixtures that SDK repos can consume:
 
-| Fixture | Location | Purpose |
-|---------|----------|---------|
-| Example event envelopes | `examples/bundle.failure.json`, `examples/bundle.improvement.json` | Reference payloads for schema validation |
-| Event envelope JSON Schema | Published at `/schemas/bundle.json` on the public site | Machine-readable schema for envelope validation |
-| Webhook event payloads | Published at `/schemas/webhook-events.json` | Reference for SDK-generated events that trigger webhooks |
+| Fixture                    | Location                                                           | Purpose                                                  |
+| -------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------- |
+| Example event envelopes    | `examples/bundle.failure.json`, `examples/bundle.improvement.json` | Reference payloads for schema validation                 |
+| Event envelope JSON Schema | Published at `/schemas/bundle.json` on the public site             | Machine-readable schema for envelope validation          |
+| Webhook event payloads     | Published at `/schemas/webhook-events.json`                        | Reference for SDK-generated events that trigger webhooks |
 
 SDK repos can fetch these from the public site URL or vendor them as test fixtures.
 

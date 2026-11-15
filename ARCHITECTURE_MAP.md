@@ -1,7 +1,23 @@
+SDK diagnostic ownership: Node `internal-diagnostics.ts` owns scoped suppression, sanitisation and emission bounds; Browser `internal-diagnostics.ts` owns contained console warnings and breadcrumb suppression; Python `internal_diagnostics.py` owns one bounded callback lane. Go `debugbundle.go`, Swift `DebugBundleInternalDiagnostic.swift` and WordPress `Diagnostics.php` own local status codes/storage. Console wrappers preserve native return values for diagnostic Promise handling; WordPress shares its native nonce fields through `Sanitization::REDACT_FIELDS`. No additional diagnostic sender exists. Cross-SDK qualification lives in `spec/sdks/internal-diagnostics-audit.md`.
+
+SDK hook size handling belongs to each SDK's `beforeSend` owner and evidence
+helpers. `scripts/sync-hook-budget-fixtures.py` vendors the same boundary corpus;
+`tests/contracts/sdk-hook-budget.test.ts` verifies it against strict receiving
+schemas. Hook-only budget checks retain all other shape and topology refinements;
+ordinary receiving validators enforce every byte limit. Framework adapters reuse
+those owners; WordPress packages PHP/Browser
+and React Native forwards the protected result through its native carriers.
+Applicability and qualification: `spec/sdks/before-send-budget-audit.md`.
+
 SDK documentation consistency is enforced by `tests/contracts/sdk-documentation.test.ts` and `make sdk-documentation-check`. Core owns the shared contract and public README; `site/` owns homepage and guide content, and `sdks/` contains independent package READMEs. Site CI supplies its checkout; the strict local gate requires all maintained SDK checkouts. Applicability and evidence: `spec/sdk-documentation-alignment.md`.
 
 The strict local documentation gate also reads each SDK's package manifest to
 validate public current-release labels; runtime and registry acceptance stay separate.
+
+`rules/release-governance.md#package-release-eligibility` owns package release
+selection before versioning or workflow dispatch. `AGENTS.md` makes that check
+mandatory; README/docs/example-only updates retain official versions and do not
+trigger wrapper or dependency release cascades.
 
 MCP ecosystem verification owns exact-version ClawScan security acceptance and
 separate discovery checks. Its report preserves findings and ClawHub's verified
@@ -738,7 +754,7 @@ rejected nested calls cannot clear their caller's recursion/suppression state.
 Rust wire protection reduces optional evidence at the combined serialized budget
 before dropping a valid primary or restoring owner-removed hook content. Capture
 and both relay adapters share that helper; ingress validation remains strict.
-Comparable owner-hook budget paths in other SDKs require separate runtime follow-up.
+The cross-SDK hook-budget follow-up is qualified in `spec/sdks/before-send-budget-audit.md`. Rust rejects unavailable whole-event ownership validation before optional reduction; the deep audit is recorded in `spec/sdks/sdk-deep-audit-20261115.md`.
 
 Rust work is recorded in [the implementation plan](spec/sdks/rust-sdk.md)
 and [qualification matrix](spec/sdks/rust-sdk-qualification.md): one standalone

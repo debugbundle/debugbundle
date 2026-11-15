@@ -6,6 +6,18 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.27.2] - 2026-11-15
+
+- Adopt the corrected Node/Browser 3.2.4 SDKs in DebugBundle's hosted runtime
+  and app. Preserve application hook redaction during optional-evidence overflow,
+  complete malformed-return validation and contain sanitised local diagnostics.
+- Qualify all thirteen maintained SDK/plugin surfaces and publish their eligible
+  independent fixes, with native roots preceding React Native and PHP/Browser
+  preceding WordPress. Python 3.0.0 explicitly versions the optional diagnostic
+  callback timing change and supplies a migration guide.
+- Align public SDK safety guidance, current install versions and audit evidence.
+  Core APIs, event schemas, persisted data and configuration remain compatible.
+
 ## [1.27.1] - 2026-11-15
 
 - Standardise SDK installation and initialization examples, catalogue order and

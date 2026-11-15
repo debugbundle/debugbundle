@@ -210,6 +210,7 @@ Project tokens → SDK write-only (ingestion). Member tokens → CLI/API/MCP rea
 
 ## 9) Git and Safety Rules
 
+- Before planning any package release, follow [package release eligibility](rules/release-governance.md#package-release-eligibility). README/docs/example-only changes do not justify official package version bumps, tags or publication. Record each distribution as Publish or Retain with an actual code/installed-behaviour change or concrete distribution necessity; "release everything" does not override this gate.
 - Never commit, push, publish, or deploy unless the user explicitly requests that action for the current changes. A fix/revert request or approval for an earlier release is not authorization.
 - Never revert unrelated local changes.
 - Never use destructive git commands unless explicitly requested.

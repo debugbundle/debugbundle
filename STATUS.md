@@ -1,3 +1,44 @@
+SDK internal diagnostics remediation is implemented locally for Node, Browser,
+Python, Go, Swift and WordPress. All 13 SDK/plugin surfaces are evaluated, with
+React Native native integration qualified against the corrected Swift candidate.
+Permanent regressions and final-audit evidence: `spec/sdks/internal-diagnostics-qualification.md`.
+The deep final audit found and corrected console Promise forwarding, Swift credential-shaped
+codes, WordPress nonce privacy and Rust unavailable-validation reduction. Final evidence
+and release boundaries are in [deep final audit](spec/sdks/sdk-deep-audit-20261115.md). No new registry release,
+hosted deployment or consumer adoption is implied.
+Public SDK safety guidance and historical audit status are reconciled. The 51
+SDK documentation checks, 98 site tests, isolated site build/typecheck and exported
+page/link/search checks pass; SDK source identities remain unchanged.
+
+# 15 November SDK hook budget correction — local qualification complete
+
+The suspected Go/.NET `beforeSend` fallback is reproduced and fixed across all
+affected maintained hook owners. Combined optional-evidence overflow now preserves
+the owner's replacement primary, removes optional evidence and its typed reference,
+and records the existing limit marker. The 26-case shared corpus checks exact
+32 KiB boundaries, escaped UTF-8, typed/legacy references, mixed evidence fields,
+and malformed inputs both below and above the limit. The requested second audit
+found and fixed malformed-plus-oversized fallback in ten hook owners, including
+Rust; Node and Browser already rejected these combined failures. Malformed
+context also remains invalid during evidence reduction.
+
+All affected SDK quality gates and installed-package checks pass. Native Android,
+Swift and React Native bridge checks pass; Swift's exact source consumers pass on
+the iOS 15 simulator. The staged WordPress ZIP passes PHP and browser hook overflow
+and invalid-return checks using corrected local SDK archives. The initial hook-budget
+qualification passed 182 Rust tests; the deep audit raises this to 183. Its 53-module coverage and extracted standalone/Axum/Actix consumers pass.
+Core's 27 budget-contract tests, 51 strict documentation checks, lint and typecheck
+pass. Go's direct reducer tests close its package coverage gap. Java's evidence
+test now mocks configuration discovery as well as ingestion, retaining every
+assertion; its full suite and installed smoke pass. Rust's local package target
+selects the current version's archive without deleting older candidates.
+The [audit](spec/sdks/before-send-budget-audit.md) records scope, implementation owners,
+receipts and the limits of this local qualification.
+
+These changes are uncommitted and unpublished. No consumer product or existing
+WordPress site was changed. Independent SDK releases and a WordPress package that
+bundles them are still required before existing installations can receive the fix.
+
 # 15 November documentation patch release — evidence index
 
 The Owner authorised publication of all pending DebugBundle work using patch

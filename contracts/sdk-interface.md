@@ -71,6 +71,7 @@ Rules:
 - If the hook throws, panics, or returns an invalid event, the SDK must keep the SDK-owned original event, emit only a bounded internal diagnostic where supported, and must not throw into host code.
 - The SDK-owned original is already sanitized. Every valid returned event must pass mandatory sanitization and complete canonical schema validation again before policy evaluation, buffering, persistence, or transmission. Failure of mandatory sanitization withholds the unsafe field or event without throwing into host code.
 - If a valid replacement cannot fit transport or ownership budgets after reducing optional SDK evidence, withhold it rather than restoring pre-hook content. A budget limit must not undo application redaction or suppression.
+- The combined 32 KiB exception-evidence limit counts UTF-8 JSON field names, wrappers, escaping and any valid typed reference. Aggregate overflow alone is not an invalid hook return: reduce optional exception evidence before fallback validation, preserve the replacement primary and ordinary custom context, omit its related typed reference, and record `context.evidence_limits`. Reduction must first preserve complete shape, scalar, event-kind and graph-topology validation; malformed optional evidence is not made valid by exceeding the aggregate limit. Keep strict receiving validation and existing malformed-return fallback. See [the cross-SDK qualification](../spec/sdks/before-send-budget-audit.md).
 - Mutating the hook input without returning a valid replacement must not mutate the SDK-owned original.
 - Hardened hook execution must not run application callbacks inline on request/response or logger capture calls. Node, browser and React Native hooks are deferred until capture returns on their JavaScript event loop: arbitrary closures cannot be isolated without breaking application state access, so application callbacks must return promptly and can delay that event loop if they block. This explicit JavaScript callback responsibility does not relax SDK queue, network, or overload bounds. Published legacy synchronous behavior remains version-specific until migrated.
 - Fatal signal handlers, hard-crash handlers, and shutdown paths may skip application hook execution when invoking user code is unsafe. Each affected SDK must document the restriction; replayed crash events use the normal hook pipeline when safe.
@@ -89,6 +90,21 @@ The Node.js SDK resolves its default transport from `projectMode` plus the confi
 | `connected`   | `staging`, `production` | HTTP transport to the configured ingestion endpoint                                                                                                          |
 
 Node file transport writes one batch per file using atomic temp-file + rename with the filename format `<timestamp>-<sequence>-<service>.events.json` so concurrent local services can write safely into the same events directory.
+
+### 1.3 Optional internal diagnostics
+
+SDK failures never initiate an undisclosed maintainer-reporting channel or recursively enter application event capture. Supported diagnostics are local/operator-controlled, optional and disabled unless configured, except existing local status snapshots and Browser authentication/acknowledgement console warnings. Silent implementations need no new diagnostic API. Application `diagnostic_context` evidence, configured ingestion/configuration requests, relay forwarding and explicit operator test events retain their separate contracts.
+
+Diagnostic preparation, arbitrary error formatting, callback throws/rejections and local storage failures must be contained. Apply mandatory privacy plus configured sensitive fields before retention or callback output. Prefer fixed protocol codes over unsafe error detail. Bound retained bytes and emission work; diagnostic output must not affect hook replacement/drop/fallback, sampling, ACK decisions, retry ownership or normal application logger results.
+
+- Node retains synchronous diagnostic invocation and suppresses capture in its diagnostic callback's asynchronous context, across clients. It consumes native Promise rejections without awaiting them, permits at most one unsettled diagnostic Promise per client configuration, uses no diagnostic worker or outbound transport, emits at most ten diagnostics per client configuration per rolling-start 60-second window and omits metadata over 4 KiB of UTF-8 JSON. Callback code must return promptly under the existing JavaScript event-loop responsibility.
+- Browser retains its existing local authentication/acknowledgement console warnings. Warnings pass mandatory/custom sanitisation, use bounded protocol codes and at most five rejection reasons, and cannot enter SDK breadcrumbs or capture during synchronous console output. Custom console return values remain observable through console capture wrappers. Deduplication and output are capped at ten warnings per 60-second window; console throws and native Promise rejection are contained, with at most one pending console Promise per client.
+- Python invokes configured diagnostic callbacks outside SDK locks on at most one daemon lane per client, with one pending diagnostic, at most ten admitted diagnostics per 60-second window and at most 4 KiB UTF-8 JSON per diagnostic. Delivery/flush does not wait for diagnostics. A stalled callback retains its lane across reinitialisation; there is no replacement worker. Reinitialisation/disposal clears queued work; an already running callback may finish. Idle workers exit. Capture from the diagnostic callback context is suppressed. Native coroutine returns are closed without execution; callbacks have a synchronous return contract.
+- Go retains its existing public `Diagnostics() []string` snapshot and 100-entry cap, with fixed SDK failure codes instead of invoking arbitrary error renderers.
+- Swift retains its existing single internal status snapshot. ACK reasons retained there are at most 64 ASCII protocol-code bytes; unsafe/free-text reasons become `unknown_rejection`. Delivery decisions still use the original reason.
+- WordPress retains its existing admin diagnostic keys and seven-day transient TTL. Values pass mandatory sanitisation before the 500-byte UTF-8 retention limit; inputs over 4 KiB are replaced by a safe marker. Existing stored diagnostics receive the same sanitisation at read time without rewriting data; failed reads return an empty status. Failed or reentrant diagnostic writes are best effort and cannot escape the SDK error handler.
+
+Browser suppression does not follow asynchronous work explicitly started by a custom application console; there is no portable browser async-context guard. These are SDK output/recapture guarantees, not control of arbitrary I/O or unrelated threads that application callbacks explicitly create. No public event schema or successful capture/ACK meaning changes. The [cross-SDK diagnostics record](../spec/sdks/internal-diagnostics-audit.md) owns applicability, failure injection and installed-artifact evidence.
 
 ## 1.1 Required Volume-Control Behavior
 
@@ -929,10 +945,10 @@ Framework integrations must auto-register log capture alongside error/request ca
 
 ### V1 SDK Targets (Wave 2 — Enterprise & Platform Depth)
 
-| Language        | Package                                             | Registry      | Status          |
-| --------------- | --------------------------------------------------- | ------------- | --------------- |
-| C#              | `DebugBundle.Sdk` plus `DebugBundle.*` integrations | NuGet         | Released v1.3.0 |
-| Kotlin (server) | `com.debugbundle:debugbundle-kotlin`                | Maven Central | Planned         |
+| Language        | Package                                             | Registry      | Status                |
+| --------------- | --------------------------------------------------- | ------------- | --------------------- |
+| C#              | `DebugBundle.Sdk` plus `DebugBundle.*` integrations | NuGet         | Released v1.3.0       |
+| Kotlin (server) | `com.debugbundle:debugbundle-kotlin`                | Maven Central | Planned               |
 | Rust            | `debugbundle`                                       | crates.io     | Unpublished candidate |
 
 ### V1 SDK Targets (Wave 3 — Client & Mobile Expansion)

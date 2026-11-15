@@ -1,7 +1,23 @@
+The SDK deep final audit also closes console Promise forwarding, Swift credential-shaped diagnostic codes, WordPress nonce privacy and Rust unvalidated optional reduction. Evidence and remaining publication gates: `spec/sdks/sdk-deep-audit-20261115.md`.
+
+SDK internal diagnostics are optional local output with no hidden reporting channel. Node scopes callback recapture suppression; Browser contains its existing local console warnings; Python dispatches diagnostics on one bounded lane outside SDK locks; Go stores fixed codes, Swift safe ACK codes and WordPress sanitised best-effort status transients. See `spec/sdks/internal-diagnostics-audit.md` for remediation and release qualification.
+
+SDK hook budget correction: local `beforeSend` owners reduce oversized optional
+exception evidence before invalid-return fallback, preserving application redaction.
+The family audit and exact byte-boundary fixtures are recorded in
+`spec/sdks/before-send-budget-audit.md`. The second audit also preserves malformed
+evidence fallback during overflow, including Rust, using the shared corpus in
+every hook owner. SDK and wrapper releases remain separate from qualification.
+
 SDK documentation follows the shared install/initialize/integrations/verification/configuration flow in `contracts/sdk-interface.md` §14. The main README and homepage cover all 13 capture surfaces, with native setup and client lifetime differences retained. See `spec/sdk-documentation-alignment.md` for scope and local verification; this documentation work does not change runtime APIs or establish publication.
 
 Public current-release labels are checked against each SDK's package manifest by
 the strict local documentation gate; historical qualification versions stay intact.
+
+Package release planning follows [release eligibility](rules/release-governance.md#package-release-eligibility):
+retain versions for README/docs/example-only changes. Publish only for changed
+shipped behaviour or a concrete distribution need; avoid documentation-driven
+wrapper and dependency version cascades.
 
 MCP ecosystem security verifies exact-version clean ClawScan audits and final
 reviews, with clean skill moderation. ClawHub's verified VirusTotal retirement is

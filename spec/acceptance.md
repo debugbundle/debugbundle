@@ -32,7 +32,17 @@ remains explicitly deferred.
 - **Given** a running Node.js application with the SDK
 - **When** the DebugBundle SDK encounters an internal error
 - **Then** the host application continues running without disruption
-- **And** the SDK logs an internal diagnostic
+- **And** supported optional diagnostics stay local/operator-controlled, sanitised, bounded and contained; diagnostics are not required or enabled by default
+
+### AC-SDK-02a: Internal Diagnostic Containment
+
+- **Given** any maintained SDK, adapter, relay, wrapper or native bridge
+- **When** a hook, transport, configuration callback, diagnostic callback, error renderer or diagnostic storage operation fails
+- **Then** SDK failure does not initiate a hidden reporting request or recursively create application events
+- **And** diagnostic throws/rejected native Promises, sensitive custom fields, oversized detail, recursive logger output and storage failure are contained
+- **And** no diagnostic callback runs under an SDK capture/delivery lock; stalled diagnostic work does not cause replacement workers or unbounded retention
+- **And** normal application logs, safe-original hook fallback, valid replacements/drops, mandatory privacy, ACK decisions and retry ownership retain their contracts
+- **And** unchanged silent SDKs remain silent; installed WordPress and React Native distributions exercise their applicable native/wrapper paths
 
 ### AC-SDK-03: Browser SDK Capture
 
@@ -240,6 +250,7 @@ Native logger level/silent/processor filtering runs before SDK capture; enabled-
 - **And** local capture-policy evaluation, capture rules, sampling, duplicate suppression, and persistence have not yet run
 - **And** returning a valid event ships that event
 - **And** returning `null` drops the event locally
+- **And** optional evidence that fits exactly 32 KiB is retained; one byte over is reduced before fallback, preserving the hook's primary fields, custom context and mandatory post-hook privacy. Count escaped/multibyte JSON and typed references; preserve unrelated legacy reference values. Malformed replacements retain the isolated original even when their optional evidence also exceeds the byte budget: validate field shapes, scalar limits, allowed event kinds and graph topology before reduction. Unreducible valid replacements are withheld. Exercise the shared `before-send-budget.json` corpus through every hook owner and check packaged WordPress and React Native carriers.
 - **And** hook exceptions or invalid returned events keep the original event and never throw into host code
 - **And** the kept original has already passed mandatory sanitization
 - **And** a valid returned event is sanitized and schema-validated again before any DebugBundle-owned buffer, file, queue, or transport

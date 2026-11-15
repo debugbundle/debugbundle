@@ -144,6 +144,8 @@ This is the most critical reliability constraint. SDK internal failures must:
 - Not crash server or browser processes
 - Degrade safely when queues are full
 - Surface errors only through internal diagnostics
+- Keep those diagnostics optional, local/operator-controlled, sanitised and bounded; never add hidden maintainer telemetry or recursive application capture
+- Contain diagnostic preparation, callbacks and storage without holding SDK capture/delivery locks or creating replacement workers
 
 ---
 

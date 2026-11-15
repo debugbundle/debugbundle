@@ -208,7 +208,7 @@ Tokio, Tower, Axum and Actix Web, composable tracing/log integrations and browse
 <dependency>
   <groupId>com.debugbundle</groupId>
   <artifactId>debugbundle-spring-boot-starter</artifactId>
-  <version>3.1.3</version>
+  <version>3.1.4</version>
 </dependency>
 ```
 
@@ -297,7 +297,7 @@ Rails, Rack, Sidekiq, Ruby Logger, Semantic Logger and browser relay handlers ar
 
 ```kotlin
 dependencies {
-    implementation(platform("com.debugbundle:debugbundle-android-bom:3.1.3"))
+    implementation(platform("com.debugbundle:debugbundle-android-bom:3.1.4"))
     implementation("com.debugbundle:debugbundle-android")
 }
 ```
@@ -326,7 +326,7 @@ Native Android capture, crash/ANR replay, WorkManager, OkHttp, Ktor, Navigation,
 ```swift
 .package(
     url: "https://github.com/debugbundle/debugbundle-swift",
-    from: "3.1.4"
+    from: "3.1.5"
 )
 ```
 

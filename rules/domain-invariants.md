@@ -21,6 +21,8 @@ SDK code in every supported backend, browser, native, and React Native SDK must 
 
 All SDK internal failures must be caught and silently swallowed (with optional internal diagnostic output). The SDK must degrade gracefully under all conditions: network failure, queue overflow, invalid configuration, missing API key, server errors.
 
+Internal diagnostics must never create an undisclosed maintainer-reporting channel or recursively capture SDK failures as application events. Supported diagnostics are optional, local/operator-controlled, sanitised and bounded; preparation, callbacks and storage are inside the same host-safety boundary. Diagnostic callbacks must not hold SDK capture/delivery locks, and a stalled callback must not create replacement workers. See `contracts/sdk-interface.md` §1.3.
+
 **Enforcement:** Dedicated failure-injection test suite. SDK tests must include: malformed config, unreachable API, 500 responses, queue-full conditions, concurrent flushes.
 
 ---

@@ -1,6 +1,6 @@
 # CocoaPods distribution — qualified Git transition
 
-Recorded: 2026-11-02; provider schedule refreshed: 2026-11-06
+Recorded: 2026-11-02; provider schedule refreshed: 2026-11-15
 Status: complete for Swift 3.1.2 and React Native 3.1.1. Public SPM, Git-pod,
 bare RN and Expo runtime gates pass; Trunk remains an explicitly separate channel.
 
