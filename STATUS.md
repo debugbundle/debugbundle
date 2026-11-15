@@ -1,8 +1,8 @@
 # 15 November documentation patch release — in progress
 
 The Owner authorised publication of all pending DebugBundle work using patch
-versions. Core 1.27.1, site 1.10.2 and independent SDK documentation patches are
-being qualified. The strict documentation gate passes all 38 checks. See
+versions. Core 1.27.1, site 1.10.3 and independent SDK documentation patches are
+being qualified. The strict documentation gate passes all 51 checks, including manifest-to-guide current versions. See
 `spec/release-20261115.md` for scope and final evidence; production acceptance is
 pending. Existing CLI/MCP, shared-package and developer-extension versions remain.
 

@@ -326,7 +326,7 @@ Native Android capture, crash/ANR replay, WorkManager, OkHttp, Ktor, Navigation,
 ```swift
 .package(
     url: "https://github.com/debugbundle/debugbundle-swift",
-    from: "3.1.3"
+    from: "3.1.4"
 )
 ```
 

@@ -265,6 +265,41 @@ const withSdks = surfaces.every((surface) =>
   : describe.skip;
 withSdks("SDK repository and package READMEs", () => {
   it.each(surfaces)(
+    "matches the advertised %s release to its package manifest",
+    (_id, label, page, repo) => {
+      const directory = join(root, "sdks", repo);
+      const files: Record<string, [string, RegExp]> = {
+        Python: ["pyproject.toml", /^version = "([^"]+)"/m],
+        PHP: ["src/DebugBundleSdk.php", /SDK_VERSION = '([^']+)'/],
+        Rust: ["Cargo.toml", /^version = "([^"]+)"/m],
+        Java: ["pom.xml", /<version>([^<]+)<\/version>/],
+        ".NET": ["Directory.Build.props", /<VersionPrefix>([^<]+)<\/VersionPrefix>/],
+        Go: ["config.go", /^\s*Version\s*=\s*"([^"]+)"/m],
+        Ruby: ["lib/debugbundle/version.rb", /VERSION = ['"]([^'"]+)['"]/],
+        Android: ["gradle.properties", /^VERSION_NAME=(.+)$/m],
+        iOS: ["DebugBundle.podspec", /s\.version\s*=\s*"([^"]+)"/]
+      };
+      const source = files[label];
+      const version = source
+        ? readFileSync(join(directory, source[0]), "utf8").match(source[1])?.[1]
+        : (JSON.parse(readFileSync(join(directory, "package.json"), "utf8")) as { version: string })
+            .version;
+      expect(version, `${label} package version`).toMatch(/^\d+\.\d+\.\d+$/);
+      const guide = readFileSync(
+        join(
+          site,
+          "content/docs",
+          label === "WordPress" ? "integrations/wordpress.mdx" : `sdks/${page}.mdx`
+        ),
+        "utf8"
+      );
+      if (label === "Rust")
+        expect(guide).toContain(`https://crates.io/crates/debugbundle/${version}`);
+      else expect(guide, `${label} current release`).toContain(`Current release: **${version}**`);
+    }
+  );
+
+  it.each(surfaces)(
     "keeps %s installation and initialization first",
     (_id, label, _guide, repo) => {
       const path = join(root, "sdks", repo, "README.md");
