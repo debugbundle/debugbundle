@@ -1,9 +1,14 @@
 # SDK deep final audit — 15 November 2026
 
+Subsequent authorised publication: all 13 capture surfaces have released corrected
+artifacts. The [SDK safety release record](../sdk-safety-release-20261115.md)
+contains the selected versions, published-consumer gates and hosted acceptance.
+The local checkpoint and its original boundaries below remain historical evidence.
+
 Status: deep audit complete; all four findings corrected and locally qualified.
 No remaining release blocker was found in the audited changes.
 
-Scope: the unreleased `beforeSend` budget correction and optional internal
+Scope at this checkpoint: the `beforeSend` budget correction and optional internal
 diagnostics remediation, across all 13 maintained capture surfaces, their
 framework/relay owners, WordPress distribution and React Native native bridges.
 This is local source and artifact qualification, not registry publication or

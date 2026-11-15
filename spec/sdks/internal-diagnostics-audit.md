@@ -1,5 +1,10 @@
 # SDK internal diagnostics audit
 
+Subsequent authorised remediation and publication are complete. See the
+[SDK safety release record](../sdk-safety-release-20261115.md) for all 13 surface
+versions, published-consumer gates and hosted acceptance. The original findings
+and checkpoint limits below remain historical evidence.
+
 The subsequent [deep final audit](sdk-deep-audit-20261115.md) records additional
 corrections and superseding source/artifact qualification. Earlier receipts below
 remain historical evidence.

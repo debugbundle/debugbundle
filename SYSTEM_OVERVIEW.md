@@ -1,4 +1,4 @@
-The SDK deep final audit also closes console Promise forwarding, Swift credential-shaped diagnostic codes, WordPress nonce privacy and Rust unvalidated optional reduction. Evidence and remaining publication gates: `spec/sdks/sdk-deep-audit-20261115.md`.
+SDK safety release acceptance is complete across all 13 capture surfaces. Core 1.27.2 and site 1.10.4 are live; Python 3.0.0 deliberately changes optional diagnostic callback timing and ships migration guidance. Other SDK corrections use patch releases. Exact artifacts, full CI, preserved configuration/data, live bytes and rollback acceptance are recorded in `spec/sdk-safety-release-20261115.md`. The deep audit closes console Promise forwarding, Swift credential-shaped diagnostic codes, WordPress nonce privacy and Rust unvalidated optional reduction.
 
 SDK internal diagnostics are optional local output with no hidden reporting channel. Node scopes callback recapture suppression; Browser contains its existing local console warnings; Python dispatches diagnostics on one bounded lane outside SDK locks; Go stores fixed codes, Swift safe ACK codes and WordPress sanitised best-effort status transients. See `spec/sdks/internal-diagnostics-audit.md` for remediation and release qualification.
 
@@ -7,7 +7,8 @@ exception evidence before invalid-return fallback, preserving application redact
 The family audit and exact byte-boundary fixtures are recorded in
 `spec/sdks/before-send-budget-audit.md`. The second audit also preserves malformed
 evidence fallback during overflow, including Rust, using the shared corpus in
-every hook owner. SDK and wrapper releases remain separate from qualification.
+every hook owner. The released SDKs and dependent wrappers pass the subsequent
+published-consumer gates recorded in the release acceptance above.
 
 SDK documentation follows the shared install/initialize/integrations/verification/configuration flow in `contracts/sdk-interface.md` §14. The main README and homepage cover all 13 capture surfaces, with native setup and client lifetime differences retained. See `spec/sdk-documentation-alignment.md` for scope and local verification; this documentation work does not change runtime APIs or establish publication.
 

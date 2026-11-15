@@ -1,3 +1,5 @@
+SDK safety publication and hosted acceptance: `spec/sdk-safety-release-20261115.md`. All 13 capture surfaces are released; core 1.27.2/site 1.10.4 adopt JS 3.2.4. Python 3.0.0 documents its diagnostic-lane timing migration. No new service, schema, endpoint or collection channel is introduced.
+
 SDK diagnostic ownership: Node `internal-diagnostics.ts` owns scoped suppression, sanitisation and emission bounds; Browser `internal-diagnostics.ts` owns contained console warnings and breadcrumb suppression; Python `internal_diagnostics.py` owns one bounded callback lane. Go `debugbundle.go`, Swift `DebugBundleInternalDiagnostic.swift` and WordPress `Diagnostics.php` own local status codes/storage. Console wrappers preserve native return values for diagnostic Promise handling; WordPress shares its native nonce fields through `Sanitization::REDACT_FIELDS`. No additional diagnostic sender exists. Cross-SDK qualification lives in `spec/sdks/internal-diagnostics-audit.md`.
 
 SDK hook size handling belongs to each SDK's `beforeSend` owner and evidence

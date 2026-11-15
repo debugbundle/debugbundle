@@ -1,14 +1,23 @@
-SDK internal diagnostics remediation is implemented locally for Node, Browser,
-Python, Go, Swift and WordPress. All 13 SDK/plugin surfaces are evaluated, with
-React Native native integration qualified against the corrected Swift candidate.
-Permanent regressions and final-audit evidence: `spec/sdks/internal-diagnostics-qualification.md`.
-The deep final audit found and corrected console Promise forwarding, Swift credential-shaped
-codes, WordPress nonce privacy and Rust unavailable-validation reduction. Final evidence
-and release boundaries are in [deep final audit](spec/sdks/sdk-deep-audit-20261115.md). No new registry release,
-hosted deployment or consumer adoption is implied.
-Public SDK safety guidance and historical audit status are reconciled. The 51
-SDK documentation checks, 98 site tests, isolated site build/typecheck and exported
-page/link/search checks pass; SDK source identities remain unchanged.
+# 15 November SDK safety release — published and production verified
+
+All 13 maintained SDK/plugin capture surfaces are released and verified. Core
+1.27.2 and site 1.10.4 are live from their exact green source commits. Node/Browser
+3.2.4 are installed in DebugBundle. Python deliberately releases 3.0.0 with migration
+guidance for the optional diagnostic callback's background-lane timing; all other
+SDK changes use patch releases. Native/public dependency and installed-artifact
+gates pass, including React Native, Swift Git-pod/SPM and WordPress.org.
+
+All 91 migration checksums, selected configuration, nineteen credential fingerprints,
+report/review budgets/state and tracked counts are preserved. API/worker health,
+exact runtime/SDK bytes, all seven alarms, scoped incident IDs and CDN/S3 byte
+comparisons pass. Doctor retains only its pre-existing profile-age warning.
+The active release and actual previous stable release remain available.
+
+The [release record](spec/sdk-safety-release-20261115.md) records versions, publication,
+full CI, deployment and acceptance receipts. The [deep final audit](spec/sdks/sdk-deep-audit-20261115.md)
+and linked hook/diagnostic qualifications retain all regressions and runtime limits.
+Final evidence reconciliation adds no runtime change. No consumer adoption, existing
+WordPress installation or independent OpenAI plugin publication is included.
 
 # 15 November SDK hook budget correction — local qualification complete
 
@@ -35,9 +44,9 @@ selects the current version's archive without deleting older candidates.
 The [audit](spec/sdks/before-send-budget-audit.md) records scope, implementation owners,
 receipts and the limits of this local qualification.
 
-These changes are uncommitted and unpublished. No consumer product or existing
-WordPress site was changed. Independent SDK releases and a WordPress package that
-bundles them are still required before existing installations can receive the fix.
+This was the original local qualification checkpoint. The subsequent publication
+and production acceptance above supersede its release status. No consumer product
+or existing WordPress site was changed.
 
 # 15 November documentation patch release — evidence index
 
@@ -2242,12 +2251,3 @@ the actual registry crate. Public docs now identify stable Rust after PHP. Share
 types 3.7.0 publication passes (`43583438840`); independent clients/core/site
 promotion and production acceptance remain pending. Go/.NET hook follow-up and
 external discovery limitations remain open; no consumer product is changed.
-SDK safety release train is owner-authorised and in progress. Independent SDK
-roots and WordPress 2.1.4 are published and registry-verified. React Native 3.1.4
-has green source/native CI and is running its gated npm release. Core 1.27.2 and
-site 1.10.4 adopt published JS 3.2.4. Site CI is green; corrected full core CI and
-the immutable hosted rollout remain pending. Rust 1.0.2 release-fixture metadata
-is aligned after the first core run's only failing coverage shard. See
-[the current release record](spec/sdk-safety-release-20261115.md) for exact versions,
-publication receipts, recovery details and the separate consumer boundary.
-

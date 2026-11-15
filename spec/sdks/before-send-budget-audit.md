@@ -1,5 +1,10 @@
 # SDK owner-hook byte-budget audit
 
+Subsequent authorised publication is complete across all 13 capture surfaces.
+See the [SDK safety release record](../sdk-safety-release-20261115.md) for selected
+versions, published-consumer gates and hosted acceptance. The original local
+checkpoint and its receipts below are retained as historical evidence.
+
 The subsequent [deep final audit](sdk-deep-audit-20261115.md) records additional
 corrections and superseding source/artifact qualification. Earlier receipts below
 remain historical evidence.

@@ -3,8 +3,8 @@
 Owner-authorised scope: commit, publish and deploy the completed DebugBundle SDK
 hook-budget and internal-diagnostic corrections, including their own dependent
 wrappers and the DebugBundle app/site. Consumer products and existing WordPress
-sites are excluded. This record tracks progress; version definitions are not
-publication or deployment receipts.
+sites are excluded. Publication and hosted acceptance are complete. The receipts below distinguish
+source qualification, registry artifacts and actual production deployment.
 
 ## Version decisions and eligibility
 
@@ -55,14 +55,15 @@ new endpoint, event schema, infrastructure or consumer adoption is introduced.
 
 Receipts: `.tmp/sdk-release-20261115/`. Initial inventory records all fifteen
 repositories, clean remote ancestry and preserved pre-release local files.
-Current status: version preparation and source qualification in progress.
+Current status: all thirteen SDK surfaces are published; core and site are live
+and independently verified.
 
 ## Publication and verification progress
 
-The independent roots and WordPress are published and verified. React Native's
-exact-source CI passes; its release workflow is qualifying the public native
-dependencies before npm publication. Core/site publication and hosted rollout
-remain gated on the remaining release and core CI results.
+All thirteen SDK capture surfaces are published and independently verified. React
+Native passes public Android/Swift dependency, Expo and device runtime gates,
+trusted npm publication and installed-package checks. Core/site publication and
+hosted acceptance also pass, as recorded below.
 
 | Distribution         | Publication / installed-consumer gate                                                                                                                                                       |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -108,9 +109,64 @@ SHA-256 is `7331cffbf7534172e5b173cdd284e7ef33f5789e6c1559f509a84786ec032a23`.
 - Core's first 138-shard run passes every shard except a release fixture still
   naming Rust 1.0.1. Aligning its selected version with the independently verified
   1.0.2 release retains wrong-version, yanked and checksum rejection controls.
-  Full corrected core CI is required before deployment.
+  Full corrected core CI 43751382686 passes on the exact deployed source.
 
 Current repository README headings describe released hook behaviour. Existing
 compatibility anchors and immutable published archives are retained; wording-only
 follow-ups do not create additional SDK versions. The final documentation pass
 introduces no new public interface or glossary term.
+
+React Native 3.1.4 npm readback verifies the archive integrity, Swift 3.1.5 and
+Android 3.1.4 dependency pins, wrapper podspec and installed contents. The
+wrapper podspec retains its compatible Swift SDK lower bound 3.1.1. Swift uses public SPM and immutable
+Git-pod distribution; no Trunk publication or production React Native SPM support
+is claimed.
+
+## Hosted acceptance
+
+Core **1.27.2** and site **1.10.4** are released and live. Full corrected core
+CI [43751382686](https://github.com/debugbundle/debugbundle/actions/runs/43751382686)
+and CLI compatibility [43751382703](https://github.com/debugbundle/debugbundle/actions/runs/43751382703)
+pass on the exact runtime source `3d205b9a45b17bf8f3a3869b42a56297f50edc6d`. Canonical core release
+[43756357576](https://github.com/debugbundle/debugbundle/actions/runs/43756357576)
+and site release [43756362222](https://github.com/debugbundle/site/actions/runs/43756362222)
+pass. Site source/tag is `9a3c2c184a89269171933cab3c75992e3611fce5`; its source CI
+[43745144000](https://github.com/debugbundle/site/actions/runs/43745144000) passes.
+
+The [hosted rollout 43757275524](https://github.com/debugbundle/debugbundle-cloud/actions/runs/43757275524)
+deploys these immutable sources with assets enabled, preserving MCP routing and
+project-merge activation. API and worker report version 1.27.2, healthy with zero
+restarts; their actual OCI revision labels match the qualified core source.
+Both immutable images use digest `sha256:c1a4f334573e6270d29c24e4150999186cf4c33638bf28ec90ce9b125c8c5aa5`.
+
+- Actual API and worker SDK installations are Node 3.2.4. Every distributed file
+  matches the independently downloaded and integrity-verified npm archive.
+- All 91 migration IDs/checksums match the predeployment baseline. No migration
+  is introduced or applied. Selected configuration, nineteen credential
+  fingerprints, report/review settings, budgets, attempt states/hashes and tracked
+  row counts are preserved in read-only repeatable-read snapshots.
+- All seven production alarms are OK. Public API readiness and app build identity
+  match the selected release. The scoped DebugBundle project retains zero local
+  and twenty cloud active incidents with exactly the same IDs. Doctor has zero
+  errors and the same pre-existing profile-freshness warning.
+- Active release is `20261115202256-f159577664fd`; previous stable is
+  `20261115030343-f4b7859cfc8f` (1.27.1). Independent retention dry-run verifies
+  exactly these two directories and all four immutable API/worker image references,
+  with zero obsolete directory/image candidates. No broad Docker prune is used.
+- Live acceptance checks 36 selected routes, twelve homepage
+  install/initialise panels and ordered guides, all thirteen current SDK labels,
+  hook/diagnostic anchors and Python 3 migration guidance. App identity, reference
+  data, search content, the Rust launch article and its linked metadata pass.
+  Fourteen actual S3 objects match publicly served CDN bytes, including compiled
+  app/site entries, app identity and the changed SDK/privacy guidance.
+
+Receipts are retained under `.tmp/sdk-release-20261115/`; operational acceptance
+is also recorded in the private cloud runbook. They contain hashes and bounded
+metadata rather than credentials or raw customer content. No consumer application,
+existing WordPress site, production synthetic event or paid-model canary is changed
+or run. The OpenAI plugin version and publication state remain unchanged; its local
+source/image evidence is refreshed under the existing release rule.
+
+Final reconciliation commits change evidence Markdown and the required OpenAI
+manifest only; they do not replace the qualified runtime source or retag releases.
+The historical audit checkpoints retain their original local qualification limits.

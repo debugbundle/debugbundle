@@ -1,5 +1,10 @@
 # SDK internal diagnostics remediation qualification
 
+Subsequent authorised publication is complete across all 13 capture surfaces.
+The [SDK safety release record](../sdk-safety-release-20261115.md) records the
+published artifacts and Python's deliberate 3.0.0 callback-timing migration.
+The qualification checkpoint below remains historical evidence.
+
 The subsequent [deep final audit](sdk-deep-audit-20261115.md) records additional
 corrections and superseding source/artifact qualification. Earlier receipts below
 remain historical evidence.
