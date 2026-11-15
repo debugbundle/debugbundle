@@ -76,7 +76,7 @@ Local events are written under `.debugbundle/local/events/`; generated bundles a
 
 ## Install an SDK
 
-All SDKs follow the same universal interface, using language-idiomatic method names: `init`, `captureException`, `captureError`, `captureLog`, `captureRequest`, `captureMessage`, `setContext`, `probe`, and `flush`.
+SDKs share the same capture concepts through language-idiomatic APIs. Client constructors, framework configuration and plugin activation remain runtime-specific. Common operations include: `init`, `captureException`, `captureError`, `captureLog`, `captureRequest`, `captureMessage`, `setContext`, `probe`, and `flush`.
 
 | Runtime      | Package                                           | Install                                        | Main docs                                                               |
 | ------------ | ------------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------- |
@@ -84,15 +84,17 @@ All SDKs follow the same universal interface, using language-idiomatic method na
 | Browser      | `@debugbundle/sdk-browser`                        | `npm install @debugbundle/sdk-browser`         | [Browser SDK](https://debugbundle.com/docs/sdks/browser)                |
 | Python       | `debugbundle-python`                              | `pip install debugbundle-python`               | [Python SDK](https://debugbundle.com/docs/sdks/python)                  |
 | PHP          | `debugbundle/sdk-php`                             | `composer require debugbundle/sdk-php`         | [PHP SDK](https://debugbundle.com/docs/sdks/php)                        |
-| Rust | [`debugbundle` 1.0.0](https://crates.io/crates/debugbundle/1.0.0) | `cargo add debugbundle@1.0.0` | [Rust SDK](https://debugbundle.com/docs/sdks/rust) |
+| Rust | `debugbundle` | `cargo add debugbundle` | [Rust SDK](https://debugbundle.com/docs/sdks/rust) |
 | Java         | `com.debugbundle:debugbundle-spring-boot-starter` | Maven or Gradle dependency                     | [Java SDK](https://debugbundle.com/docs/sdks/java)                      |
 | .NET         | `DebugBundle.AspNetCore` / `DebugBundle.Sdk`      | `dotnet add package DebugBundle.AspNetCore`    | [.NET SDK](https://debugbundle.com/docs/sdks/dotnet)                    |
-| Go           | `github.com/debugbundle/debugbundle-go`           | `go get github.com/debugbundle/debugbundle-go` | [Go SDK](https://debugbundle.com/docs/sdks/go)                          |
+| Go           | `github.com/debugbundle/debugbundle-go/v3`           | `go get github.com/debugbundle/debugbundle-go/v3` | [Go SDK](https://debugbundle.com/docs/sdks/go)                          |
 | Ruby         | `debugbundle`                                     | `gem install debugbundle`                      | [Ruby SDK](https://debugbundle.com/docs/sdks/ruby)                      |
 | Android      | `com.debugbundle:debugbundle-android`             | Maven or Gradle dependency                     | [Android SDK](https://debugbundle.com/docs/sdks/android)                |
 | iOS          | `DebugBundle`                                     | Swift Package Manager or CocoaPods             | [iOS SDK](https://debugbundle.com/docs/sdks/swift)                      |
 | React Native | `@debugbundle/sdk-react-native`                   | `npm install @debugbundle/sdk-react-native`    | [React Native SDK](https://debugbundle.com/docs/sdks/react-native)      |
-| WordPress    | `debugbundle-wordpress`                           | WordPress.org plugin directory                 | [WordPress plugin](https://debugbundle.com/docs/integrations/wordpress) |
+| WordPress    | `debugbundle`                           | WordPress.org plugin directory                 | [WordPress plugin](https://debugbundle.com/docs/integrations/wordpress) |
+
+Initialize once at application startup. These connected examples use a server environment token, a browser relay or an explicitly configured mobile ingestion token. Verification and lifecycle details are in each SDK guide.
 
 ### Node.js
 
@@ -108,12 +110,11 @@ debugbundle.init({
   environment: "production",
   service: "api"
 });
-
-debugbundle.captureExceptions();
-debugbundle.captureRejections();
 ```
 
-Express, Fastify, Next.js, pino, winston, bunyan, local file transport, remote capture policy, probes, and browser relay handlers are supported.
+Initialize once at server startup with `DEBUGBUNDLE_PROJECT_TOKEN` set in the server environment. Initialization registers the process exception and rejection hooks; request middleware belongs in the framework setup below.
+
+Express, Fastify, Next.js, pino, winston, bunyan and browser relay handlers are supported. See the [Node.js SDK guide](https://debugbundle.com/docs/sdks/node).
 
 ### Browser
 
@@ -125,7 +126,6 @@ npm install @debugbundle/sdk-browser
 import { createDebugBundleBrowserSdk } from "@debugbundle/sdk-browser";
 
 const debugbundle = createDebugBundleBrowserSdk();
-
 debugbundle.init({
   transportMode: "relay",
   endpoint: "/debugbundle/browser",
@@ -134,7 +134,9 @@ debugbundle.init({
 });
 ```
 
-For full-stack apps, prefer a backend browser relay so project tokens stay server-side. Same-origin relay paths are simplest; split frontend/backend deployments can use explicit browser relay mode with an absolute backend relay URL and backend origin allowlisting. Frontend-only deployments can send directly to DebugBundle Cloud with a dedicated public write-only token and an allowed-origin restriction. See [Browser Relay Setup](https://debugbundle.com/docs/sdks/browser-relay).
+Initialize once in the browser entry point. Configure the matching backend relay route first; this relative URL does not create a server endpoint. Keep the backend project token on the server.
+
+Browser-native capture works with React, Next.js client components, Vue, Angular, Svelte and vanilla applications. Use a backend browser relay for this setup. See the [Browser SDK guide](https://debugbundle.com/docs/sdks/browser).
 
 ### Python
 
@@ -151,12 +153,11 @@ debugbundle.init(
     environment="production",
     service="api",
 )
-
-debugbundle.capture_exceptions()
-debugbundle.capture_logging()
 ```
 
-Django, Flask, FastAPI, Python logging, structlog, loguru, local file transport, remote capture policy, probes, and browser relay helpers are supported.
+Initialize once at application startup with `DEBUGBUNDLE_PROJECT_TOKEN` set in the server environment. Initialization installs the exception hooks. Add logging and framework adapters in Integrations.
+
+Django, Flask, FastAPI, Python logging, structlog, loguru and browser relay helpers are supported. See the [Python SDK guide](https://debugbundle.com/docs/sdks/python).
 
 ### PHP
 
@@ -174,13 +175,103 @@ DebugBundle::init([
     'environment' => 'production',
     'service' => 'api',
 ]);
-
-DebugBundle::captureErrors();
-DebugBundle::captureExceptions();
-DebugBundle::captureShutdown();
 ```
 
-Laravel, Symfony, Monolog, local file transport, remote capture policy, probes, and browser relay adapters are supported.
+Initialize in your application bootstrap after loading Composer’s autoloader. Set `DEBUGBUNDLE_PROJECT_TOKEN` in the server environment, initialization installs error, exception and shutdown hooks. Add framework and logger adapters in Integrations.
+
+Laravel, Symfony, Monolog and browser relay adapters are supported. See the [PHP SDK guide](https://debugbundle.com/docs/sdks/php).
+
+### Rust
+
+```bash
+cargo add debugbundle
+```
+
+```rust
+use debugbundle::Config;
+
+let client = debugbundle::init(Config {
+    project_token: std::env::var("DEBUGBUNDLE_PROJECT_TOKEN").unwrap_or_default(),
+    environment: "production".into(),
+    service: "api".into(),
+    ..Config::default()
+});
+```
+
+Run this in application startup and retain `client` for the application lifetime. Set `DEBUGBUNDLE_PROJECT_TOKEN` in the server environment. The example sets `environment` and `service` explicitly; `..Config::default()` supplies the remaining options. Initialization starts the client; panic observation and framework capture are explicit integrations. Flush only when verifying an event or during controlled shutdown.
+
+Tokio, Tower, Axum and Actix Web, composable tracing/log integrations and browser relays are supported. See the [Rust SDK guide](https://debugbundle.com/docs/sdks/rust).
+
+### Java
+
+```xml
+<dependency>
+  <groupId>com.debugbundle</groupId>
+  <artifactId>debugbundle-spring-boot-starter</artifactId>
+  <version>3.1.3</version>
+</dependency>
+```
+
+```yaml
+debugbundle:
+  project-token: ${DEBUGBUNDLE_PROJECT_TOKEN}
+  environment: production
+  service: api
+  project-mode: connected
+```
+
+For Spring Boot 3, put this in `application.yml` and set `DEBUGBUNDLE_PROJECT_TOKEN` in the server environment. The starter initializes the client through Spring configuration. Other Java runtimes use the adapters below.
+
+Spring Boot, servlet WARs, JAX-RS/RESTEasy, WildFly/JBoss, vanilla Java and the Java agent have runtime-specific setup. See the [Java SDK guide](https://debugbundle.com/docs/sdks/java).
+
+### .NET
+
+```bash
+dotnet add package DebugBundle.AspNetCore
+```
+
+```csharp
+using DebugBundle.AspNetCore;
+
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddDebugBundle(options =>
+{
+    options.ProjectToken = builder.Configuration["DEBUGBUNDLE_PROJECT_TOKEN"];
+    options.Environment = builder.Environment.EnvironmentName;
+    options.Service = "api";
+});
+
+var app = builder.Build();
+app.UseDebugBundle();
+```
+
+Add this to ASP.NET Core `Program.cs`, with `DEBUGBUNDLE_PROJECT_TOKEN` in application configuration. Keep your endpoint mappings and `app.Run()` after the middleware. The hosted service handles application shutdown.
+
+ASP.NET Core, Microsoft.Extensions.Logging, gRPC, Worker Service, Hangfire, Azure Functions isolated worker and logging adapters have dedicated integrations. See the [.NET SDK guide](https://debugbundle.com/docs/sdks/dotnet).
+
+### Go
+
+```bash
+go get github.com/debugbundle/debugbundle-go/v3
+```
+
+```go
+import (
+    "os"
+    debugbundle "github.com/debugbundle/debugbundle-go/v3"
+)
+
+// Inside application startup:
+client := debugbundle.New(debugbundle.Config{
+    ProjectToken: os.Getenv("DEBUGBUNDLE_PROJECT_TOKEN"),
+    Environment:  "production",
+    Service:      "api",
+})
+```
+
+Set `DEBUGBUNDLE_PROJECT_TOKEN` in the server environment and retain the client for your service lifetime. Add the imports to the file’s import block and create the client inside `main` or your bootstrap function. Use a bounded flush during controlled shutdown.
+
+net/http, Gin, Echo, slog, zap, zerolog and browser relay handlers are supported. See the [Go SDK guide](https://debugbundle.com/docs/sdks/go).
 
 ### Ruby
 
@@ -196,52 +287,90 @@ DebugBundle.init(
   environment: "production",
   service: "api"
 )
-
-DebugBundle.capture_exceptions
 ```
 
-Rails, Rack, Sidekiq, Ruby Logger, Semantic Logger, local file transport, remote capture policy, probes, and browser relay handlers are supported.
+Initialize once at application startup with `DEBUGBUNDLE_PROJECT_TOKEN` set in the server environment. Initialization arms best-effort process exception capture. Add framework and logger adapters below.
 
-### Java
+Rails, Rack, Sidekiq, Ruby Logger, Semantic Logger and browser relay handlers are supported. See the [Ruby SDK guide](https://debugbundle.com/docs/sdks/ruby).
 
-```xml
-<dependency>
-  <groupId>com.debugbundle</groupId>
-  <artifactId>debugbundle-spring-boot-starter</artifactId>
-  <version>3.1.1</version>
-</dependency>
+### Android
+
+```kotlin
+dependencies {
+    implementation(platform("com.debugbundle:debugbundle-android-bom:3.1.3"))
+    implementation("com.debugbundle:debugbundle-android")
+}
 ```
 
-```yaml
-debugbundle:
-  project-token: ${DEBUGBUNDLE_PROJECT_TOKEN}
-  environment: production
-  service: api
-  project-mode: connected
+```kotlin
+import com.debugbundle.android.DebugBundle
+import com.debugbundle.android.DebugBundleConfig
+
+// Inside Application.onCreate(), after super.onCreate():
+DebugBundle.init(
+    application = this,
+    config = DebugBundleConfig(
+        projectToken = BuildConfig.DEBUGBUNDLE_PROJECT_TOKEN,
+        environment = "production",
+        service = "android-app",
+    ),
+)
 ```
 
-The Spring Boot starter supports servlet request capture, MVC exception capture, Logback capture, remote config, probes, and an optional browser relay route.
+Call this from your registered `Application.onCreate()`. Define the app-owned `BuildConfig.DEBUGBUNDLE_PROJECT_TOKEN` field in Gradle. A token embedded in a mobile app is a public write-only ingestion credential, never a member token.
 
-### Go
+Native Android capture, crash/ANR replay, WorkManager, OkHttp, Ktor, Navigation, Compose and Timber integrations are available. See the [Android SDK guide](https://debugbundle.com/docs/sdks/android).
+
+### iOS
+
+```swift
+.package(
+    url: "https://github.com/debugbundle/debugbundle-swift",
+    from: "3.1.3"
+)
+```
+
+```swift
+import Foundation
+import DebugBundle
+
+DebugBundle.initialize(
+    DebugBundleConfig(
+        projectToken: Bundle.main.debugBundleProjectToken,
+        environment: "production",
+        service: "ios-app"
+    )
+)
+```
+
+Add the Swift Package dependency to your application target. Initialize once from SwiftUI app initialization or UIKit launch, with `DebugBundleProjectToken` in Info.plist. Mobile tokens are public write-only ingestion credentials, never member tokens.
+
+UIKit, SwiftUI, URLSession, Alamofire, SwiftLog, crash replay and offline queueing are supported. See the [iOS SDK guide](https://debugbundle.com/docs/sdks/swift).
+
+### React Native
 
 ```bash
-go get github.com/debugbundle/debugbundle-go
+npm install @debugbundle/sdk-react-native
+cd ios && pod install
 ```
 
-```go
-client := debugbundle.New(debugbundle.Config{
-  ProjectToken: os.Getenv("DEBUGBUNDLE_PROJECT_TOKEN"),
-  Environment:  "production",
-  Service:      "api",
-})
-defer func() { _ = client.Flush(context.Background()) }()
+```typescript
+import { DebugBundle } from "@debugbundle/sdk-react-native";
+
+DebugBundle.init({
+  projectToken: process.env.EXPO_PUBLIC_DEBUGBUNDLE_TOKEN,
+  environment: __DEV__ ? "development" : "production",
+  service: "mobile-app"
+});
 ```
 
-net/http, Gin, Echo, slog, zap, zerolog, local file transport, remote capture policy, probes, and browser relay handlers are supported.
+Initialize once in the app entry point after completing native installation. This example uses Expo’s public environment-variable support; bare React Native apps supply the token through their own build configuration. Mobile tokens are public write-only ingestion credentials. Use a native development build: Expo Go cannot load the native SDK.
+
+React error boundaries, React Navigation, scoped fetch/XHR instrumentation, Expo development builds and native Android/iOS queues are supported. See the [React Native SDK guide](https://debugbundle.com/docs/sdks/react-native).
 
 ### WordPress
 
-Install **DebugBundle** from the [WordPress.org plugin directory](https://wordpress.org/plugins/debugbundle/), then open **Settings -> DebugBundle** and save your project token. The plugin bundles backend PHP capture, frontend browser capture, and a WordPress REST relay so the project token stays server-side.
+Install **DebugBundle** from the [WordPress.org plugin directory](https://wordpress.org/plugins/debugbundle/), activate it, then open **Settings -> DebugBundle** and save your project token. The plugin bundles PHP and browser capture with a server-side relay. See the [WordPress guide](https://debugbundle.com/docs/integrations/wordpress) for integrations, first-event verification and configuration.
 
 ## CLI, API, and MCP
 

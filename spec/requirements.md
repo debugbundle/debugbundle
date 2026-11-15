@@ -693,6 +693,8 @@ When a collaborator is removed from a project or leaves a shared project, DebugB
 
 **FR-DOC-13:** Public support chat must load its third-party provider only after an explicit chat activation. Rendering, hydration, hover, scroll, timers and existing provider cookies must not initialise it. Preserve one loader/session during client navigation, contain failures with bounded loading feedback and retry/email recovery, and disclose the lifecycle on the privacy page. The homepage hero image must be discoverable in the initial exported HTML with high fetch priority without preloading it on unrelated pages. Source/build checks do not establish hosted Lighthouse scores or provider acceptance.
 
+**FR-DOC-14:** All maintained SDKs must follow the documentation and example pattern in `contracts/sdk-interface.md` §14: canonical catalogue order, uniform package columns, matching concise install/initialize examples, and guides/readmes ordered Installation → Initialize → Integrations → First-event verification → Configuration. Preserve required runtime differences, public anchors, explicit delivery modes and bounded lifecycle guidance. Automated checks must detect missing SDK examples and cross-surface drift. See `spec/sdk-documentation-alignment.md` for the current applicability record.
+
 ### 1.18 Onboarding & Installation
 
 **FR-ONB-01:** Installation documentation must offer two paths: (a) **Agent-driven** — provide a ready-made prompt/instruction the user gives to their AI agent, which then runs `debugbundle setup` to detect runtimes, install SDKs, generate scaffold, create agent skill, and configure transport; (b) **Manual** — traditional step-by-step CLI commands. See `/spec/local-first-onboarding.md`.

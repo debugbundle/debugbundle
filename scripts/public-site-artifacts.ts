@@ -3,6 +3,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { z } from "zod";
+import { readRustRelease } from "./check-rust-release.mjs";
 import { toInputJsonSchema } from "../packages/shared-types/src/json-schema.js";
 
 import { buildPublicOpenApiSpec } from "../apps/api/src/openapi.js";
@@ -203,7 +204,7 @@ function toMarkdownLink(label: string, href: string): string {
   return `[${label}](${href})`;
 }
 
-function buildLlmsTxt(): string {
+function buildLlmsTxt(rustVersion: string): string {
   return ensureTrailingNewline(
     [
       "# DebugBundle",
@@ -234,7 +235,7 @@ function buildLlmsTxt(): string {
       `- ${toMarkdownLink("Browser relay", toAbsoluteUrl("/docs/sdks/browser-relay/"))}`,
       `- ${toMarkdownLink("Python SDK", toAbsoluteUrl("/docs/sdks/python/"))}`,
       `- ${toMarkdownLink("PHP SDK", toAbsoluteUrl("/docs/sdks/php/"))}`,
-      `- ${toMarkdownLink("Rust SDK", toAbsoluteUrl("/docs/sdks/rust/"))} — released 1.0.0 on crates.io.`,
+      `- ${toMarkdownLink("Rust SDK", toAbsoluteUrl("/docs/sdks/rust/"))} — released ${rustVersion} on crates.io.`,
       `- ${toMarkdownLink("Java SDK", toAbsoluteUrl("/docs/sdks/java/"))}`,
       `- ${toMarkdownLink(".NET SDK", toAbsoluteUrl("/docs/sdks/dotnet/"))}`,
       `- ${toMarkdownLink("Go SDK", toAbsoluteUrl("/docs/sdks/go/"))}`,
@@ -471,10 +472,11 @@ async function buildErrorCodeReference(): Promise<ErrorCodeReference> {
 }
 
 export async function buildMachineReadableArtifacts(): Promise<MachineReadableArtifact[]> {
-  const [failureBundle, improvementBundle, license] = await Promise.all([
+  const [failureBundle, improvementBundle, license, sdkManifest] = await Promise.all([
     readExampleBundle("bundle.failure.json"),
     readExampleBundle("bundle.improvement.json"),
-    readFile(join(workspaceRoot, "LICENSE"), "utf8")
+    readFile(join(workspaceRoot, "LICENSE"), "utf8"),
+    readFile(join(workspaceRoot, "sdks.json"), "utf8")
   ]);
 
   return [
@@ -491,7 +493,7 @@ export async function buildMachineReadableArtifacts(): Promise<MachineReadableAr
     {
       routePath: "/llms.txt",
       contentType: "text/plain",
-      content: buildLlmsTxt()
+      content: buildLlmsTxt(readRustRelease(JSON.parse(sdkManifest)).version)
     },
     {
       routePath: "/openapi.json",

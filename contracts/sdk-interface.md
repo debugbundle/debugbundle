@@ -1511,6 +1511,75 @@ All server SDKs must implement sections 1–8, section 11, section 12, and secti
 
 Exception projection in the hardened native releases: Java3/Android3 and genuine reference errors in Swift3 may use bounded non-owning weak handles inspected only by the existing delivery worker. Queued telemetry remains privacy-protected; weak handles do not extend raw exception lifetime. At most one current raw exception graph is inspected by each worker, with no arbitrary graph byte-bound claim and no replacement workers if an accessor stalls. Collected/unavailable details use an explicit safe fallback. Swift custom value-error/formatter details that require arbitrary caller accessors use documented type/stack or placeholder fallback. Python2 uses built-in exception descriptors to preserve standard details without overridable metadata access.
 
+## 14. SDK Documentation and Examples
+
+SDK documentation is part of the public interface. Apply this section to the core
+README, public SDK index, homepage cards, individual guides and SDK repository or
+package READMEs. Use the same runtime order wherever a complete catalogue appears:
+Node.js, Browser, Python, PHP, Rust, Java, .NET, Go, Ruby, Android, iOS, React Native,
+WordPress. A focused subset retains that relative order.
+
+### 14.1 Consumer reading order
+
+Each SDK guide and README starts with a short description and any essential
+compatibility notice, followed by these sections:
+
+1. **Installation** — the minimal package or plugin installation, supported runtime
+   prerequisites and required native setup. Optional adapters are identified as optional.
+2. **Initialize** — one idiomatic application-startup example. Use configuration order
+   project token or mode, environment, service, then optional fields where the API permits.
+   Show those fields explicitly in introductory examples; environment-loading helpers
+   belong in the configuration reference as an alternative, not a substitute for visible setup.
+3. **Integrations** — framework, logger, relay and native lifecycle wiring, with the
+   capture hooks installed automatically distinguished from explicit opt-ins.
+4. **First-event verification** — an intentional test event and evidence of receipt.
+5. **Configuration** — supported settings, defaults and source precedence, followed by
+   detailed capture, transport, lifecycle, safety, runtime and maintainer references.
+
+Keep existing public heading anchors working when reorganising a guide. SDK families
+may show their component packages within each section. WordPress uses activation and
+settings instructions instead of invented initialization code. Spring Boot configuration,
+ASP.NET Core middleware, Rust/Go client ownership, mobile startup and native dependency
+requirements remain explicit; do not add compatibility wrappers to make APIs look alike.
+
+### 14.2 Short examples and table columns
+
+Homepage cards and the main repository README show installation plus initialization,
+with the same example as the corresponding guide and package README. They do not include
+synthetic errors, probes, printed status, flush/shutdown calls or arbitrary timeout values.
+Include required middleware and startup context; do not impose a line limit that hides
+necessary integration work. Link to the full guide for the next steps.
+
+State the delivery mode and credential source. Connected server examples use environment
+configuration, browser relay examples contain no server token, and mobile examples explain
+their app-supplied public write-only token. Local-only examples select that mode explicitly.
+Do not imply that client construction installs every hook or proves delivery. Preserve
+client/guard lifetime requirements and explain bounded shutdown separately.
+
+Package columns contain package identifiers in code formatting. Put installation commands,
+registry/docs links and release status in their own consistently named columns or prose;
+never append a version or registry link only for the newest SDK. Use supported major import
+paths and keep pinned examples aligned with the corresponding published package family.
+Use the same existing SDK icon in homepage tabs and documentation navigation. When a local
+preview is part of the task, refresh its served build and verify its HTTP content; an isolated
+qualification build does not update the preview automatically.
+
+### 14.3 Verification and drift prevention
+
+**Initialization is not a delivery receipt.** First-event checks must identify the event,
+service, environment and destination being verified. A successful capture call, drained
+queue, local file, mock endpoint or framework startup does not prove cloud acceptance.
+Short-lived verification applications must use the SDK's bounded lifecycle API when needed;
+ordinary request handlers must not wait for telemetry delivery.
+
+Changes to introductory examples require cross-surface checks and a per-runtime applicability
+record under `spec/`. `tests/contracts/sdk-documentation.test.ts` checks catalogue coverage,
+reading order, package formatting and matching initialization examples. Run
+`make sdk-documentation-check` with all SDK and site checkouts for the complete local gate;
+core-only CI checks the public core contract, and site CI supplies its own checkout.
+Content checks supplement source/API and compile/runtime validation; they do not establish
+that an SDK artifact was published, deployed or adopted by a consumer.
+
 ## Public Browser flow client
 
 The additive `createAnalyticsFlowClient` export provides headless `start`, `step`, `handoff`,

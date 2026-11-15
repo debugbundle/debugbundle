@@ -24,6 +24,11 @@ framework/logger adapter, lifecycle hook, relay, bridge and bundled distribution
 It also applies when core ingestion, redaction or bundle interpretation changes
 the meaning or acceptance of SDK evidence.
 
+Documentation and introductory-example changes also require review across every
+maintained surface. Apply `contracts/sdk-interface.md` §14 without hiding native
+setup, token boundaries, client ownership, explicit hooks or lifecycle differences.
+Record documentation equivalence separately from runtime or release qualification.
+
 Do the applicability review during planning, before implementation is confined to
 the SDK that exposed the issue. Revisit it whenever implementation changes scope.
 

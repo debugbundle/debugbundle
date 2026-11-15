@@ -349,6 +349,10 @@ browser-evidence-check: license-prepare-shared
 test-focused:
 	$(NODE_RUN) "apk add --no-cache git >/dev/null && corepack enable && corepack pnpm vitest run $(TEST_FILES)"
 
+.PHONY: sdk-documentation-check
+sdk-documentation-check:
+	$(NODE_RUN) "DEBUGBUNDLE_REQUIRE_SDK_DOCS=1 node_modules/.bin/vitest run tests/contracts/sdk-documentation.test.ts tests/contracts/rust-sdk-public-docs.test.ts"
+
 .PHONY: project-service-test project-service-format project-service-check project-service-integration
 project-service-test:
 	$(NODE_RUN) "node_modules/.bin/vitest run --reporter=dot $(if $(TEST_FILES),$(TEST_FILES),tests/packages/storage/project-merge-plan.test.ts)"

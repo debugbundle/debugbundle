@@ -1670,6 +1670,9 @@ Mapped requirements: FR-PJS-01/04. Explicit roots, secret-free manifest/diff, re
 - **Given** a new or changed SDK method
 - **Then** JSDoc/TSDoc (or language-equivalent docstrings), README example, and docs page exist
 
+- **And** FR-DOC-14 introductory examples cover all 13 maintained SDK surfaces in the common catalogue order, use matching install/initialize snippets across the core README, homepage, SDK guides and package READMEs, and keep event verification and lifecycle calls separate.
+- **And** guides/readmes follow Installation → Initialize → Integrations → First-event verification → Configuration, preserve existing anchors and document runtime-specific setup; the strict `make sdk-documentation-check` gate requires all companion checkouts.
+
 ### AC-DOC-04: Webhook Documentation
 
 - **Given** a new or changed webhook event type

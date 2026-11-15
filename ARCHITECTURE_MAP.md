@@ -1,3 +1,5 @@
+SDK documentation consistency is enforced by `tests/contracts/sdk-documentation.test.ts` and `make sdk-documentation-check`. Core owns the shared contract and public README; `site/` owns homepage and guide content, and `sdks/` contains independent package READMEs. Site CI supplies its checkout; the strict local gate requires all maintained SDK checkouts. Applicability and evidence: `spec/sdk-documentation-alignment.md`.
+
 MCP ecosystem verification owns exact-version ClawScan security acceptance and
 separate discovery checks. Its report preserves findings and ClawHub's verified
 VirusTotal retirement without inventing an antivirus pass; active audits and

@@ -1,3 +1,5 @@
+SDK documentation follows the shared install/initialize/integrations/verification/configuration flow in `contracts/sdk-interface.md` §14. The main README and homepage cover all 13 capture surfaces, with native setup and client lifetime differences retained. See `spec/sdk-documentation-alignment.md` for scope and local verification; this documentation work does not change runtime APIs or establish publication.
+
 MCP ecosystem security verifies exact-version clean ClawScan audits and final
 reviews, with clean skill moderation. ClawHub's verified VirusTotal retirement is
 explicit in receipts; active missing/adverse audits and returned adverse historical

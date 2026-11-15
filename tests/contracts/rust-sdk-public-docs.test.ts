@@ -5,6 +5,11 @@ import { describe, expect, it } from "vitest";
 import { buildMachineReadableArtifacts } from "../../scripts/public-site-artifacts.js";
 
 const site = process.env["DEBUGBUNDLE_SITE_ROOT"] ?? join(process.cwd(), "site");
+const rustVersion = (
+  JSON.parse(readFileSync(join(process.cwd(), "sdks.json"), "utf8")) as {
+    releases: { rust: { version: string } };
+  }
+).releases.rust.version;
 // The private-site pipeline supplies its checkout explicitly, as with the other
 // public docs contracts. Public core CI always verifies the generated SDK index.
 const describeSiteDocs =
@@ -42,9 +47,9 @@ describeSiteDocs("Rust SDK public discovery and publication status", () => {
     }
     const guide = readFileSync(join(site, "content/docs/sdks/rust.mdx"), "utf8");
     expect(guide).toMatch(/^title: "Rust SDK"$/m);
-    expect(guide).toContain("1.0.0");
-    expect(guide).toContain('version = "1.0.0"');
-    expect(guide).toContain("https://crates.io/crates/debugbundle/1.0.0");
+    expect(guide).toContain(rustVersion);
+    expect(guide).toContain(`version = "${rustVersion}"`);
+    expect(guide).toContain(`https://crates.io/crates/debugbundle/${rustVersion}`);
     expect(guide).not.toMatch(/unpublished|publication remains on hold|path = "/i);
     expect(guide).toContain("Config::local");
     expect(guide).toContain("outcome.accepted_events");
@@ -66,11 +71,10 @@ describeSiteDocs("Rust SDK public discovery and publication status", () => {
     expect(navigation).toMatch(/'php',\s*'rust',\s*'java'/);
     expect(homepageGuide).toContain('href="/docs/sdks/rust/"');
     const rustBlock = homepageGuide.split("value: 'rust',")[1]!.split("value: 'java-spring',")[0]!;
-    expect(rustBlock).toContain('version = "1.0.0"');
+    expect(rustBlock).toContain("cargo add debugbundle");
     expect(rustBlock).toContain("setupLang: 'rust'");
-    expect(rustBlock).toContain("Config::local");
-    expect(rustBlock).toContain("capture_exception");
-    expect(rustBlock).toContain("client.flush(");
+    expect(rustBlock).toContain("debugbundle::init(Config {");
+    expect(rustBlock).not.toMatch(/capture_exception|client\.flush\(|Duration::/);
     expect(rustBlock).not.toMatch(/alpha|unpublished|candidate/i);
   });
 
@@ -90,7 +94,8 @@ describeSiteDocs("Rust SDK public discovery and publication status", () => {
         const rust = labels.indexOf("Rust");
         expect(rust, path).toBe(labels.indexOf("PHP") + 1);
         expect(panels[rust], path).toMatch(/debugbundle::|debugbundle =/);
-        expect(panels[rust - 1], path).toContain("DebugBundle");
+        // Local-only PHP documents its transport limitation instead of an unsupported init mode.
+        expect(panels[rust - 1], path).toContain("composer require debugbundle/sdk-php");
       }
     }
     expect(groups).toBe(3);
@@ -105,7 +110,7 @@ describe("Rust SDK generated discovery index", () => {
     const rust = links.findIndex((line) => line.includes("[Rust SDK]"));
     expect(rust).toBeGreaterThan(0);
     expect(links[rust - 1]).toContain("[PHP SDK]");
-    expect(links[rust]).toContain("1.0.0");
+    expect(links[rust]).toContain(rustVersion);
     expect(links[rust]).not.toMatch(/alpha|unpublished|candidate/i);
     const cliReadme = readFileSync(join(process.cwd(), "apps/cli/README.md"), "utf8");
     expect(cliReadme).toContain("https://crates.io/crates/debugbundle/1.0.0");

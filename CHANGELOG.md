@@ -6,6 +6,15 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.27.1] - 2026-11-15
+
+- Standardise SDK installation and initialization examples, catalogue order and
+  package tables across the README and public documentation. Preserve explicit
+  framework setup, delivery modes and client lifetime requirements.
+- Enforce the shared documentation pattern with cross-SDK contract checks and
+  register the independently qualified Rust 1.0.1 documentation patch.
+- Runtime APIs, event schemas and persisted data are unchanged.
+
 ## [1.27.0] - 2026-11-14
 
 ### CLI documentation follow-up

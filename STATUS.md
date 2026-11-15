@@ -1,3 +1,52 @@
+# 15 November documentation patch release — in progress
+
+The Owner authorised publication of all pending DebugBundle work using patch
+versions. Core 1.27.1, site 1.10.2 and independent SDK documentation patches are
+being qualified. The strict documentation gate passes all 38 checks. See
+`spec/release-20261115.md` for scope and final evidence; production acceptance is
+pending. Existing CLI/MCP, shared-package and developer-extension versions remain.
+
+# Rust SDK launch article — local preparation evidence
+
+The Rust SDK 1.0 launch post is prepared for the next coordinated release with
+the SDK documentation below. It follows the existing SDK blog style and uses the
+same explicit initialization example. Metadata, hero, six internal links and
+README/guide example parity pass source checks. See
+`site/docs/rust-sdk-post-editorial.md` for search intent and release coordination.
+Docker was recovered after its earlier disk-full shutdown. All 98 site tests,
+the 151-page static export and typecheck pass in an isolated build. The refreshed
+local blog on port 5292 serves the article, archive entry, sitemap, metadata and
+linked guides with bytes matching that export. No commit, push, publication or
+deployment was performed. Update the proposed 15 November article date if the
+combined release occurs later.
+
+# SDK documentation alignment — verified locally, uncommitted
+
+Local public preview on port 5292 has now been rebuilt and remounted. Its homepage,
+Rust guide, installation and quickstart match the current export, show the public
+Rust `debugbundle::init(...)` example, and contain no Rust alpha version. SDK icons
+match between homepage and docs navigation; served HTML and regression checks pass.
+Rust initialization now displays token, environment and service explicitly. Its
+exact README snippet compiles, and the refreshed preview serves the same example.
+
+All 13 SDK surfaces now have consistent install/initialize examples in the core
+README, homepage and connected setup panels. SDK guides and package READMEs use
+Installation → Initialize → Integrations → First-event verification → Configuration,
+with native/framework requirements and existing anchors retained. Rust initialization
+is concise; event capture, timeouts and delivery receipts stay in verification.
+Package columns, SDK order and missing main README examples are corrected.
+
+The shared contract, requirements and acceptance criteria now enforce this pattern.
+The strict gate passes 38 checks; broader public-site contracts pass 54 checks;
+all 98 site tests, isolated static build, site/core typechecks, focused lint and
+Rust example compilation pass. No anchors were lost across 33 reviewed documents.
+Source review also corrected Python/PHP's outdated local-file claims: their built-in
+application clients use HTTP; their browser relays support local files. Runtime
+behaviour was not changed. See [the alignment record](spec/sdk-documentation-alignment.md).
+
+Changes remain local across core, site, organisation profile and 12 SDK repositories.
+No commit, push, package publication, deployment or consumer mutation was performed.
+
 # 14 November release — published and production verified; external discovery partial
 
 Rust 1.0.0 is published from `a522d783`, with all eight exact-source/platform jobs,
