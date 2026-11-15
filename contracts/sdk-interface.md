@@ -1560,6 +1560,9 @@ Package columns contain package identifiers in code formatting. Put installation
 registry/docs links and release status in their own consistently named columns or prose;
 never append a version or registry link only for the newest SDK. Use supported major import
 paths and keep pinned examples aligned with the corresponding published package family.
+An explicit "Current release" label must match the qualified distribution's package
+manifest. Preserve the original versions in historical release receipts rather than
+renaming them when a new patch is prepared.
 Use the same existing SDK icon in homepage tabs and documentation navigation. When a local
 preview is part of the task, refresh its served build and verify its HTTP content; an isolated
 qualification build does not update the preview automatically.

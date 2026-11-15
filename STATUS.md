@@ -1,10 +1,19 @@
-# 15 November documentation patch release — in progress
+# 15 November documentation patch release — evidence index
 
 The Owner authorised publication of all pending DebugBundle work using patch
-versions. Core 1.27.1, site 1.10.3 and independent SDK documentation patches are
-being qualified. The strict documentation gate passes all 51 checks, including manifest-to-guide current versions. See
-`spec/release-20261115.md` for scope and final evidence; production acceptance is
-pending. Existing CLI/MCP, shared-package and developer-extension versions remain.
+versions. The release defines core 1.27.1, site 1.10.3 and the independent SDK
+patches in [the release index](spec/release-20261115.md). The strict documentation
+gate passes 51 checks, including manifest-to-guide current versions; the broader
+contract suite passes 79. Site tests, 151-page export and typecheck pass.
+The first full core qualification and completed SDK publication gates pass.
+React Native's publication and final source/deployment acceptance have their own
+linked workflows; their state must be read separately from preparation evidence.
+
+The [canonical 1.27.1 release](https://github.com/debugbundle/debugbundle/releases/tag/v1.27.1)
+is the acceptance record for final source, registry and production checks. Hosted
+operational details remain in the private cloud runbook. Existing CLI/MCP,
+shared-package and developer-extension versions are retained. Consumer products
+and the independent OpenAI candidate are outside the release.
 
 # Rust SDK launch article — local preparation evidence
 
@@ -16,11 +25,11 @@ README/guide example parity pass source checks. See
 Docker was recovered after its earlier disk-full shutdown. All 98 site tests,
 the 151-page static export and typecheck pass in an isolated build. The refreshed
 local blog on port 5292 serves the article, archive entry, sitemap, metadata and
-linked guides with bytes matching that export. No commit, push, publication or
-deployment was performed. Update the proposed 15 November article date if the
-combined release occurs later.
+linked guides with bytes matching that export. This was preparation evidence;
+the publication and deployment receipts are indexed above. The article uses the
+coordinated 15 November date.
 
-# SDK documentation alignment — verified locally, uncommitted
+# SDK documentation alignment — preparation verification
 
 Local public preview on port 5292 has now been rebuilt and remounted. Its homepage,
 Rust guide, installation and quickstart match the current export, show the public
@@ -44,8 +53,9 @@ Source review also corrected Python/PHP's outdated local-file claims: their buil
 application clients use HTTP; their browser relays support local files. Runtime
 behaviour was not changed. See [the alignment record](spec/sdk-documentation-alignment.md).
 
-Changes remain local across core, site, organisation profile and 12 SDK repositories.
-No commit, push, package publication, deployment or consumer mutation was performed.
+At this preparation checkpoint changes were local across core, site, organisation
+profile and twelve SDK repositories. The subsequent authorised patch publication
+and production acceptance are recorded in the release index above.
 
 # 14 November release — published and production verified; external discovery partial
 
