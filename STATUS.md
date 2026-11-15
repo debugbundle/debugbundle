@@ -2242,3 +2242,12 @@ the actual registry crate. Public docs now identify stable Rust after PHP. Share
 types 3.7.0 publication passes (`43583438840`); independent clients/core/site
 promotion and production acceptance remain pending. Go/.NET hook follow-up and
 external discovery limitations remain open; no consumer product is changed.
+SDK safety release train is owner-authorised and in progress. Independent SDK
+roots and WordPress 2.1.4 are published and registry-verified. React Native 3.1.4
+has green source/native CI and is running its gated npm release. Core 1.27.2 and
+site 1.10.4 adopt published JS 3.2.4. Site CI is green; corrected full core CI and
+the immutable hosted rollout remain pending. Rust 1.0.2 release-fixture metadata
+is aligned after the first core run's only failing coverage shard. See
+[the current release record](spec/sdk-safety-release-20261115.md) for exact versions,
+publication receipts, recovery details and the separate consumer boundary.
+
