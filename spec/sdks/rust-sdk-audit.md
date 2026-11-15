@@ -1,10 +1,11 @@
 # Rust SDK deep audit
 
-Current publication: stable Rust 1.0.0 is released. Its unchanged audited runtime
-passes fresh all-eight-job qualification and genuine registry consumers; see
-[stable publication evidence](rust-sdk-release.md). The audit narrative below
-records the original pre-publication source and remediation chronology. Core and
-site promotion are tracked in [the coordinated release](../release-20261114.md).
+Current publication and production acceptance are recorded in the
+[SDK safety release](../sdk-safety-release-20261115.md) and the
+[Rust qualification record](rust-sdk-qualification.md). The hook-budget and
+unavailable-validation corrections are published and verified. The audit narrative
+below retains the original source, remediation chronology and immutable earlier
+release evidence; it does not describe the current SDK version.
 
 ## Historical audit receipts
 

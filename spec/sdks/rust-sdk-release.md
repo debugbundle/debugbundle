@@ -1,5 +1,10 @@
 # Rust SDK first publication and release automation
 
+The subsequent [SDK safety release](../sdk-safety-release-20261115.md) and
+[qualification record](rust-sdk-qualification.md) contain current publication
+and production acceptance. The first-publication history and immutable earlier
+release receipts below are retained as historical evidence.
+
 ## Stable 1.0.0 - published 14 November 2026
 
 Stable source `a522d78385f3a4ae332dab330399625b15e26fa9` and tag `v1.0.0`
@@ -30,15 +35,15 @@ Current repository and public-page source use the published installation command
 the next version will include that updated packaged README. Do not replace or
 retag the accepted alpha to alter documentation.
 
-| Identity | Accepted value |
-| --- | --- |
-| SDK source/tag | `eb9e09afc02751ebd34464bfa4b8808a565635b4` / `v1.0.0-alpha.1` |
-| Crate SHA-256 | `1aed6405f1b6b80ef9430d8300e9efe330a9e06be8c51587da0a41fe07abd8bc` |
-| Size | 224714 bytes |
+| Identity                                       | Accepted value                                                                          |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------- |
+| SDK source/tag                                 | `eb9e09afc02751ebd34464bfa4b8808a565635b4` / `v1.0.0-alpha.1`                           |
+| Crate SHA-256                                  | `1aed6405f1b6b80ef9430d8300e9efe330a9e06be8c51587da0a41fe07abd8bc`                      |
+| Size                                           | 224714 bytes                                                                            |
 | Eight-job source/native/artifact qualification | [43468613263](https://github.com/debugbundle/debugbundle-rust/actions/runs/43468613263) |
-| Upload and genuine registry consumer checks | [43530643791](https://github.com/debugbundle/debugbundle-rust/actions/runs/43530643791) |
-| Verification-only recovery | [43531207396](https://github.com/debugbundle/debugbundle-rust/actions/runs/43531207396) |
-| Release tooling repairs | `1112653`, `6d33321`, `2d98d9b` |
+| Upload and genuine registry consumer checks    | [43530643791](https://github.com/debugbundle/debugbundle-rust/actions/runs/43530643791) |
+| Verification-only recovery                     | [43531207396](https://github.com/debugbundle/debugbundle-rust/actions/runs/43531207396) |
+| Release tooling repairs                        | `1112653`, `6d33321`, `2d98d9b`                                                         |
 
 The public index, downloaded crate and GitHub asset agree on that checksum.
 Actual registry-installed standalone, Axum and genuinely non-Send Actix
