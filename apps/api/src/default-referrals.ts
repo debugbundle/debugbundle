@@ -1,3 +1,5 @@
+import { createReferralEligibilityReader } from "../../../packages/storage/src/referral-customer-eligibility.js";
+export { createReferralEligibilityReader } from "../../../packages/storage/src/referral-customer-eligibility.js";
 import { z } from "zod";
 import { createReferralStore } from "../../../packages/storage/src/referral-store.js";
 import type { Queryable } from "../../../packages/storage/src/types.js";
@@ -6,11 +8,7 @@ import {
   type ReferralManagement
 } from "../../../packages/referrals/src/referral-management.js";
 import { createReferralLinkCodec } from "../../../packages/referrals/src/referral-link.js";
-import {
-  ReferralError,
-  ReferralHttpUrlSchema
-} from "../../../packages/referrals/src/referral-contracts.js";
-import { readStripeCustomerPaymentHistory } from "../../../packages/referrals/src/stripe-customer-eligibility.js";
+import { ReferralHttpUrlSchema } from "../../../packages/referrals/src/referral-contracts.js";
 import type { StripeConfig } from "./stripe-config.js";
 import { createReferralFinance } from "../../../packages/referrals/src/referral-finance.js";
 import { createReferralLedgerStore } from "../../../packages/storage/src/referral-ledger-store.js";
@@ -72,29 +70,6 @@ export function createDefaultReferrals(input: {
     enrollmentEnabled: config.enrollmentEnabled,
     ...(config.publicApiUrl === undefined ? {} : { publicApiUrl: config.publicApiUrl }),
     ...(config.publicLandingUrl === undefined ? {} : { publicLandingUrl: config.publicLandingUrl }),
-    async readEligibility(actor) {
-      const row = (
-        await input.db.query<{ stripe_customer_id: string | null; email: string }>(
-          `SELECT o.stripe_customer_id,u.email FROM organizations o
-        JOIN organization_members m ON m.organization_id=o.id AND m.role='owner' AND m.user_id=$2::uuid
-        JOIN users u ON u.id=m.user_id AND u.email_verified_at IS NOT NULL
-        WHERE o.id=$1::uuid AND o.suspended_at IS NULL`,
-          [actor.organization_id, actor.actor_user_id]
-        )
-      ).rows[0];
-      if (!row) throw new ReferralError("forbidden");
-      if (row.stripe_customer_id && !input.stripeConfig)
-        throw new ReferralError("program_unavailable");
-      return {
-        provider_customer_id_checked: row.stripe_customer_id,
-        provider_previously_paid:
-          input.stripeConfig !== undefined
-            ? await readStripeCustomerPaymentHistory(input.stripeConfig.client, {
-                customer_id: row.stripe_customer_id,
-                verified_email: row.email
-              })
-            : false
-      };
-    }
+    readEligibility: createReferralEligibilityReader(input.db, input.stripeConfig)
   });
 }

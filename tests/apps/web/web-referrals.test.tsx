@@ -16,8 +16,16 @@ import {
 import { REFERRAL_TERMS_VERSION } from "../../../packages/referrals/src/referral-contracts.js";
 import { ReferralBalanceSummary } from "../../../apps/web/src/components/system/referral-balance-summary.js";
 import { ReferralHistory } from "../../../apps/web/src/components/system/referral-history.js";
+import { offerVersion, offerDefinition } from "../../helpers/offer-fixtures.js";
+import { PAYOUT_COUNTRIES } from "../../../packages/referrals/src/payout-preferences.js";
+import { SessionProvider, useSession } from "../../../apps/web/src/lib/session.js";
+import { ReferralsPage } from "../../../apps/web/src/pages/referrals-page.js";
 const org = "11111111-1111-4111-8111-111111111111",
   partner = "22222222-2222-4222-8222-222222222222";
+HTMLElement.prototype.hasPointerCapture ??= () => false;
+HTMLElement.prototype.setPointerCapture ??= () => {};
+HTMLElement.prototype.releasePointerCapture ??= () => {};
+HTMLElement.prototype.scrollIntoView ??= () => {};
 const profile = {
   partner_id: partner,
   code: "ABCD234567",
@@ -65,6 +73,249 @@ function base(input: RequestInfo | URL): Response | null {
   if (url.endsWith("/v1/organizations")) return jsonResponse(200, { organizations: [] });
   return null;
 }
+
+function tabbedReferrals(versioned: boolean, initiallyJoined = true, savedPayout = false) {
+  let enrolled = initiallyJoined,
+    preferenceReads = 0,
+    payoutSaves = 0;
+  const session = createSession({ user_id: partner, organization_id: org });
+  const payout = {
+    programme_id: offerVersion.programme_id,
+    revision: partner,
+    method: "iban",
+    country: "MT",
+    currency: "usd",
+    masked_destination: "••••3000",
+    updated_at: "2026-11-17T00:00:00.000Z"
+  };
+  const creator = {
+    partner_id: partner,
+    code: "ABCD234567",
+    legacy_code: "ABCD234567",
+    accepting_new_referrals: true,
+    version: offerVersion,
+    accepted_at: offerVersion.created_at
+  };
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (requestUrl(input).endsWith("/v1/auth/session")) return jsonResponse(200, { session });
+    const known = base(input);
+    if (known) return known;
+    const path = requestUrl(input);
+    if (path.endsWith("/v2/offers/capabilities")) return jsonResponse(200, { enabled: versioned });
+    if (path.includes("/v2/offers/programmes?"))
+      return jsonResponse(200, { programmes: [offerDefinition] });
+    if (path.endsWith("/v2/offers/creator")) {
+      if (init?.method === "POST") enrolled = true;
+      return jsonResponse(200, {
+        creator: versioned && enrolled ? creator : null,
+        share_url: versioned && enrolled ? "https://debugbundle.com/r/ABCD234567" : null
+      });
+    }
+    if (path.endsWith("/referrals/partner"))
+      return jsonResponse(200, {
+        partner: enrolled ? profile : null,
+        share_url: enrolled ? "https://debugbundle.com/r/ABCD234567" : null,
+        enrollment_enabled: true,
+        terms_version: REFERRAL_TERMS_VERSION
+      });
+    if (path.endsWith("/referrals/earnings"))
+      return jsonResponse(200, {
+        balance: enrolled
+          ? {
+              currency: "usd",
+              available_minor: 5000,
+              pending_minor: 100,
+              claimed_minor: 0,
+              paid_minor: 0
+            }
+          : null,
+        operator_access: false
+      });
+    if (path.endsWith("/v2/referrals/payout-policy"))
+      return jsonResponse(200, {
+        configured: true,
+        currencies: ["usd", "eur", "gbp", "cad", "aud"],
+        methods: ["iban", "wise", "revolut"],
+        countries: PAYOUT_COUNTRIES,
+        default_currency: "usd",
+        routine_minimum_usd_minor: 5000
+      });
+    if (path.endsWith("/v2/referrals/payout-preferences")) {
+      if (init?.method === "POST") {
+        if (++payoutSaves === 1)
+          return jsonResponse(503, { error: "payout_preferences_unavailable" });
+        savedPayout = true;
+        return jsonResponse(200, { preference: payout });
+      }
+      preferenceReads++;
+      return jsonResponse(200, {
+        user_id: session.user_id,
+        programmes: enrolled
+          ? [
+              {
+                programme_id: offerVersion.programme_id,
+                name: offerVersion.name,
+                preference: savedPayout ? payout : null
+              }
+            ]
+          : []
+      });
+    }
+    if (path.includes("/referrals/clients")) return jsonResponse(200, { clients: [] });
+    if (path.includes("/referrals/payouts")) return jsonResponse(200, { payouts: [] });
+    return jsonResponse(404, { error: "not_found" });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return { fetchMock, preferenceReads: () => preferenceReads, session };
+}
+
+it.each([true, false])(
+  "organises versioned=%s creator sections into accessible tabs and preserves drafts",
+  async (versioned) => {
+    const user = userEvent.setup(),
+      fixture = tabbedReferrals(versioned);
+    render(<App initialEntries={["/settings/referrals"]} />);
+    await screen.findByLabelText("Referral code");
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "Programme",
+      "Earnings",
+      "Referred clients",
+      "Payments"
+    ]);
+    expect(screen.getByRole("tab", { name: "Programme" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getAllByRole("tabpanel")).toHaveLength(1);
+    expect(screen.queryByText("Your creator code") === null).toBe(!versioned);
+    expect(screen.queryByRole("textbox", { name: "IBAN" })).toBeNull();
+    if (versioned) await user.type(screen.getByLabelText("Choose your branded code"), "DRAFTCODE");
+    await user.click(screen.getByRole("tab", { name: "Payments" }));
+    expect(await screen.findByText("No payments yet")).toBeVisible();
+    if (versioned) {
+      await user.type(
+        await screen.findByLabelText("Account holder / recipient name"),
+        "Private draft"
+      );
+      await user.type(screen.getByLabelText("IBAN"), "DE89370400440532013000");
+    } else expect(screen.queryByText("Payout preferences")).toBeNull();
+    await user.click(screen.getByRole("tab", { name: "Earnings" }));
+    expect(screen.getByText("Available")).toBeVisible();
+    expect(screen.getByText("$50.00")).toBeVisible();
+    expect(screen.queryByRole("textbox", { name: "IBAN" })).toBeNull();
+    await user.keyboard("{ArrowRight}");
+    expect(screen.getByRole("tab", { name: "Referred clients" })).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
+    expect(await screen.findByText("No referred clients yet")).toBeVisible();
+    await user.click(screen.getByRole("tab", { name: "Programme" }));
+    if (versioned)
+      expect(screen.getByLabelText("Choose your branded code")).toHaveValue("DRAFTCODE");
+    await user.click(screen.getByRole("tab", { name: "Payments" }));
+    if (versioned) {
+      expect(screen.getByLabelText("Account holder / recipient name")).toHaveValue("Private draft");
+      expect(screen.getByLabelText("IBAN")).toHaveValue("DE89370400440532013000");
+    }
+    expect(fixture.fetchMock.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(
+      0
+    );
+  }
+);
+
+it.each([false, true])(
+  "shows payments first only after confirmed payout setup: saved=%s",
+  async (saved) => {
+    const user = userEvent.setup();
+    tabbedReferrals(true, true, saved);
+    render(<App initialEntries={["/settings/referrals"]} />);
+    await screen.findByLabelText("Referral code");
+    await user.click(screen.getByRole("tab", { name: "Payments" }));
+    const headings = (): string[] =>
+      within(screen.getByRole("tabpanel"))
+        .getAllByRole("heading")
+        .map((h) => h.textContent ?? "");
+    if (!saved) {
+      await screen.findByLabelText("IBAN");
+      expect(headings()).toEqual(["Payout preferences", "Payments"]);
+      await user.type(screen.getByLabelText("Account holder / recipient name"), "Review Creator");
+      await user.type(screen.getByLabelText("IBAN"), "DE89370400440532013000");
+      await user.click(screen.getByRole("combobox", { name: "Country" }));
+      await user.click(screen.getByRole("option", { name: "Malta" }));
+      await user.click(screen.getByRole("button", { name: "Save payout preferences" }));
+      await screen.findByRole("alert");
+      expect(headings()).toEqual(["Payout preferences", "Payments"]);
+      expect(screen.getByLabelText("IBAN")).toHaveValue("DE89370400440532013000");
+      await user.click(screen.getByRole("button", { name: "Save payout preferences" }));
+    }
+    await screen.findByRole("button", { name: "Update payout preferences" });
+    await waitFor(() => expect(headings()).toEqual(["Payments", "Payout preferences"]));
+    await user.click(screen.getByRole("button", { name: "Update payout preferences" }));
+    await user.type(screen.getByLabelText("Account holder / recipient name"), "Updated draft");
+    await user.click(screen.getByRole("tab", { name: "Programme" }));
+    await user.click(screen.getByRole("tab", { name: "Payments" }));
+    expect(headings()).toEqual(["Payments", "Payout preferences"]);
+    expect(screen.getByLabelText("Account holder / recipient name")).toHaveValue("Updated draft");
+  }
+);
+
+it("refreshes payment setup after joining from the Programme tab", async () => {
+  const user = userEvent.setup(),
+    fixture = tabbedReferrals(true, false);
+  render(<App initialEntries={["/settings/referrals"]} />);
+  const join = await screen.findByRole("button", { name: "Join referral programme" });
+  await user.click(screen.getByRole("tab", { name: "Earnings" }));
+  const earningsEmpty = await screen.findByText("No earnings yet");
+  expect(earningsEmpty.closest('[data-slot="empty"]')).not.toBeNull();
+  const earningsCard = earningsEmpty.closest('[data-slot="card"]');
+  expect(earningsCard).not.toBeNull();
+  expect(
+    within(earningsCard as HTMLElement).getByRole("heading", { name: "Earnings" })
+  ).toBeVisible();
+  await user.click(screen.getByRole("tab", { name: "Payments" }));
+  expect(
+    await screen.findByText(/Join a referral programme to add payout preferences/)
+  ).toBeVisible();
+  await user.click(screen.getByRole("tab", { name: "Programme" }));
+  await user.click(screen.getByRole("checkbox", { name: /accept.*referral.*terms/i }));
+  await user.click(join);
+  await screen.findByLabelText("Referral code");
+  await user.click(screen.getByRole("tab", { name: "Payments" }));
+  expect(await screen.findByLabelText("Account holder / recipient name")).toBeVisible();
+  expect(fixture.preferenceReads()).toBeGreaterThan(1);
+});
+
+it("clears hidden creator drafts and resets the selected tab when the signed-in person changes", async () => {
+  const user = userEvent.setup(),
+    fixture = tabbedReferrals(true);
+  function CreatorSession(): JSX.Element | null {
+    const { session, setSession } = useSession();
+    if (!session) return null;
+    return (
+      <>
+        <button
+          onClick={() => {
+            fixture.session.user_id = org;
+            setSession({ ...fixture.session });
+          }}
+        >
+          Change creator
+        </button>
+        <ReferralsPage />
+      </>
+    );
+  }
+  render(
+    <SessionProvider>
+      <CreatorSession />
+    </SessionProvider>
+  );
+  await user.type(await screen.findByLabelText("Choose your branded code"), "PERSONALDRAFT");
+  await user.click(screen.getByRole("tab", { name: "Payments" }));
+  await user.type(await screen.findByLabelText("Account holder / recipient name"), "Private draft");
+  await user.click(screen.getByRole("button", { name: "Change creator" }));
+  expect(screen.getByRole("tab", { name: "Programme" })).toHaveAttribute("aria-selected", "true");
+  expect(await screen.findByLabelText("Choose your branded code")).toHaveValue("");
+  await user.click(screen.getByRole("tab", { name: "Payments" }));
+  expect(await screen.findByLabelText("Account holder / recipient name")).toHaveValue("");
+});
 
 it.each([
   { plan: "business", state: "active", trial: false, visible: false },
@@ -291,103 +542,129 @@ it.each(["clients", "payouts"] as const)(
     await waitFor(() => expect(screen.getByRole("button", { name: "Next" })).toBeEnabled());
   }
 );
-it("retries an uncertain claim with the same identity and retains externally paid details after recording failure", async () => {
-  const user = userEvent.setup(),
-    batchId = "33333333-3333-4333-8333-333333333333";
-  vi.spyOn(crypto, "randomUUID").mockReturnValue(batchId);
-  const balance = {
-    currency: "usd",
-    available_minor: 2655,
-    pending_minor: 0,
-    claimed_minor: 0,
-    paid_minor: 0
-  };
-  const payout = {
-    batch_id: batchId,
-    partner_id: partner,
-    currency: "usd",
-    amount_minor: 2655,
-    status: "claimed",
-    external_reference: null,
-    claimed_at: "2026-12-10T00:00:00.000Z",
-    paid_at: null
-  };
-  let claimed = false,
-    paid = false;
-  const claimRequest = vi
-    .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
-    .mockResolvedValueOnce(jsonResponse(503, { error: "referral_service_unavailable" }))
-    .mockImplementation(async () => {
-      claimed = true;
-      return jsonResponse(200, { payout });
-    });
-  const recordRequest = vi
-    .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
-    .mockResolvedValueOnce(jsonResponse(503, { error: "referral_service_unavailable" }))
-    .mockImplementation(async () => {
-      paid = true;
-      return jsonResponse(200, {
-        payout: {
-          ...payout,
-          status: "paid",
-          external_reference: "manual-bank-001",
-          paid_at: "2026-12-10T00:01:00.000Z"
-        }
+it.each(["legacy", "programme"])(
+  "retries an uncertain %s claim with the same identity and retains externally paid details after recording failure",
+  async (scope) => {
+    const user = userEvent.setup(),
+      batchId = "33333333-3333-4333-8333-333333333333";
+    vi.spyOn(crypto, "randomUUID").mockReturnValue(batchId);
+    const balance = {
+      currency: "usd",
+      available_minor: 2655,
+      pending_minor: 0,
+      claimed_minor: 0,
+      paid_minor: 0
+    };
+    const payout = {
+      batch_id: batchId,
+      partner_id: partner,
+      currency: "usd",
+      amount_minor: 2655,
+      status: "claimed",
+      external_reference: null,
+      claimed_at: "2026-12-10T00:00:00.000Z",
+      paid_at: null
+    };
+    let claimed = false,
+      paid = false;
+    const claimRequest = vi
+      .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
+      .mockResolvedValueOnce(jsonResponse(503, { error: "referral_service_unavailable" }))
+      .mockImplementation(async () => {
+        claimed = true;
+        return jsonResponse(200, { payout });
       });
-    });
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const known = base(input);
-      if (known) return known;
-      const url = requestUrl(input);
-      if (url.endsWith("/referrals/earnings"))
-        return jsonResponse(200, { balance: null, operator_access: true });
-      if (url.includes("/operator/balances"))
+    const recordRequest = vi
+      .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
+      .mockResolvedValueOnce(jsonResponse(503, { error: "referral_service_unavailable" }))
+      .mockImplementation(async () => {
+        paid = true;
         return jsonResponse(200, {
-          partners: [
-            {
-              partner_id: partner,
-              code: profile.code,
-              balance: claimed
-                ? {
-                    ...balance,
-                    available_minor: 0,
-                    claimed_minor: paid ? 0 : 2655,
-                    paid_minor: paid ? 2655 : 0
-                  }
-                : balance
-            }
-          ]
+          payout: {
+            ...payout,
+            status: "paid",
+            external_reference: "manual-bank-001",
+            paid_at: "2026-12-10T00:01:00.000Z"
+          }
         });
-      if (url.endsWith("/operator/payouts/claim")) return claimRequest(input, init);
-      if (url.endsWith(`/${batchId}/paid`)) return recordRequest(input, init);
-      if (url.includes("/operator/payouts?"))
-        return jsonResponse(200, { payouts: claimed ? [payout] : [] });
-      return jsonResponse(404, { error: "not_found" });
-    })
-  );
-  render(<App initialEntries={["/settings/referrals/payouts"]} />);
-  await user.click(await screen.findByRole("button", { name: "Claim balance" }));
-  await user.click(screen.getByRole("button", { name: "Claim balance" }));
-  await screen.findByRole("alert");
-  await user.click(screen.getByRole("button", { name: "Claim balance" }));
-  const field = await screen.findByLabelText("External payment reference");
-  expect(claimRequest).toHaveBeenCalledTimes(2);
-  expect(claimRequest.mock.calls[0]![1]?.body).toBe(claimRequest.mock.calls[1]![1]?.body);
-  const record = screen.getByRole("button", { name: "Record external payment" });
-  expect(record).toBeDisabled();
-  await user.type(field, "manual-bank-001");
-  await user.click(screen.getByRole("checkbox", { name: /verified.*exact external payment/i }));
-  await user.click(record);
-  await screen.findByRole("alert");
-  expect(field).toHaveValue("manual-bank-001");
-  expect(screen.getByRole("checkbox")).toBeChecked();
-  await user.click(record);
-  await screen.findByText("External payment recorded.");
-  expect(recordRequest).toHaveBeenCalledTimes(2);
-  expect(recordRequest.mock.calls[0]![1]?.body).toBe(recordRequest.mock.calls[1]![1]?.body);
-});
+      });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const known = base(input);
+        if (known) return known;
+        const url = requestUrl(input);
+        if (url.endsWith("/referrals/earnings"))
+          return jsonResponse(200, { balance: null, operator_access: true });
+        if (url.includes("/operator/balances"))
+          return jsonResponse(200, {
+            partners: [
+              {
+                partner_id: partner,
+                code: profile.code,
+                balance: claimed
+                  ? {
+                      ...balance,
+                      available_minor: 0,
+                      claimed_minor: paid ? 0 : 2655,
+                      paid_minor: paid ? 2655 : 0
+                    }
+                  : balance
+              }
+            ]
+          });
+        if (url.endsWith("/operator/payouts/claim")) return claimRequest(input, init);
+        if (url.endsWith("/v2/referrals/payouts/prepare")) return claimRequest(input, init);
+        if (url.includes("/v2/referrals/payout-balances"))
+          return jsonResponse(200, {
+            programmes: [
+              {
+                programme_id: scope === "legacy" ? null : batchId,
+                name: "Legacy Business referral",
+                available_minor: 2655,
+                preference:
+                  scope === "legacy"
+                    ? null
+                    : {
+                        programme_id: batchId,
+                        revision: batchId,
+                        method: "wise",
+                        country: "CA",
+                        currency: "cad",
+                        masked_destination: "••••ient",
+                        updated_at: "2026-11-16T00:00:00.000Z"
+                      }
+              }
+            ]
+          });
+        if (url.endsWith(`/${batchId}/paid`)) return recordRequest(input, init);
+        if (url.includes("/operator/payouts?"))
+          return jsonResponse(200, { payouts: claimed ? [payout] : [] });
+        return jsonResponse(404, { error: "not_found" });
+      })
+    );
+    render(<App initialEntries={["/settings/referrals/payouts"]} />);
+    await user.click(await screen.findByRole("button", { name: "Claim balance" }));
+    await user.click(screen.getByRole("button", { name: "Claim balance" }));
+    await screen.findByRole("alert");
+    await user.click(screen.getByRole("button", { name: "Claim balance" }));
+    const field = await screen.findByLabelText("External payment reference");
+    expect(claimRequest).toHaveBeenCalledTimes(2);
+    expect(claimRequest.mock.calls[0]![1]?.body).toBe(claimRequest.mock.calls[1]![1]?.body);
+    const record = screen.getByRole("button", { name: "Record external payment" });
+    expect(record).toBeDisabled();
+    await user.type(field, "manual-bank-001");
+    await user.click(screen.getByRole("checkbox", { name: /verified.*exact external payment/i }));
+    await user.click(record);
+    await screen.findByRole("alert");
+    expect(field).toHaveValue("manual-bank-001");
+    expect(screen.getByRole("checkbox")).toBeChecked();
+    await user.click(record);
+    await screen.findByText("External payment recorded.");
+    expect(recordRequest).toHaveBeenCalledTimes(2);
+    expect(recordRequest.mock.calls[0]![1]?.body).toBe(recordRequest.mock.calls[1]![1]?.body);
+  }
+);
 
 it("preserves server referral error codes while keeping invalid-session handling intact", async () => {
   vi.stubGlobal(
@@ -415,6 +692,7 @@ it("hides the Billing referral form when the programme is unavailable", async ()
 });
 
 it("shows a neutral programme-unavailable state instead of blaming the connection", async () => {
+  const user = userEvent.setup();
   vi.stubGlobal(
     "fetch",
     vi.fn(
@@ -424,6 +702,9 @@ it("shows a neutral programme-unavailable state instead of blaming the connectio
   );
   render(<App initialEntries={["/settings/referrals"]} />);
   expect(await screen.findByText("Referrals are unavailable")).toBeVisible();
+  expect(screen.queryByText("Check your connection and try again.")).not.toBeInTheDocument();
+  await user.click(screen.getByRole("tab", { name: "Earnings" }));
+  expect(screen.getByText("Earnings are unavailable")).toBeVisible();
   expect(screen.queryByText("Check your connection and try again.")).not.toBeInTheDocument();
 });
 

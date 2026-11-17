@@ -93,7 +93,13 @@ export interface CreateSessionInput {
   auth_method: "email_code" | "github_oauth";
 }
 
+export interface SignupOfferHint {
+  code: string;
+  expires_at: string;
+}
+
 export interface CreateUserAccountInput {
+  signup_offer?: SignupOfferHint;
   email: string;
   organization_name: string;
   organization_slug: string;
@@ -114,6 +120,7 @@ export interface GitHubUserAccountResult extends WebUserAccount {
 }
 
 export interface GitHubUserAccountInput {
+  signup_offer?: SignupOfferHint;
   github_user_id: string;
   email: string;
   verified_at: string;

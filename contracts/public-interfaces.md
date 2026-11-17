@@ -1,7 +1,7 @@
 # Public Interfaces — DebugBundle
 
 Version: v1
-Last updated: 2026-07-04
+Last updated: 2026-11-17
 
 ---
 
@@ -15,6 +15,7 @@ Every capability must be available through all applicable interfaces. Operations
 | Verify email code                            | `POST /v1/auth/verify-code`                                         | —                                         | —                                                                                                                    | Web-auth bootstrap only                                                                                                                                                         |
 | Logout (web session)                         | `POST /v1/auth/logout`                                              | —                                         | —                                                                                                                    | Web-auth bootstrap only                                                                                                                                                         |
 | Current session                              | `GET /v1/auth/session`                                              | —                                         | —                                                                                                                    | Web-auth bootstrap only                                                                                                                                                         |
+| Renew browser session | `POST /v1/auth/session/renew` | — | — | Browser lifecycle only; cookie, CSRF and exact app Origin required. No CLI/MCP token renewal. |
 | Get current account avatar                   | `GET /v1/account/avatar`                                            | —                                         | —                                                                                                                    | Browser session only, cached first-party avatar bytes                                                                                                                           |
 | Import Gravatar avatar                       | `POST /v1/account/avatar/import-gravatar`                           | —                                         | —                                                                                                                    | Browser session only, explicit user action from account settings                                                                                                                |
 | Export account data                          | `GET /v1/account/export`                                            | —                                         | —                                                                                                                    | Browser session only, owner only                                                                                                                                                |
@@ -268,6 +269,7 @@ Billing summary, no-card trial start, and allowance-capacity management routes n
 | POST   | `/v1/auth/verify-code`               | None            | Verify a one-time email code and create a browser session                                                       |
 | POST   | `/v1/auth/logout`                    | Browser Session | Revoke current browser session                                                                                  |
 | GET    | `/v1/auth/session`                   | Browser Session | Return current session state or `session: null` when signed out                                                 |
+| POST | `/v1/auth/session/renew` | Browser Session | Renew the idle deadline within the original thirty-day maximum |
 | GET    | `/review/access`                     | None            | Secret-gated reviewer bootstrap that sets a short-lived review grant cookie and redirects to the app            |
 | GET    | `/v1/account/avatar`                 | Browser Session | Return the signed-in user's cached avatar bytes when one has been imported                                      |
 | POST   | `/v1/account/avatar/import-gravatar` | Browser Session | Import and cache a Gravatar avatar server-side after explicit user action                                       |
@@ -291,6 +293,11 @@ Browser-session bootstrap endpoints exist for the SPA flow only. The separate Gi
 `GET /v1/admin/analytics/malformed-rejections` is a second internal browser-only operator surface for tracing malformed ingestion spikes. It uses the same access controls and `404 { "error": "not_found" }` fail-closed behavior as the summary route. Unlike the summary route, this response may include internal project/service identifiers plus SDK/version, event-type, and schema-validation metadata so operators can identify a misbehaving sender quickly. It must never include raw payload values, tokens, email addresses, or stack traces.
 
 `GET /v1/auth/session` returns either `session: null` or a session object with `auth_methods.email`, `auth_methods.github`, `avatar_url`, and `csrf_token`. Browser-session mutations continue to use `csrf_token` from the same session payload.
+
+`POST /v1/auth/session/renew` accepts an empty JSON object (or absent body), the session cookie, its `X-CSRF-Token`, and the exact `APP_BASE_URL` Origin. Authorization headers and client-selected expiry values are rejected. It returns `{ "session_id": "...", "expires_at": "<ISO timestamp>", "absolute_expires_at": "<ISO timestamp>" }` with `Cache-Control: no-store` and no Set-Cookie or credential plaintext. The default hosted auth limit is 10 requests/IP/minute (the existing self-host bypass is retained). Errors: `400 invalid_body`, `401 invalid_session`, `403 invalid_origin` or `invalid_csrf_token`, `429 rate_limited` with Retry-After, and `503 auth_not_configured`.
+
+Browser activity extends the server idle deadline to seven days from acknowledgement, capped at immutable creation plus thirty days. Expired, revoked or suspended sessions cannot renew. The SPA sends bounded foreground activity requests (at most every five minutes per tab); passive reads, polling and unattended tabs do not extend sessions. Email and GitHub sign-in issue a fixed thirty-day HttpOnly/Secure/SameSite=Strict cookie, which the server may reject earlier for inactivity. Renewal never rewrites cookies, so late responses cannot overwrite newer sign-in/logout cookies. Older cookies keep their existing expiry until a new sign-in. See FR/AC-WEB-14 and SEC-08.
+
 
 `POST /v1/auth/request-code` always returns a generic success payload when the request is valid. Existing accounts can use the code immediately. New accounts are created only after a valid code is verified, and the request endpoint preserves the same response shape so the browser flow does not reveal account existence.
 

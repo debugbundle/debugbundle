@@ -99,6 +99,8 @@ help:
 	@echo "  make dev-openai-plugin-preview Start dev with the local synthetic OpenAI UI review route"
 	@echo "  make dev-public      Start the public-site dev server at http://localhost:5292"
 	@echo "  make dev-public-refresh Rebuild and remount the existing local static public preview"
+	@echo "  make referral-public-review Start synthetic referral API and rebuild the local public preview"
+	@echo "  make referral-public-review-stop Remove only the owned synthetic review containers and data"
 	@echo "  make public-site-artifacts Refresh generated public API/reference artifacts"
 	@echo "  make dev-down        Stop the full local dev stack"
 	@echo "  make dev-reset       Drop local DB/cache/object-store state and rebuild from scratch"
@@ -391,6 +393,38 @@ project-service-format:
 format-check-focused:
 	test -n "$(FORMAT_FILES)"
 	$(NODE_RUN) "node_modules/.bin/prettier --check $(FORMAT_FILES)"
+
+.PHONY: referral-programmes-test referral-programmes-integration
+referral-programmes-test:
+	$(NODE_RUN) "node_modules/.bin/vitest run $(if $(TEST_FILES),$(TEST_FILES),tests/packages/referrals/programme-policy.test.ts) --maxWorkers=4 --reporter=dot"
+
+referral-programmes-integration:
+	sh scripts/test-referral-programmes-integration.sh
+
+.PHONY: referral-payout-coverage
+referral-payout-coverage:
+	REFERRAL_COVERAGE=1 REFERRAL_COVERAGE_DIR=.tmp/payout-preferences-coverage TEST_FILES='tests/integration/payout-preferences.integration.test.ts tests/integration/referral-ledger.integration.test.ts tests/integration/offer-compatibility.integration.test.ts tests/integration/offer-programmes.integration.test.ts tests/packages/referrals/*.test.ts tests/packages/storage/schema-migrations.test.ts tests/apps/api/api-payout-preferences.test.ts tests/apps/api/api-default-payout-preferences.test.ts tests/apps/api/api-default-dependencies*.test.ts tests/apps/api/api-default-referrals.test.ts tests/apps/api/api-dogfooding.test.ts tests/apps/api/api-offers.test.ts tests/apps/cli/cli-offers.test.ts tests/apps/mcp/mcp-default-tools.test.ts tests/apps/web/web-payout-preferences.test.tsx tests/apps/web/web-referrals.test.tsx tests/apps/web/web-creator-programmes.test.tsx tests/apps/web/web-dogfooding*.test.ts tests/infrastructure/dev-mock-referral-offers.test.ts' sh scripts/test-referral-programmes-integration.sh
+
+# Release fixture tests need git only inside their disposable tool container.
+.PHONY: automation-contract-test
+automation-contract-test:
+	$(NODE_RUN) "apk add --no-cache git >/dev/null && VITEST_COVERAGE_SHARD=1 node_modules/.bin/vitest run --maxWorkers=2 --reporter=dot $(TEST_FILES)"
+
+.PHONY: referral-payout-client-coverage
+referral-payout-client-coverage:
+	$(NODE_RUN) "VITEST_COVERAGE_SHARD=1 VITEST_COVERAGE_DIR=.tmp/payout-preferences-client-coverage node_modules/.bin/vitest run --coverage --maxWorkers=2 --reporter=dot tests/apps/web/web-offer-operator.test.tsx tests/apps/web/web-offer-inventories.test.tsx tests/apps/web/web-customer-offers.test.tsx"
+
+.PHONY: referral-programme-disclosure-coverage
+referral-programme-disclosure-coverage:
+	$(NODE_RUN) "VITEST_COVERAGE_SHARD=1 VITEST_COVERAGE_DIR=$(if $(COVERAGE_DIR),$(COVERAGE_DIR),.tmp/referral-programme-disclosure-coverage) node_modules/.bin/vitest run --coverage --maxWorkers=2 --reporter=dot $(if $(TEST_FILES),$(TEST_FILES),tests/apps/web/web-creator-programmes.test.tsx tests/apps/web/web-offer-programme-forms.test.tsx tests/apps/web/web-offer-programmes-page.test.tsx tests/apps/web/web-offer-policy.test.tsx)"
+
+.PHONY: referral-programmes-coverage
+referral-programmes-coverage:
+	REFERRAL_COVERAGE=1 TEST_FILES='tests/integration/offer-*.integration.test.ts tests/packages/referrals/*.test.ts tests/apps/api/api-offers.test.ts tests/apps/cli/cli-offers.test.ts tests/apps/web/web-*offer*.test.tsx tests/apps/web/web-creator-programmes.test.tsx tests/apps/worker/referral-processing-lane.test.ts tests/contracts/referral-site-projection.test.ts' sh scripts/test-referral-programmes-integration.sh
+
+.PHONY: referral-ui-component-docs
+referral-ui-component-docs:
+	$(NODE_RUN) "corepack enable && cd apps/web && corepack pnpm dlx shadcn@latest docs card input field alert alert-dialog table checkbox select"
 
 project-service-check:
 	test -n "$(LINT_FILES)"
@@ -735,6 +769,14 @@ dev-public-refresh:
 	curl --fail --silent --show-error --retry 3 --retry-connrefused --retry-delay 1 -o /dev/null "http://127.0.0.1:$(PUBLIC_SITE_PORT)/"
 	@echo "Public preview ready: http://localhost:$(PUBLIC_SITE_PORT)"
 
+.PHONY: referral-public-review referral-public-review-api referral-public-review-stop
+referral-public-review-api:
+	sh scripts/referral-public-review.sh up
+referral-public-review: referral-public-review-api
+	$(MAKE) dev-public-refresh SITE_BUILD_API_BASE_URL=http://localhost:3003
+referral-public-review-stop:
+	sh scripts/referral-public-review.sh down
+
 # Recreate only the frontend. API, worker and database state stay independent.
 .PHONY: dev-mock dev-mock-off
 dev-mock:
@@ -984,3 +1026,7 @@ smart-products-coverage:
 	docker build --build-arg "NODE_IMAGE=$(NODE_IMAGE)" -t debugbundle-qualified-unit:local -f deploy/test/qualified-unit.Dockerfile deploy/test
 	$(MAKE) smart-report-integration NODE_IMAGE=debugbundle-qualified-unit:local INTEGRATION_COVERAGE=1 SMART_REPORT_TEST_FILES="$(SMART_PRODUCTS_TEST_FILES) --reporter=dot"
 	$(NODE_RUN) "apk add --no-cache git >/dev/null && node scripts/check-changed-file-coverage.mjs"
+
+.PHONY: referral-site-contracts
+referral-site-contracts:
+	$(NODE_RUN) 'node_modules/.bin/tsx scripts/referral-site-contracts.ts'

@@ -33,11 +33,17 @@ export function AppUpdateNotifier(): null {
 
     let isDisposed = false;
     let hasPromptedForCurrentUpdate = false;
+    let isChecking = false;
     let lastCheckedAt = 0;
     const minCheckIntervalMs = 60_000;
 
     async function checkForUpdatedBuild(): Promise<void> {
-      if (isDisposed || hasPromptedForCurrentUpdate || document.visibilityState === "hidden") {
+      if (
+        isDisposed ||
+        isChecking ||
+        hasPromptedForCurrentUpdate ||
+        document.visibilityState === "hidden"
+      ) {
         return;
       }
 
@@ -46,15 +52,19 @@ export function AppUpdateNotifier(): null {
         return;
       }
       lastCheckedAt = now;
+      isChecking = true;
 
       try {
         const latestBuildId = await fetchLatestAppBuildId();
-        if (!isDifferentAppBuild({ currentBuildId, latestBuildId })) {
+        if (isDisposed || !isDifferentAppBuild({ currentBuildId, latestBuildId })) {
           return;
         }
 
         hasPromptedForCurrentUpdate = true;
         showInfoToast("A DebugBundle update is available.", {
+          id: "app-update-available",
+          duration: Infinity,
+          dismissible: false,
           description: "Reload to use the latest build.",
           action: {
             label: "Reload",
@@ -63,6 +73,8 @@ export function AppUpdateNotifier(): null {
         });
       } catch {
         // Network failures here are expected during flaky sessions and should stay silent.
+      } finally {
+        isChecking = false;
       }
     }
 

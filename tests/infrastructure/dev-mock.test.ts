@@ -146,6 +146,17 @@ describe("opt-in local dashboard mocks", () => {
         (await fetch(`${origin}/v1/alerts`, { method: "POST", body: "x".repeat(65537) })).status
       ).toBe(400);
       expect((await fetch(`${origin}/dashboard`)).status).toBe(418);
+      const offers = await fetch(`${origin}/v2/offers/operator/programmes`);
+      expect(offers.status).toBe(200);
+      expect(offers.headers.get("content-type")).toContain("application/json");
+      expect((await fetch(`${origin}/v2/offers/unknown`)).status).toBe(503);
+      expect(
+        (
+          await fetch(`${origin}/v2/offers/operator/programmes`, {
+            headers: { origin: "https://foreign.example" }
+          })
+        ).status
+      ).toBe(403);
     } finally {
       await new Promise<void>((resolve, reject) =>
         server.close((error) => (error ? reject(error) : resolve()))

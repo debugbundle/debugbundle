@@ -48,7 +48,11 @@ export function devMockPlugin(): Plugin {
 export function createDevMockMiddleware() {
   const api = createDevMockApi();
   return (request: IncomingMessage, response: ServerResponse, next: () => void): void => {
-    if (!request.url?.startsWith("/v1") && !request.url?.startsWith("/debugbundle")) {
+    if (
+      !request.url?.startsWith("/v1") &&
+      !request.url?.startsWith("/v2") &&
+      !request.url?.startsWith("/debugbundle")
+    ) {
       next();
       return;
     }

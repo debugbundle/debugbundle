@@ -1,3 +1,4 @@
+import type { OfferHttpClient } from "../../../packages/referral-client/src/offer-api.js";
 import type { AnalyticsFlowHttpClient } from "./analytics-flow-commands.js";
 import { formatMutationOutcomeError } from "../../../packages/retrieval-client/src/mutation-outcome.js";
 import { nodeFetch } from "../../../packages/node-http/src/index.js";
@@ -75,7 +76,8 @@ async function parseResponseBody(response: { text(): Promise<string> }): Promise
 export function createCliHttpClient(
   input: { baseUrl: string },
   dependencies?: { fetchImpl?: typeof fetch }
-): AnalyticsFlowHttpClient &
+): OfferHttpClient &
+  AnalyticsFlowHttpClient &
   RetrievalHttpClient &
   TokenManagementHttpClient &
   AlertHttpClient &
@@ -108,6 +110,9 @@ export function createCliHttpClient(
         accept: "application/json",
         authorization: `Bearer ${request.bearerToken}`
       };
+
+      if ("operatorProof" in request && typeof request.operatorProof === "string")
+        headers["x-debugbundle-operator-authorization"] = `Bearer ${request.operatorProof}`;
 
       const fetchInput: RequestInit = {
         method: request.method,

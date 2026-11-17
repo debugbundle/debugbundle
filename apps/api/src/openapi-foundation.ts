@@ -238,6 +238,39 @@ export function foundationOperations(): OperationSpec[] {
 
     {
       method: "post",
+      path: "/v1/auth/session/renew",
+      operationId: "renewBrowserSession",
+      summary: "Renew an active browser session within its original thirty-day maximum",
+      tags: ["Auth"],
+      security: browserSessionAuth,
+      requestBody: component("SessionRenewalBody", z.object({}).strict()),
+      responses: {
+        "200": {
+          description:
+            "Seven-day idle deadline extended, capped at original sign-in plus thirty days. Requires app Origin and CSRF; background reads do not renew.",
+          schema: component(
+            "SessionRenewalResponse",
+            z.object({
+              session_id: z.string(),
+              expires_at: z.string().datetime(),
+              absolute_expires_at: z.string().datetime()
+            })
+          )
+        },
+        "400": { description: "Invalid request body.", schema: apiError },
+        "401": {
+          description:
+            "Missing, expired or revoked browser session; bearer authentication is not supported.",
+          schema: apiError
+        },
+        "403": { description: "Invalid Origin or CSRF token.", schema: apiError },
+        "429": { description: "Too many auth attempts from this IP.", schema: apiError },
+        "503": { description: "Session renewal is unavailable.", schema: apiError }
+      }
+    },
+
+    {
+      method: "post",
       path: "/v1/auth/logout",
       operationId: "logout",
       summary: "Revoke the current browser session",

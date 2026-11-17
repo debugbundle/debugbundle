@@ -243,6 +243,25 @@ describe("worker runtime", () => {
     expect(queueCloseMock).toHaveBeenCalledOnce();
     expect(poolEndMock).toHaveBeenCalledTimes(2);
   });
+  it("processes queued creator mail independently of new referral enrolment", async (): Promise<void> => {
+    await runWorkerFromEnv({
+      WORKER_RUN_ONCE: "1",
+      ANALYTICS_HASH_SECRET: "test-analytics-secret",
+      SES_FROM_EMAIL: "noreply@example.test",
+      SES_REGION: "us-east-1",
+      APP_BASE_URL: "https://app.example.test",
+      REFERRAL_PROGRAMMES_ENABLED: "false"
+    });
+    expect(poolQueryMock).toHaveBeenCalledWith(
+      expect.stringContaining("FROM referral_creator_email_state WHERE id FOR UPDATE SKIP LOCKED"),
+      []
+    );
+    expect(poolQueryMock).toHaveBeenCalledWith(
+      expect.stringContaining("UPDATE referral_creator_email_deliveries d SET status='claimed'"),
+      expect.any(Array)
+    );
+    expect(emailTransportSendMock).not.toHaveBeenCalled();
+  });
 
   it("should run the availability-check loop until shutdown is requested", async (): Promise<void> => {
     const shutdownState = createWorkerShutdownState();

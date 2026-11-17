@@ -7,6 +7,7 @@ import {
   buildClearedGithubOauthStateCookie,
   buildGithubOauthStateCookie,
   buildSessionCookie,
+  browserSessionAbsoluteExpiry,
   readCookieValue
 } from "../../../../packages/auth/src/index.js";
 import { importUserAvatarFromUrl } from "../../../../packages/storage/src/index.js";
@@ -323,7 +324,9 @@ export function registerBrowserAuthRoutes(
         });
       }
 
+      const signupOffer = dependencies.offers?.signupHint(request.headers.cookie);
       const login = await dependencies.webAuth.verifyEmailCode({
+        ...(signupOffer ? { signup_offer: signupOffer } : {}),
         email: parsedBody.data.email,
         code: parsedBody.data.code,
         now: new Date()
@@ -350,12 +353,16 @@ export function registerBrowserAuthRoutes(
         });
       }
 
-      const referralCookie = await captureSignupReferral(dependencies.referrals, {
-        organization_id: login.session.organization_id,
-        actor_user_id: login.session.user_id,
-        created_user: login.created_user,
-        cookie_header: request.headers.cookie
-      });
+      const referralCookie = await captureSignupReferral(
+        dependencies.referrals,
+        {
+          organization_id: login.session.organization_id,
+          actor_user_id: login.session.user_id,
+          created_user: login.created_user,
+          cookie_header: request.headers.cookie
+        },
+        dependencies.offers
+      );
       if (login.created_user) {
         await recordAuditLog(dependencies.auditLogging, {
           organization_id: login.session.organization_id,
@@ -413,9 +420,13 @@ export function registerBrowserAuthRoutes(
 
       reply.header(
         "Set-Cookie",
-        buildSessionCookie(login.session_token, login.session.expires_at, {
-          secure: helpers.shouldUseSecureCookies()
-        })
+        buildSessionCookie(
+          login.session_token,
+          browserSessionAbsoluteExpiry(login.session.created_at),
+          {
+            secure: helpers.shouldUseSecureCookies()
+          }
+        )
       );
       if (plan.clear_review_cookie) {
         helpers.appendSetCookieHeader(
@@ -426,7 +437,8 @@ export function registerBrowserAuthRoutes(
         );
       }
 
-      if (referralCookie !== null) helpers.appendSetCookieHeader(reply, referralCookie);
+      if (referralCookie !== null)
+        for (const cookie of referralCookie) helpers.appendSetCookieHeader(reply, cookie);
 
       return reply.status(200).send(
         helpers.buildSessionResponse(login.session_token, {
@@ -519,7 +531,9 @@ export function registerBrowserAuthRoutes(
       request.headers.cookie,
       GITHUB_OAUTH_STATE_COOKIE_NAME
     );
+    const signupOffer = dependencies.offers?.signupHint(request.headers.cookie);
     const completed = await dependencies.webAuth.completeGithubAuth({
+      ...(signupOffer ? { signup_offer: signupOffer } : {}),
       code: parsedQuery.data.code,
       state: parsedQuery.data.state,
       stateCookieValue,
@@ -540,12 +554,16 @@ export function registerBrowserAuthRoutes(
       return reply.redirect(completed.redirect_url);
     }
 
-    const referralCookie = await captureSignupReferral(dependencies.referrals, {
-      organization_id: completed.session.organization_id,
-      actor_user_id: completed.session.user_id,
-      created_user: completed.created_user,
-      cookie_header: request.headers.cookie
-    });
+    const referralCookie = await captureSignupReferral(
+      dependencies.referrals,
+      {
+        organization_id: completed.session.organization_id,
+        actor_user_id: completed.session.user_id,
+        created_user: completed.created_user,
+        cookie_header: request.headers.cookie
+      },
+      dependencies.offers
+    );
     if (completed.created_user) {
       await recordAuditLog(dependencies.auditLogging, {
         organization_id: completed.session.organization_id,
@@ -593,13 +611,18 @@ export function registerBrowserAuthRoutes(
     });
 
     reply.header("Set-Cookie", [
-      buildSessionCookie(completed.session_token, completed.session.expires_at, {
-        secure: helpers.shouldUseSecureCookies()
-      }),
+      buildSessionCookie(
+        completed.session_token,
+        browserSessionAbsoluteExpiry(completed.session.created_at),
+        {
+          secure: helpers.shouldUseSecureCookies()
+        }
+      ),
       buildClearedGithubOauthStateCookie({ secure: helpers.shouldUseSecureCookies() }),
       buildClearedGithubSignupTrialCookie({ secure: helpers.shouldUseSecureCookies() })
     ]);
-    if (referralCookie !== null) helpers.appendSetCookieHeader(reply, referralCookie);
+    if (referralCookie !== null)
+      for (const cookie of referralCookie) helpers.appendSetCookieHeader(reply, cookie);
 
     if (
       typeof completed.avatar_url === "string" &&

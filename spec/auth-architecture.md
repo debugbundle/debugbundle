@@ -158,11 +158,11 @@ Properties:
 - delivered via `HttpOnly`, `Secure` cookie
 - `SameSite` policy chosen to match same-site SPA + API deployment
 - revocable server-side
-- short idle timeout plus bounded absolute lifetime
+- seven days of inactivity, automatically renewed during foreground use, capped at thirty days from original sign-in
 
 Storage model:
 
-- session record stored server-side in Postgres or Redis-backed session storage
+- canonical session record stored server-side in Postgres; immutable `created_at` anchors the absolute limit and `expires_at` stores the effective idle/absolute deadline
 - browser stores only the opaque cookie value
 
 Rules:
@@ -278,6 +278,46 @@ This is the primary bootstrap flow for V1.
 5. API returns a secure session cookie.
 6. SPA calls session-aware API endpoints using that cookie.
 7. Logout revokes the server-side session and clears the cookie.
+
+The SPA revalidates established sessions on visible focus and visibility return,
+coalescing overlapping reads without replacing the page with a loading screen.
+Confirmed loss clears in-memory session/CSRF state and sends protected routes to
+login with one expiry notice. Cookie-backed adapters recognize both
+`401 invalid_session` and the shared management API's compatible
+`401 invalid_member_token`; CLI/MCP error contracts stay unchanged. Unavailable
+reads preserve the current session. A local revision fences session reads begun
+before invalidation, logout or replacement sign-in so they cannot restore stale
+identity or CSRF state (SEC-05/08).
+
+Foreground pointer/keyboard/wheel activity and trusted visible, focused tab return
+call `POST /v1/auth/session/renew`. Each tab allows one in-flight request and at
+most one successful renewal per five minutes. Failure retries require a later
+activity event after at least one minute. There is no timer-based keepalive;
+ordinary API reads and polling remain read-only. Idle time is measured from the
+last acknowledged renewal, so activity has up to five minutes of granularity;
+offline or rejected renewals do not extend the server deadline. Client signals
+are not a security proof of human presence.
+
+The domain service supplies server time and the fixed policy to an atomic
+Postgres update: `min(created_at + 30 days, max(expires_at, now + 7 days))`.
+Only an unexpired, unrevoked session with active organization membership may
+renew. The absolute cap is also checked on every ordinary session resolution
+and invite acceptance. Concurrent updates serialize with logout; renewal never
+clears revocation or changes creation time. Token and CSRF identities stay stable.
+
+Sign-in sets the cookie expiry to original creation plus thirty days, while the
+server remains authoritative for the earlier inactivity deadline. Renewal never
+emits Set-Cookie, preventing a delayed renewal from replacing a subsequent
+sign-in/logout cookie. Existing pre-release cookies keep their original expiry
+and may need one additional sign-in to fully adopt the policy. Valid stored
+sessions are retained; expired ones are never backfilled or revived.
+
+This uses existing session columns and needs no schema migration or backfill.
+Existing migration/readiness gates remain unchanged. Deploy the API before the
+SPA; an old API's missing renewal endpoint cannot extend sessions but does not
+sign users out by itself. An old SPA does not renew. Rolling back stops renewal
+while existing effective deadlines remain bounded by the original thirty-day
+limit. Access-token, project-token and OpenAI OAuth policies are unchanged.
 
 ### 6.5 Ingestion Flow
 

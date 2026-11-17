@@ -1,4 +1,17 @@
 import { MetadataSeparator } from "../components/system/metadata-separator.js";
+import { PayoutInstructionDetails } from "../components/system/payout-instruction-details.js";
+import { offerApi, offerErrorMessage } from "../lib/offer-api.js";
+import { OfferApiError } from "../../../../packages/referral-client/src/offer-api.js";
+import type { z } from "zod";
+import type { PayoutProgrammeBalanceSchema } from "../../../../packages/referrals/src/payout-preferences.js";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+  SelectGroup
+} from "../components/ui/select.js";
 import { useEffect, useRef, useState } from "react";
 import { WalletIcon } from "lucide-react";
 import type {
@@ -25,6 +38,7 @@ import { Field, FieldLabel, FieldError } from "../components/ui/field.js";
 import { Input } from "../components/ui/input.js";
 import { Checkbox } from "../components/ui/checkbox.js";
 import { Skeleton } from "../components/ui/skeleton.js";
+import { Notice } from "../components/ui/notice.js";
 import {
   Empty,
   EmptyHeader,
@@ -69,6 +83,42 @@ export function ReferralPayoutsPage(): JSX.Element {
     claims = useRef(new Map<string, string>()),
     { pending, run } = usePendingAction(),
     before = cursors.at(-1);
+  const [programmes, setProgrammes] = useState<
+      z.infer<typeof PayoutProgrammeBalanceSchema>[] | null
+    >(null),
+    [programme, setProgramme] = useState(""),
+    [scopeAttempted, setScopeAttempted] = useState(false);
+  useEffect(() => {
+    if (!claim) return;
+    let cancelled = false;
+    setProgrammes(null);
+    setProgramme("");
+    setScopeAttempted(false);
+    void offerApi
+      .execute("payout_balances", { partner_id: claim.partner.partner_id })
+      .then((result) => {
+        if (cancelled) return;
+        setProgrammes(result.programmes);
+        setProgramme(
+          result.programmes.find((p) => p.available_minor > 0)?.programme_id ?? "legacy"
+        );
+      })
+      .catch((reason) => {
+        if (!cancelled) {
+          setProgrammes([]);
+          setError(offerErrorMessage(reason));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [claim?.partner.partner_id]);
+  const selectedProgramme = programmes?.find((p) => (p.programme_id ?? "legacy") === programme);
+  useEffect(() => {
+    setSelected(null);
+    setClaim(null);
+    claims.current.clear();
+  }, [identity]);
   useEffect(() => {
     const current = ++generation.current;
     setLoadError(false);
@@ -114,20 +164,41 @@ export function ReferralPayoutsPage(): JSX.Element {
     setNotice(null);
   };
   const confirmClaim = (): void => {
-    if (!claim) return;
+    if (
+      !claim ||
+      !selectedProgramme ||
+      (selectedProgramme.programme_id && !selectedProgramme.preference)
+    )
+      return;
     const requested = claim;
+    const scope = selectedProgramme;
     void run(async () => {
       const current = ++generation.current;
       setError(null);
+      setScopeAttempted(true);
       try {
-        const result = await referralApi.claim(requested.partner.partner_id, requested.id);
+        const result = scope.programme_id
+          ? (
+              await offerApi.execute("prepare_payout", {
+                partner_id: requested.partner.partner_id,
+                claim_id: requested.id,
+                programme_id: scope.programme_id,
+                preference_revision: scope.preference!.revision
+              })
+            ).payout
+          : await referralApi.claim(requested.partner.partner_id, requested.id);
         if (current !== generation.current) return;
         claims.current.delete(requested.partner.partner_id);
         setClaim(null);
         review(result);
         setRevision((value) => value + 1);
       } catch (reason) {
-        if (current === generation.current) setError(referralErrorMessage(reason));
+        if (current === generation.current)
+          setError(
+            reason instanceof OfferApiError
+              ? offerErrorMessage(reason)
+              : referralErrorMessage(reason)
+          );
       }
     });
   };
@@ -215,7 +286,7 @@ export function ReferralPayoutsPage(): JSX.Element {
                 <EmptyDescription>
                   {cursors.length
                     ? "Return to the previous page to review earlier balances."
-                    : "Partner balances appear when eligible Business payments earn commission."}
+                    : "Partner balances appear when eligible paid plans earn commission."}
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>
@@ -296,6 +367,7 @@ export function ReferralPayoutsPage(): JSX.Element {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <PayoutInstructionDetails key={selected.batch_id} batchId={selected.batch_id} />
             <form
               className="space-y-4"
               onSubmit={(event) => {
@@ -360,13 +432,61 @@ export function ReferralPayoutsPage(): JSX.Element {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Claim partner balance?</AlertDialogTitle>
+            <AlertDialogTitle>Prepare programme payout?</AlertDialogTitle>
             <AlertDialogDescription>
-              Reserve the available balance for {claim?.partner.code}, currently{" "}
-              {formatReferralAmount(claim?.partner.balance.available_minor ?? 0)} USD. The server
-              returns the frozen batch amount. Review that amount before any external payment.
+              Reserve one programme’s available USD earnings for {claim?.partner.code}. The server
+              freezes its payment instructions and amount. Unpaid reversals from other programmes
+              also reduce the amount. Transfers remain manual.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {programmes === null ? (
+            <Skeleton className="h-16 w-full" />
+          ) : (
+            <Field>
+              <FieldLabel htmlFor="payout-programme">Programme</FieldLabel>
+              <Select
+                value={programme}
+                disabled={pending || scopeAttempted}
+                onValueChange={setProgramme}
+              >
+                <SelectTrigger id="payout-programme">
+                  <SelectValue placeholder="Choose a programme" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {programmes.map((p) => (
+                      <SelectItem
+                        key={p.programme_id ?? "legacy"}
+                        value={p.programme_id ?? "legacy"}
+                      >
+                        {p.name} · {formatReferralAmount(p.available_minor)}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
+          )}
+          {selectedProgramme?.preference ? (
+            <p className="text-sm">
+              {selectedProgramme.preference.method.toUpperCase()} ·{" "}
+              {selectedProgramme.preference.masked_destination} ·{" "}
+              {selectedProgramme.preference.currency.toUpperCase()}
+            </p>
+          ) : selectedProgramme?.programme_id ? (
+            <Notice tone="warning">
+              Ask the creator to save payout preferences for this programme before preparing
+              payment.
+            </Notice>
+          ) : null}
+          {selectedProgramme &&
+          selectedProgramme.available_minor > 0 &&
+          selectedProgramme.available_minor < 5000 ? (
+            <p className="text-sm text-muted-foreground">
+              This is below the routine US$50 payout threshold. Proceed only for a manually agreed
+              arrangement or final settlement.
+            </p>
+          ) : null}
           {error ? <FieldError role="alert">{error}</FieldError> : null}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
@@ -374,6 +494,11 @@ export function ReferralPayoutsPage(): JSX.Element {
               <PendingButton
                 pending={pending}
                 pendingLabel="Claiming"
+                disabled={
+                  !selectedProgramme ||
+                  selectedProgramme.available_minor <= 0 ||
+                  Boolean(selectedProgramme.programme_id && !selectedProgramme.preference)
+                }
                 onClick={(event) => {
                   event.preventDefault();
                   confirmClaim();

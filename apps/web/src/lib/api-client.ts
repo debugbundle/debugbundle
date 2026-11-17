@@ -38,7 +38,8 @@ export function resolveApiResourceUrl(
 
 export const API_BASE = resolveApiBaseUrl();
 
-let browserSessionCsrfToken: string | null = null;
+let browserSession: SessionRecord | null = null;
+let browserSessionRevision = 0;
 let browserSessionInvalidated = false;
 const browserSessionInvalidationListeners = new Set<() => void>();
 
@@ -71,10 +72,15 @@ export function isInvalidSessionError(error: unknown): error is InvalidSessionEr
 }
 
 export function clearBrowserSessionState(): void {
-  browserSessionCsrfToken = null;
+  browserSession = null;
+  browserSessionRevision += 1;
 }
 
-function invalidateBrowserSession(): void {
+export function getBrowserSessionSnapshot(): { session: SessionRecord | null; revision: number } {
+  return { session: browserSession, revision: browserSessionRevision };
+}
+
+export function invalidateBrowserSession(): void {
   clearBrowserSessionState();
 
   if (browserSessionInvalidated) {
@@ -173,13 +179,22 @@ export function normalizeBillingSummary(
   };
 }
 
-export async function readJson<T>(response: Response): Promise<T> {
+export function assertBrowserSessionResponse(status: number, body: unknown): void {
+  const error = body !== null && typeof body === "object" && "error" in body ? body.error : null;
+  // Shared management routes retain their member-token error for CLI/MCP
+  // compatibility. This client authenticates those routes with cookies only.
+  if (status === 401 && (error === "invalid_session" || error === "invalid_member_token")) {
+    invalidateBrowserSession();
+    throw new InvalidSessionError();
+  }
+}
+
+export async function readJson<T>(response: Response, sessionRevision?: number): Promise<T> {
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as { error?: string } | null;
-
-    if (response.status === 401 && body?.error === "invalid_session") {
-      invalidateBrowserSession();
-      throw new InvalidSessionError();
+    // Session-lifecycle requests may finish parsing after another identity wins.
+    if (sessionRevision === undefined || sessionRevision === browserSessionRevision) {
+      assertBrowserSessionResponse(response.status, body);
     }
 
     throw new ApiRequestError(
@@ -197,7 +212,8 @@ export function rememberSession<T extends SessionRecord | null>(session: T): T {
     browserSessionInvalidated = false;
   }
 
-  browserSessionCsrfToken = session?.csrf_token ?? null;
+  browserSession = session;
+  browserSessionRevision += 1;
   return session;
 }
 
@@ -208,8 +224,8 @@ export function buildBrowserSessionHeaders(includeJsonContentType = false): Reco
     headers["Content-Type"] = "application/json";
   }
 
-  if (browserSessionCsrfToken !== null) {
-    headers["X-CSRF-Token"] = browserSessionCsrfToken;
+  if (browserSession !== null) {
+    headers["X-CSRF-Token"] = browserSession.csrf_token;
   }
 
   return headers;

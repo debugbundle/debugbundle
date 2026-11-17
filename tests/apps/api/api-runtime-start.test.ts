@@ -93,10 +93,12 @@ import {
 } from "../../../apps/api/src/runtime.js";
 
 function buildMigratedRuntimeSchemaRows(sql: string): { rows: Record<string, unknown>[] } {
+  if (sql.includes("AS ready")) return { rows: [{ ready: true }] };
+  if (sql.includes("protect_offer_immutable_records")) return { rows: [{ available: true }] };
+  if (sql.includes("AS available")) return { rows: [{ available: true }] };
   if (sql.includes("information_schema.tables")) {
     return { rows: REQUIRED_API_TABLES.map((table_name) => ({ table_name })) };
   }
-  if (sql.includes("AS available")) return { rows: [{ available: true }] };
 
   if (sql.includes("AS project_service_schema_available")) {
     return { rows: [{ project_service_schema_available: true }] };
@@ -165,8 +167,10 @@ describe("api runtime start", () => {
 
     // The current runtime validates additive access, financial and report
     // structures as well as the installed table/ledger and project-scope guards.
-    expect(queryMock).toHaveBeenCalledTimes(24);
+    expect(queryMock).toHaveBeenCalledTimes(28);
     for (const guard of [
+      "referral_creator_email_deliveries",
+      "referral_creator_email_state",
       "report_identity_snapshots",
       "report_runs_factual_no_ai",
       "project_analytics_review_privacy_guard",
@@ -184,6 +188,7 @@ describe("api runtime start", () => {
     for (const table of [
       "referral_reconciliation_events",
       "referral_invoice_benefits",
+      "protect_offer_immutable_records",
       "report_email_deliveries",
       "report_collection_progress",
       "report_health_recoveries"

@@ -15,6 +15,8 @@ import { createPublicStatusMocks } from "./public-status.js";
 import { createNotificationMocks } from "./notifications.js";
 import { createReportMocks } from "./reports.js";
 import { createImprovementReviewMocks } from "./improvement-reviews.js";
+import { createReferralOfferMocks } from "./referral-offers.js";
+import { createAdminAnalyticsMocks } from "./admin-analytics.js";
 
 export interface MockResponse {
   status: number;
@@ -35,6 +37,8 @@ const missing = (): MockResponse => reply({ error: "mock_record_not_found" }, 40
 export function createDevMockApi() {
   const data = createDevMockFixtures();
   const management = createManagementMocks(data);
+  const referralOffers = createReferralOfferMocks(management.isSignedIn);
+  const adminAnalytics = createAdminAnalyticsMocks(management.isSignedIn);
   const analytics = createAnalyticsMocks(data);
   const billing = createBillingMocks(data);
   const publicStatus = createPublicStatusMocks(data, management.isSignedIn);
@@ -167,12 +171,15 @@ export function createDevMockApi() {
     const projectId = projectMatch?.[1] ?? query.get("project_id");
     const route = path.replace(/^\/v1\/projects\/[^/]+/, "/v1");
     const read = method === "GET";
+    const offer = referralOffers.handle(method, path, query, payload);
+    if (offer) return offer;
+    const admin = adminAnalytics.handle(method, path);
+    if (admin) return admin;
     const review = improvementReviews.handle(method, path, query, payload);
     if (review) return review;
     const report = reports.handle(method, path, query, payload);
     if (report) return report;
     if (read && path === "/v1/organizations") return reply({ organizations: [] });
-    if (path.startsWith("/v1/referrals/")) return reply({ error: "program_unavailable" }, 503);
     const published = publicStatus.handle(method, path, query, payload, origin);
     if (published) return published;
     const notification = notifications.handle(method, path, query, payload);

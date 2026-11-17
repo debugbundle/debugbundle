@@ -30,7 +30,11 @@ export interface AlertDigestPreheaderEntry {
 }
 
 export function formatCount(count: number, singular: string, plural = `${singular}s`): string {
-  return `${count} ${count === 1 ? singular : plural}`;
+  return `${count} ${formatPlural(count, singular, plural)}`;
+}
+
+export function formatPlural(count: number, singular: string, plural = `${singular}s`): string {
+  return count === 1 ? singular : plural;
 }
 
 export function titleCase(value: string): string {
@@ -81,17 +85,25 @@ export function formatWeeklyReportPreheader(
 }
 
 export function formatAlertPreheader(input: AlertPreheaderInput): string {
-  const projectPrefix = input.projectName === undefined || input.projectName === null ? "" : `${input.projectName}: `;
+  const projectPrefix =
+    input.projectName === undefined || input.projectName === null ? "" : `${input.projectName}: `;
   return `${projectPrefix}${titleCase(input.severity)} ${input.conditionLabel.toLowerCase()} for ${input.serviceName} in ${input.environment} at ${formatEmailDate(input.occurredAt)}.`;
 }
 
-export function formatAlertDigestPreheader(alerts: AlertDigestPreheaderEntry[], totalIncidentCount = alerts.length): string {
+export function formatAlertDigestPreheader(
+  alerts: AlertDigestPreheaderEntry[],
+  totalIncidentCount = alerts.length
+): string {
   if (alerts.length === 0) {
     return "No incidents were included in this alert digest.";
   }
 
   const firstAlert = alerts[0]!;
-  const projectPrefix = firstAlert.projectName === undefined || firstAlert.projectName === null ? "" : `${firstAlert.projectName}: `;
-  const additionalIncidents = totalIncidentCount > 1 ? ` and ${formatCount(totalIncidentCount - 1, "other incident")}` : "";
+  const projectPrefix =
+    firstAlert.projectName === undefined || firstAlert.projectName === null
+      ? ""
+      : `${firstAlert.projectName}: `;
+  const additionalIncidents =
+    totalIncidentCount > 1 ? ` and ${formatCount(totalIncidentCount - 1, "other incident")}` : "";
   return `${projectPrefix}${formatCount(totalIncidentCount, "incident")} matched alerts. First: ${titleCase(firstAlert.severity)} ${firstAlert.summary ?? firstAlert.incidentId} on ${firstAlert.serviceName} in ${firstAlert.environment}${additionalIncidents}.`;
 }

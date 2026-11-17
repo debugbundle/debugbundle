@@ -1,3 +1,5 @@
+import { readStripeOfferInvoice } from "./stripe-offer-invoice.js";
+import type { OfferPolicy } from "./programme-policy.js";
 import type { ReferralReconciliationEvent } from "./referral-reconciliation.js";
 import type Stripe from "stripe";
 import { z } from "zod";
@@ -124,12 +126,15 @@ export async function readStripeReferralSnapshot(
   options: {
     expectedResource?: Pick<ReferralReconciliationEvent, "resource_type" | "resource_id">;
     includeInvoiceBenefits?: boolean;
+    offerPolicy?: OfferPolicy;
   } = {}
 ): Promise<ReferralReceiptSnapshot> {
   try {
     const input = ReferralReceiptSnapshotSchema.omit({ invoices: true, observed_at: true }).parse(
       raw
     );
+    const includeDrafts = options.includeInvoiceBenefits || options.offerPolicy !== undefined;
+    const offerBenefits: NonNullable<ReferralReceiptSnapshot["offer_benefit_invoices"]> = [];
     const client = provider.client,
       nextRead = createStripeReferralReadBudget(120_000, 1000);
     const invoices = new Map<string, InvoiceWork>(),
@@ -145,7 +150,7 @@ export async function readStripeReferralSnapshot(
         {
           customer: input.provider_customer_id,
           limit: 100,
-          ...(options.includeInvoiceBenefits ? { expand: ["data.discounts"] } : {}),
+          ...(includeDrafts ? { expand: ["data.discounts"] } : {}),
           ...(after === undefined ? {} : { starting_after: after })
         },
         nextRead()
@@ -156,7 +161,7 @@ export async function readStripeReferralSnapshot(
         seenInvoices.add(invoice.id);
         if (
           !invoice.parent?.subscription_details?.subscription ||
-          (invoice.status === "draft" && !options.includeInvoiceBenefits)
+          (invoice.status === "draft" && !includeDrafts)
         )
           continue;
         if (invoice.currency !== "usd") fail("referral_currency_unsupported");
@@ -167,6 +172,15 @@ export async function readStripeReferralSnapshot(
         if (options.includeInvoiceBenefits) {
           const benefit = readStripeInvoiceBenefit(invoice, lines, provider.priceMap);
           if (benefit) benefits.push(benefit);
+        }
+        if (options.offerPolicy) {
+          const benefit = readStripeOfferInvoice(
+            invoice,
+            lines,
+            provider.priceMap,
+            options.offerPolicy
+          );
+          if (benefit) offerBenefits.push(benefit);
         }
         if (invoice.status === "draft") continue;
         const cash = await readStripeInvoiceCash(
@@ -190,7 +204,24 @@ export async function readStripeReferralSnapshot(
             provider_available_at: value.provider_available_at
           })),
           refunds: [],
-          disputed: false
+          disputed: false,
+          ...(options.offerPolicy
+            ? {
+                base_discount_minor: lines.reduce(
+                  (sum, line, index) =>
+                    sum +
+                    (mapped[index]?.kind === "plan"
+                      ? Math.max(
+                          (line.discount_amounts ?? []).reduce((n, d) => n + d.amount, 0),
+                          (line.pretax_credit_amounts ?? [])
+                            .filter((c) => c.type === "discount")
+                            .reduce((n, d) => n + d.amount, 0)
+                        )
+                      : 0),
+                  0
+                )
+              }
+            : {})
         };
         invoices.set(invoice.id, { source: invoice, facts, cash });
         bytes += Buffer.byteLength(JSON.stringify(facts));
@@ -395,6 +426,7 @@ export async function readStripeReferralSnapshot(
       ...input,
       observed_at: new Date().toISOString(),
       ...(options.includeInvoiceBenefits ? { benefit_invoices: benefits } : {}),
+      ...(options.offerPolicy ? { offer_benefit_invoices: offerBenefits } : {}),
       invoices: [...invoices.values()]
         .map((value) => value.facts)
         .sort((a, b) => a.invoice_id.localeCompare(b.invoice_id))

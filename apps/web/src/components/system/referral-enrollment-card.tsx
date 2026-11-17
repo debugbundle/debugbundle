@@ -3,6 +3,7 @@ import { Checkbox } from "../ui/checkbox.js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card.js";
 import { Field, FieldLabel, FieldError } from "../ui/field.js";
 import { PendingButton } from "./pending-button.js";
+import { resolveReferralTermsUrl } from "../../lib/external-links.js";
 
 export function ReferralEnrollmentCard({
   termsVersion,
@@ -53,7 +54,7 @@ export function ReferralEnrollmentCard({
               I accept the{" "}
               <a
                 className="text-primary underline underline-offset-4"
-                href="https://debugbundle.com/terms/#referrals"
+                href={resolveReferralTermsUrl()}
                 target="_blank"
                 rel="noreferrer"
               >

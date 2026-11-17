@@ -1,5 +1,9 @@
 import type { CaptureRuleMatcher as SharedCaptureRuleMatcher } from "../../../../packages/shared-types/src/capture-rule-schemas.js";
-import { buildApiUrl, buildBrowserSessionHeaders, InvalidSessionError } from "./api.js";
+import {
+  buildApiUrl,
+  buildBrowserSessionHeaders,
+  readJson as readCaptureRuleJson
+} from "./api-client.js";
 
 export type CaptureRuleAction = "demote" | "sample" | "drop";
 export type CaptureRuleEventType =
@@ -11,7 +15,15 @@ export type CaptureRuleEventType =
   | "deploy_metadata"
   | "error_suppressed"
   | "probe_event";
-export type CaptureRuleRuntime = "browser" | "node" | "python" | "php" | "java" | "go" | "ruby" | "unknown";
+export type CaptureRuleRuntime =
+  | "browser"
+  | "node"
+  | "python"
+  | "php"
+  | "java"
+  | "go"
+  | "ruby"
+  | "unknown";
 export type CaptureRuleBrowserEventKind = "window_error" | "resource_error";
 export type CaptureRuleClientKind = "human" | "bot" | "unknown";
 
@@ -22,7 +34,13 @@ export interface CaptureRuleUrlMatcher {
   path_equals?: string;
 }
 
-export interface CaptureRuleMatcher extends Pick<SharedCaptureRuleMatcher, "browser_page_visibility_state" | "browser_page_ready_state" | "browser_target_tag_name" | "browser_target_attributes"> {
+export interface CaptureRuleMatcher extends Pick<
+  SharedCaptureRuleMatcher,
+  | "browser_page_visibility_state"
+  | "browser_page_ready_state"
+  | "browser_target_tag_name"
+  | "browser_target_attributes"
+> {
   event_types?: CaptureRuleEventType[];
   services?: string[];
   environments?: string[];
@@ -126,20 +144,9 @@ export interface CaptureRuleSuggestionsResponse {
   bundle_reason?: string | null;
 }
 
-async function readCaptureRuleJson<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { error?: string } | null;
-    if (response.status === 401 && body?.error === "invalid_session") {
-      throw new InvalidSessionError();
-    }
-
-    throw new Error(body?.error ?? `request_failed_${response.status}`);
-  }
-
-  return (await response.json()) as T;
-}
-
-export async function listProjectCaptureRules(projectId: string): Promise<ProjectCaptureRulesResponse> {
+export async function listProjectCaptureRules(
+  projectId: string
+): Promise<ProjectCaptureRulesResponse> {
   return await readCaptureRuleJson<ProjectCaptureRulesResponse>(
     await fetch(buildApiUrl(`/v1/projects/${projectId}/capture-rules`), {
       credentials: "include"
@@ -190,7 +197,9 @@ export async function deleteProjectCaptureRule(projectId: string, ruleId: string
   );
 }
 
-export async function suggestCaptureRulesFromIncident(incidentId: string): Promise<CaptureRuleSuggestionsResponse> {
+export async function suggestCaptureRulesFromIncident(
+  incidentId: string
+): Promise<CaptureRuleSuggestionsResponse> {
   return await readCaptureRuleJson<CaptureRuleSuggestionsResponse>(
     await fetch(buildApiUrl(`/v1/incidents/${incidentId}/capture-rule-suggestion`), {
       method: "POST",

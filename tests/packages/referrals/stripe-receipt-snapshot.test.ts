@@ -4,6 +4,7 @@ import { readStripeReferralSnapshot } from "../../../packages/referrals/src/stri
 import { calculateReferralCommission } from "../../../packages/referrals/src/commission-policy.js";
 import type { StripeBillingProvider } from "../../../packages/billing/src/stripe-subscription.js";
 import { mockedObject } from "../../helpers/vitest.js";
+import { offerPolicy, offerClaim, offerDefinition } from "../../helpers/offer-fixtures.js";
 const org = "11111111-1111-4111-8111-111111111111";
 function setup() {
   const invoice = {
@@ -128,6 +129,96 @@ it("freezes only verified financial facts and original collection chronology", a
   ).toBe(2655);
   expect(JSON.stringify(snapshot)).not.toContain("private");
 });
+it.each(["paid", "draft"] as const)(
+  "projects a %s Solo offer invoice through the complete provider snapshot adapter",
+  async (status) => {
+    const f = setup();
+    f.provider.priceMap.set("price_solo", { plan: "solo", type: "plan", interval: "month" });
+    f.invoices.mockResolvedValue({
+      data: [
+        {
+          ...f.invoice,
+          status,
+          created: 1793491200,
+          amount_due: 400,
+          total: 400,
+          total_excluding_tax: 400,
+          status_transitions: { finalized_at: status === "draft" ? null : 1793491200 },
+          parent: {
+            subscription_details: {
+              subscription: "sub_one",
+              metadata: {
+                offer_claim_id: offerClaim.claim_id,
+                offer_version_id: offerDefinition.version_id
+              }
+            }
+          },
+          discounts: [
+            {
+              id: "di_offer",
+              promotion_code: null,
+              source: { type: "coupon", coupon: "coupon_offer" }
+            }
+          ]
+        }
+      ],
+      has_more: false
+    });
+    f.lines.mockResolvedValue({
+      data: [
+        {
+          ...f.line,
+          subtotal: 500,
+          amount: 500,
+          discount_amounts: [{ discount: "di_offer", amount: 100 }],
+          pretax_credit_amounts: [{ type: "discount", amount: 100 }],
+          pricing: { price_details: { price: "price_solo" } }
+        }
+      ],
+      has_more: false
+    });
+    f.payments.mockResolvedValue({ data: [{ ...f.payment, amount_paid: 400 }], has_more: false });
+    f.charges.mockResolvedValue({ ...f.charge, amount: 400, amount_captured: 400 });
+    vi.mocked(f.provider.client.balanceTransactions.retrieve).mockResolvedValue(
+      mockedObject<Stripe.Response<Stripe.BalanceTransaction>>({
+        id: "txn_one",
+        source: "ch_one",
+        amount: 400,
+        currency: "usd",
+        available_on: 1793664000
+      })
+    );
+    const snapshot = await readStripeReferralSnapshot(
+      f.provider,
+      {
+        organization_external_id: org,
+        owner_identity_hash: "a".repeat(64),
+        provider_customer_id: "cus_one"
+      },
+      { offerPolicy }
+    );
+    expect(snapshot.offer_benefit_invoices).toMatchObject([
+      {
+        claim_id: offerClaim.claim_id,
+        version_id: offerDefinition.version_id,
+        base_net_minor: 400,
+        finalized: status !== "draft",
+        verified_base_coupon_ids: ["coupon_offer"]
+      }
+    ]);
+    if (status === "draft") {
+      expect(snapshot.invoices).toEqual([]);
+      expect(f.payments).not.toHaveBeenCalled();
+    } else {
+      expect(snapshot.invoices[0]).toMatchObject({
+        base_discount_minor: 100,
+        payments: [{ cash_minor: 400 }],
+        lines: [{ kind: "plan", plan: "solo", net_amount_minor: 400, tax_amount_minor: 0 }]
+      });
+    }
+    expect(JSON.stringify(snapshot)).not.toContain("private");
+  }
+);
 it("resolves expanded provider identities and rejects a mismatched expanded customer before reading cash", async () => {
   const f = setup();
   f.invoices.mockResolvedValue({

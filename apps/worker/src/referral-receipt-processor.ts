@@ -1,3 +1,14 @@
+import { recordOfferPerformance } from "../../../packages/storage/src/offer-performance-store.js";
+import {
+  lockCreatorEmailEpoch,
+  recordCreatorFirstPurchase
+} from "../../../packages/storage/src/creator-email-events.js";
+import {
+  readOfferReconciliationContext,
+  reconcileOfferInvoiceBenefits,
+  completeOfferBenefitRecovery
+} from "../../../packages/storage/src/offer-benefit-reconciliation.js";
+import { restoreStripeOfferBenefit } from "../../../packages/referrals/src/stripe-offer-recovery.js";
 import { z } from "zod";
 import type { StripeBillingProvider } from "../../../packages/billing/src/stripe-subscription.js";
 import { readStripeReferralSnapshot } from "../../../packages/referrals/src/stripe-receipt-snapshot.js";
@@ -29,6 +40,7 @@ export async function processNextReferralReceiptJob(input: {
   readCustomer?: typeof readStripeReconciliationCustomer;
   readSnapshot?: typeof readStripeReferralSnapshot;
   restoreBenefit?: typeof restoreStripeReferralBenefit;
+  restoreOfferBenefit?: typeof restoreStripeOfferBenefit;
   readResourceContext?: typeof readStripeReferralResourceContext;
 }): Promise<{ processed: boolean }> {
   const jobs = createWorkerJobStore(input.db);
@@ -92,10 +104,18 @@ export async function processNextReferralReceiptJob(input: {
     )
       throw new Error("referral_customer_binding_conflict");
     const benefit = await readReferralBenefitContext(input.db, customer.organization_external_id);
+    const offerBenefit = await readOfferReconciliationContext(
+      input.db,
+      customer.organization_external_id
+    );
     const snapshot = await (input.readSnapshot ?? readStripeReferralSnapshot)(
       input.provider,
       customer,
-      { expectedResource: event, ...(benefit ? { includeInvoiceBenefits: true } : {}) }
+      {
+        expectedResource: event,
+        ...(benefit ? { includeInvoiceBenefits: true } : {}),
+        ...(offerBenefit ? { offerPolicy: offerBenefit.policy } : {})
+      }
     );
     if (
       snapshot.organization_external_id !== customer.organization_external_id ||
@@ -118,20 +138,40 @@ export async function processNextReferralReceiptJob(input: {
       );
       if (result === "recheck_invoices") throw new Error("referral_invoice_state_changed");
     }
+    const offerRecovery = offerBenefit
+      ? await runInTransaction(input.db, async (connection) => {
+          const tx = createSavepointQueryable(connection);
+          await createWorkerJobStore(tx).lock(claim);
+          await bindReferralReconciliationCustomer(tx, event.event_id, customer);
+          return reconcileOfferInvoiceBenefits(tx, snapshot, event.livemode);
+        })
+      : null;
+    if (offerRecovery) {
+      const result = await (input.restoreOfferBenefit ?? restoreStripeOfferBenefit)(
+        input.provider,
+        offerRecovery
+      );
+      if (result === "recheck_invoices") throw new Error("offer_invoice_state_changed");
+    }
     await runInTransaction(input.db, async (connection) => {
       const tx = createSavepointQueryable(connection),
         scopedJobs = createWorkerJobStore(tx);
       await tx.query("SET LOCAL statement_timeout='30s'", []);
       await tx.query("SET LOCAL idle_in_transaction_session_timeout='60s'", []);
       await scopedJobs.lock(claim);
+      const creatorEmailEpoch = await lockCreatorEmailEpoch(tx);
       if (recovery)
         await completeReferralBenefitRecovery(
           tx,
           recovery.organization_external_id,
           recovery.invoice_id
         );
+      if (offerRecovery)
+        await completeOfferBenefitRecovery(tx, offerRecovery.claim_id, offerRecovery.invoice_id);
       await bindReferralReconciliationCustomer(tx, event.event_id, customer);
       await createReferralLedgerStore(tx).reconcile(snapshot);
+      await recordOfferPerformance(tx, snapshot);
+      await recordCreatorFirstPurchase(tx, snapshot, creatorEmailEpoch);
       await completeReferralReconciliationEvent(tx, event.event_id);
       await scopedJobs.complete(claim);
     });

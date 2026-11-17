@@ -57,7 +57,9 @@ Password creation (signup, reset, change) must enforce: minimum 12 characters, a
 
 ### SEC-08: Session Lifetime Bounds
 
-Default browser-session lifetime must not exceed 7 days. Changes to session lifetime require explicit rationale and security review.
+Browser sessions have a **7-day inactivity deadline** and a **30-day absolute maximum from original sign-in**, enforced on the server. Renewal never changes `created_at`, clears revocation, or revives an expired/suspended session. Ordinary authentication, polling and background tabs must not extend expiry. An explicit foreground-activity POST requires the browser cookie, CSRF token, exact app Origin and auth rate limiting; bearer credentials cannot renew browser sessions. The cookie is issued at sign-in with the absolute deadline; server idle expiry may reject it earlier, and renewal does not write cookies.
+
+Owner-approved policy change, 17 November 2026: replace the fixed seven-day sign-out with bounded renewal to avoid interrupting active users. Security review must cover exact idle/absolute boundaries, concurrent renewal/logout, membership suspension, CSRF/Origin enforcement, throttling, transient failure and stale responses. Foreground activity is a client signal, not proof of a human; a stolen valid session may be renewed until the fixed thirty-day cap or revocation. This tradeoff is bounded by HttpOnly/Secure/SameSite cookies, hashed server storage and immediate revocation. Changes to these limits require explicit rationale and review.
 
 ### SEC-09: Constant-Time Security Comparisons
 
@@ -236,3 +238,36 @@ The shared API/worker runtime logger projects request/response objects to method
 Public status pages must also enforce [the public publication trust rules](public-status-pages.md); anonymous projections are not an exception to sanitization or owner-only configuration.
 
 Billing first-purchase admission (local candidate): never trust a browser clock, disabled button, customer ID or failed subscription as purchase eligibility. Recheck the immutable trial start and processed paid-invoice history inside the organisation-locked reservation before returning/replaying Checkout. Return `paid_purchase_locked` without deleting ambiguous work. Payment/webhook reconciliation must continue to honour existing provider-confirmed payments. The gate cannot revoke previously issued hosted URLs.
+
+### Public referral offer context
+
+For FR-REF-04, `/v2/offers/context`, `/v2/offers/programmes`,
+`/v2/offers/capabilities` and `/v2/offers/pending` use credentialed CORS only for
+an exact configured public-site or app origin. Context/programmes/capabilities
+are read-only. Pending POST/DELETE are narrow exemptions from the authenticated
+CSRF middleware: they require the exact Origin even without a session, validate
+bounded public-code input and are rate-limited. They write/clear only a signed
+anonymous hint and never an account claim. Other offer mutations retain normal
+session CSRF enforcement or unrestricted scoped member credentials.
+Never widen management CORS. Responses are private/no-store, contain no identity
+or financial data, and enforce input/rate limits. Code inputs and signed cookie
+values are not raw log/telemetry dimensions. Public codes confer no authority.
+Programme operators use the existing Analytics allowlist and email-code gate;
+automation additionally requires an explicitly issued, hashed, short-lived,
+revocable session/token/action-bound delegation. No delegation grants internal
+Analytics reads or payout rights.
+
+Operator inventories and cohort metrics require the same gate on every request.
+No private identity, provider IDs, raw receipt payloads or credential material enter
+those projections. Inventory paging uses bounded server queries. Performance
+windows are UTC [from,to), at most 366 days; observations and reconciliation gaps
+are explicit. Delegation bearer proofs are never accepted as query parameters,
+regular member tokens or payout authority. Browser requests have bounded timeouts.
+
+Creator payment setup (FR-REF-11) uses personal verified identity with an expected
+user guard and normal session CSRF. Raw recipient details are encrypted under a
+dedicated key, excluded from ordinary reads/exports and audit metadata. Both API
+and app SDK configurations add payment-field redaction, including nested failed
+request bodies. Explicit frozen-instruction disclosure is private/no-store and
+audited, and requires the separate billing payout allowlist. Programme delegation
+grants no finance access. Payment stores never initiate transfers.

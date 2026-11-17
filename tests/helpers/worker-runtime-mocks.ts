@@ -422,6 +422,9 @@ export const WORKER_TABLE_ROWS = [
 ];
 
 export function buildMigratedWorkerSchemaRows(sql: string): { rows: Record<string, unknown>[] } {
+  if (sql.includes("AS ready")) return { rows: [{ ready: true }] };
+  if (sql.includes("protect_offer_immutable_records")) return { rows: [{ available: true }] };
+  if (sql.includes("AS available")) return { rows: [{ available: true }] };
   if (sql.includes("information_schema.tables")) {
     return { rows: WORKER_TABLE_ROWS };
   }
@@ -432,7 +435,6 @@ export function buildMigratedWorkerSchemaRows(sql: string): { rows: Record<strin
 
   // This fixture represents every currently required forward migration.
   // Missing-schema tests override their specific proof separately.
-  if (sql.includes("AS available")) return { rows: [{ available: true }] };
 
   if (sql.includes("to_regclass")) {
     return { rows: [{ relation_name: "storage_migration_ledger" }] };

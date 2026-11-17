@@ -1,5 +1,9 @@
 # DebugBundle for Gemini CLI changelog
 
+## [1.8.0] - 2026-11-17
+
+- Adopt MCP 1.26.0 with configurable referral programmes, offer management and payout-preference tools. Preserve local authentication and existing tool permissions.
+
 ## [1.7.1] - 2026-11-14
 
 - Adopt MCP 1.25.0 with compatible Rust evidence and additive analytics count schemas. Preserve tool permissions, local authentication and existing workflows.

@@ -373,3 +373,10 @@ suspension, explicit inherited grants, legacy-token isolation or report consent.
 Trial-deadline numeric collection must stop before lifecycle cleanup runs, and a
 late paid conversion must begin a fresh coverage epoch. Both guarantees require
 forward migrations and fail-closed readiness.
+
+## Versioned referral programme follow-up
+
+FR-BUS-04 and AC-BUS-04 above remain the legacy Business-only agreement. The
+approved [referral programmes extension](referral-programmes.md), FR-REF-01–10 /
+AC-REF-01–10, adds explicit all-paid-plan programmes without rewriting legacy
+claims, invoices, balances or accepted terms.

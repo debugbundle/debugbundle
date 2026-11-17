@@ -180,7 +180,12 @@ describe("web app — admin analytics", () => {
 
     render(<App initialEntries={["/analytics"]} />);
 
-    expect(await screen.findByRole("heading", { name: /analytics/i })).toBeInTheDocument();
+    expect(
+      (await screen.findByRole("heading", { name: "Internal Analytics" })).closest("header")
+    ).not.toBeNull();
+    const programmes = await screen.findByRole("link", { name: "Programmes & offers" });
+    expect(programmes).toHaveAttribute("href", "/programmes");
+    expect(programmes.parentElement).toContainElement(screen.getByText("UTC windows"));
     expect(screen.getByText("Active this month")).toBeInTheDocument();
     expect(screen.getByText("1,200")).toBeInTheDocument();
     expect(screen.getByText("80%")).toBeInTheDocument();
@@ -220,7 +225,9 @@ describe("web app — admin analytics", () => {
     render(<App initialEntries={["/analytics"]} />);
 
     expect(await screen.findByText(/continue with email/i)).toBeInTheDocument();
-    expect(screen.getByText(/analytics access requires an email-authenticated session/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/analytics access requires an email-authenticated session/i)
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /send code/i })).toBeInTheDocument();
   });
 

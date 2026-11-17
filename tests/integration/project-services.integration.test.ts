@@ -10,6 +10,7 @@ import { createPostgresGitHubStore } from "../../packages/storage/src/github-sto
 import { createProjectMergeStore } from "../../packages/storage/src/project-merge-store.js";
 import { getOrCreateServiceId } from "../../packages/storage/src/metadata-incident-shared.js";
 import { inspectProjectMergeInventory } from "../../packages/storage/src/project-merge-inventory.js";
+import { OFFER_PROGRAMME_TABLES } from "../../packages/storage/src/offer-programme-schema.js";
 import { createProjectServicesApi } from "../../packages/project-management-client/src/project-services.js";
 import { createApiServer } from "../../apps/api/src/server.js";
 import { createBaseDependencies } from "../helpers/api-capture-rule-ingestion.js";
@@ -99,6 +100,11 @@ runIntegration("logical services on fresh and populated databases", () => {
     const inventory = await inspectProjectMergeInventory(db);
     expect(inventory.blockers).toEqual([]);
     expect(inventory.complete).toBe(true);
+    for (const table of OFFER_PROGRAMME_TABLES)
+      expect(inventory.dependencies.find((entry) => entry.table === table)).toMatchObject({
+        disposition: "unchanged_account",
+        project_columns: []
+      });
     await pool.query(
       "CREATE TABLE unknown_consumer(id uuid PRIMARY KEY, incident_id uuid REFERENCES incidents(id))"
     );

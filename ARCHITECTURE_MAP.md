@@ -1,3 +1,114 @@
+Creator notifications: `referrals/creator-email-contracts.ts` validates private
+mail snapshots and `creator-email-delivery.ts` owns the send fence orchestration.
+`email/creator-referral-emails.ts` reuses the shared HTML/plain-text layout;
+`creator-email-review.ts` supplies three local catalogue previews.
+`storage/creator-email-schema.ts` adds the forward migration/readiness guard;
+`creator-email-events.ts` records accepted revisions and first verified customers
+in their existing transaction, and `creator-email-store.ts` seals daily UTC windows
+and fences per-recipient delivery. The receipt worker calls it only after financial
+settlement; `worker/creator-email-processor.ts` composes the optional existing SES
+configuration independently of payment processing. Personal account export adds
+bounded delivery metadata; notifications never change cash or payout authority.
+
+Payout setup: `referrals/payout-preferences.ts` owns fixed policy/validation;
+`payout-management.ts` separates personal setup and billing-operator functions.
+`storage/payout-preference-schema.ts` adds a forward migration/readiness guards;
+`payout-preference-store.ts` encrypts recipient data and snapshots exact revisions.
+`referral-ledger-store.ts` prepares scoped positive entries plus global negative
+offsets under existing financial locks. `referral-payout-scope.ts` shares hold SQL.
+API composition is `default-payout-preferences.ts` and `routes/payout-preferences.ts`;
+`referral-client/payout-operations.ts` feeds API/CLI/ordinary MCP contracts.
+Creator and operator UI reuse `creator-payout-preferences.tsx` and
+`payout-instruction-details.tsx`. The local mock keeps masked ephemeral state only.
+`referrals-page.tsx` composes the shared Tabs into Programme, Earnings, Referred
+clients and Payments. It owns payout setup alongside payment history; the creator
+programme control reports confirmed enrolment so setup and balances refresh.
+Panels remain mounted while hidden to retain drafts, keyed to personal identity.
+The payout component reports confirmed setup completeness; the page reorders
+keyed cards so history precedes fully saved preferences without resetting state.
+The dedicated optional server key never enters browser or worker configuration.
+Current profile deletion on anonymisation is deferred pending explicit approval;
+frozen payment instructions are immutable retained financial records.
+
+Referral/offer implementation (local, qualified for internal review):
+`packages/referrals/src/programme-policy.ts` owns browser-safe commercial schemas
+and integer money projections; `offer-quote-contracts.ts` keeps client validation
+separate from the server-only HMAC codec. The policy module shares the 0–100%
+commission-rate schema with the cash calculator and exact two-decimal percentage
+input with the editor/public projection. `packages/storage/src/offer-*` owns
+immutable versions/codes/audit, claims, signup intents, grants, provider bindings
+and operator delegation. `offer-programme-schema.ts` adds a forward migration and
+fail-closed runtime shape/guard checks. Billing and receipt reconciliation freeze
+and settle the same claim through the existing checkout, receipt and ledger lane.
+`programme-lifecycle.ts` shares pre-provider/locked state checks;
+`stripe-offer-catalogue.ts` shares unique current price, advertised amount and
+base-only scope/mode validation (including retained capacity products) between
+`stripe-offer-provisioning.ts` and the existing checkout coupon verifier. Management
+prepares/reuses the binding outside DB locks before final activation. API/CLI/MCP
+all use this lifecycle service; the manual-binding operation remains compatible.
+`packages/referral-client/src/offer-api.ts` supplies shared API/CLI/ordinary MCP
+validation; restricted MCP catalogues stay separate. `/v2/offers/*` routes enforce
+public-context, verified Owner and internal operator boundaries independently.
+App offer components reuse the existing design system. The independent site
+consumes a generated browser-safe policy projection and runtime public context;
+`/affiliates/` composes `PublicProgrammeCard` and the shared `SiteDialog` for
+compact programme summaries and complete terms. `affiliate-programmes.ts` projects
+eligible catalogue examples with the existing integer-money policy; shorter annual
+windows show date-dependent commission instead of a full-year amount.
+Its announcement is in `site/content/blog/debugbundle-affiliate-programme.mdx`
+and approved for the coordinated release. Hosted `/r/<code>` routing source
+belongs to `.local-repos/debugbundle-cloud`. No activation or deployment occurred.
+See [the approved plan](spec/referral-programmes-plan.md) and `STATUS.md`.
+`scripts/referral-public-review.ts` seeds only the named disposable review
+database and composes the real public offer routes without private authentication
+or provider transports. Its ownership-checked shell launcher publishes the API on
+loopback; `make referral-public-review` rebuilds the static site with an explicit
+local API override. This review fixture does not configure production runtime.
+The separate private app preview on 5291 uses `scripts/dev-mock/referral-offers.ts`
+and `admin-analytics.ts` for synthetic in-memory operator/referral views. The
+development-only middleware intercepts v1/v2 requests, validates offer contracts,
+rejects foreign origins and never proxies unsupported operations. Its state is
+independent of the public fixture. Internal route titles live in `site-header.tsx`.
+`offer-code-registry.ts` supplies the shared claim-admission lock for legacy and
+versioned paths. Programme activation validates positive catalogue totals;
+the site's public offer client consumes successful URL hints and preserves
+typed conflict reasons. Follow-up audit: `spec/referral-programmes-audit-20261116.md`.
+The public provider keeps state separate from `public-offer-notice.tsx`; the latter
+uses shared `site-dialog.tsx` for conditions. The existing agent-prompt client also
+uses this frame: size/position, optional eyebrow/description, scrollable body,
+footer and circular close control are shared; prompt content/copy state remain in
+`agent-assist-prompt-dialog-trigger.tsx`. `offer-badge.tsx` and `offer-price.tsx`
+present offer-type/discount tags and amounts with existing site tokens.
+`offer-programme-details.tsx` composes the existing Collapsible/Button primitives
+for administrator version cards. `referral-programme-card.tsx` composes app
+Card/Dialog primitives for creator discovery and accepted agreements, with consent
+owned by `creator-programme-control.tsx`. Public and internal examples share
+`programmeEarningsExamples` in the browser-safe commercial policy projection.
+Policies, examples and admin metadata start closed; consent and action controls
+stay outside the disclosure. Site banner and homepage use the same shared link
+class with no underline until hover.
+The strip uses REFERRAL/SALE labels and follows the active route layout width
+without a dismiss control. Full codes and conditions live in the
+modal; public code entry uses a closed native disclosure. Public and signup code fields own anonymous hint clearing through the
+existing pending endpoint. `email-auth-page.tsx` consumes the URL hint only after
+successful clearing, preserving trial, return path, hash and router state.
+Operator inventories use bounded support projections. `offer-performance.ts` and
+`offer-performance-store.ts` derive cohort reporting from verified receipt cash
+and the existing ledger; coverage and holds are explicit. The receipt worker
+updates that projection only in its lease-fenced final transaction. Hosted source
+checks `referral-offers-v1` candidate and rollback reader capability even after
+new claims are disabled. Creator reads report actual new-referral availability,
+including blocked codes and superseded agreements.
+`referral-benefit-recovery-retirement.ts` is the shared legacy/versioned SQL-only
+zero-invoice repair retirement inside the receipt lease fence. Its immutable
+evidence table is the twelfth table in the additive programme migration; it never
+releases Checkout or resets first-benefit eligibility. Legacy signup hint capture
+and bounded recovery are independent of the new-programme switch.
+`project-merge-inventory.ts` classifies all twelve programme tables as
+`unchanged_account`, preserving financial promises while project origins merge.
+`billing-checkout-store.ts` lets the same Owner's saved promise supersede an
+unacknowledged signup hint while retaining quote/coupon/identity/admission checks.
+
 SDK safety publication and hosted acceptance: `spec/sdk-safety-release-20261115.md`. All 13 capture surfaces are released; core 1.27.2/site 1.10.4 adopt JS 3.2.4. Python 3.0.0 documents its diagnostic-lane timing migration. No new service, schema, endpoint or collection channel is introduced.
 
 SDK diagnostic ownership: Node `internal-diagnostics.ts` owns scoped suppression, sanitisation and emission bounds; Browser `internal-diagnostics.ts` owns contained console warnings and breadcrumb suppression; Python `internal_diagnostics.py` owns one bounded callback lane. Go `debugbundle.go`, Swift `DebugBundleInternalDiagnostic.swift` and WordPress `Diagnostics.php` own local status codes/storage. Console wrappers preserve native return values for diagnostic Promise handling; WordPress shares its native nonce fields through `Sanitization::REDACT_FIELDS`. No additional diagnostic sender exists. Cross-SDK qualification lives in `spec/sdks/internal-diagnostics-audit.md`.
@@ -1019,6 +1130,8 @@ Public Reports labels retain existing `smart-reports` routes and capability name
 - **Internal structure:** `src/index.ts` maps the MCP catalog to OpenClaw `defineToolPlugin` metadata, converts Zod schemas to JSON Schema and TypeBox unsafe schemas, delegates execution to `createDefaultMcpTools`, uses `src/tool-policy.ts` to default unreviewed capabilities to optional, and installs native per-call approval hooks for optional tools; `scripts/check-bundle.mjs` rejects server-only imports and dynamic compilation in the assembled artifact; `openclaw.plugin.json` is generated from the built entry; `package.json` owns OpenClaw compatibility metadata and ClawHub install hints.
 
 ### `apps/web`
+
+- **Session/update lifecycle:** `lib/session.tsx` coalesces bootstrap/manual/focus reads and revalidates on visible focus/visibility return. `lib/api-auth.ts` fences uncached session reads against identity changes; `lib/api-client.ts` owns in-memory session/CSRF revisions and shared cookie-auth invalidation. Protected adapters reuse that boundary, including management `invalid_member_token` responses. `RootGate` owns the single expiry toast/login redirect. `components/system/app-update-notifier.tsx` uses the existing shared Sonner wrapper for a non-dismissible, untimed Reload notice; completed-reload changelog feedback stays temporary. FR/AC-WEB-13 covers local qualification. FR/AC-WEB-14 adds throttled trusted foreground activity in `lib/session-activity.ts` and revision-fenced renewal in `lib/api-auth.ts`. `packages/auth/src/browser-session-policy.ts` owns seven-day idle/thirty-day absolute bounds; `packages/storage/src/auth-session-store.ts` owns session persistence and atomic renewal, composed by the unchanged auth-store factory. `routes/auth-session-renewal.ts` enforces cookie/CSRF/app-Origin renewal without Set-Cookie; email/GitHub sign-in issue the fixed absolute cookie. Existing created/expiry columns support the policy without a migration; background reads and automation tokens retain their policies.
 
 - **Owns:** Implemented first seven web management slices plus hosted improvement management, project product-analytics overview/routes/funnels/audiences/journeys/opportunities/bundles, customer workspace Analytics inventory, internal operator analytics, and the owner-approved existing-app OpenAI consent/reviewer/connection-revocation experience. Public-auth routes include `/login`, `/signup`, `/invite`, `/oauth/consent`, and `/oauth/reviewer`; signed-in management includes `/settings` plus the existing dashboard/project/incident/analytics/billing routes. The explicitly opted-in `/__dev/openai-plugin` route is a non-public synthetic visual-review harness and is not mounted in production.
 - **Framework:** React + Vite SPA deployed to `app.debugbundle.com`

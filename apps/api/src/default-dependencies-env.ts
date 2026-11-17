@@ -189,6 +189,10 @@ export function createApiDependenciesFromEnv(
       : { billingAdminEmails: billingAdminEmails ?? [] }),
     ...(stripeConfig === undefined ? {} : { stripeConfig }),
     ...(referralConfig === undefined ? {} : { referralConfig }),
+    ...(env["REFERRAL_PAYOUT_ENCRYPTION_KEY"]?.trim()
+      ? { referralPayoutEncryptionKey: env["REFERRAL_PAYOUT_ENCRYPTION_KEY"].trim() }
+      : {}),
+    offerProgrammesEnabled: env["REFERRAL_PROGRAMMES_ENABLED"] === "true",
     ...(lifecycleWebhookFallbackTargetUrl === undefined
       ? {}
       : { lifecycleWebhookFallbackTargetUrl }),

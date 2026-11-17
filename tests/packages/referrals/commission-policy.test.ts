@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   calculateReferralCommission,
+  calculateCollectedBaseCash,
   referralCommissionEndsAt,
   referralFundsAvailableAt,
   referralAttributionAllowed
@@ -8,6 +9,11 @@ import {
 
 const start = "2026-01-31T00:00:00.000Z";
 const end = "2027-01-31T00:00:00.000Z";
+const allPaidPolicy = {
+  eligible_plans: ["solo", "team", "business"] as ("solo" | "team" | "business")[],
+  commission_basis_points: 5000,
+  commission_months: 12
+};
 function line(amount = 5900) {
   return {
     id: "base",
@@ -28,6 +34,69 @@ function invoice(amount = 5900) {
   };
 }
 describe("Business base referral commission", () => {
+  it.each(["solo", "team", "business"] as const)(
+    "uses the frozen explicit policy for %s without changing the legacy default",
+    (plan) => {
+      const input = { ...invoice(400), lines: [{ ...line(400), plan }] };
+      expect(calculateReferralCommission(input, allPaidPolicy)).toBe(200);
+      expect(calculateReferralCommission(input)).toBe(plan === "business" ? 200 : 0);
+      expect(
+        calculateReferralCommission(input, { ...allPaidPolicy, commission_basis_points: 2500 })
+      ).toBe(100);
+    }
+  );
+  it("clamps a shorter calendar-month window and excludes service beyond it", () => {
+    expect(referralCommissionEndsAt(start, 1)).toBe("2026-02-28T00:00:00.000Z");
+    const input = {
+      ...invoice(),
+      lines: [
+        {
+          ...line(),
+          service_starts_at: "2026-02-28T00:00:00.000Z",
+          service_ends_at: "2026-03-31T00:00:00.000Z"
+        }
+      ]
+    };
+    expect(calculateReferralCommission(input, { ...allPaidPolicy, commission_months: 1 })).toBe(0);
+    expect(() =>
+      calculateReferralCommission(input, { ...allPaidPolicy, commission_basis_points: 10001 })
+    ).toThrow();
+    expect(() =>
+      calculateReferralCommission(
+        {
+          ...input,
+          lines: [
+            { ...input.lines[0]!, plan: "solo", service_ends_at: input.lines[0]!.service_starts_at }
+          ]
+        },
+        allPaidPolicy
+      )
+    ).toThrow();
+  });
+  it.each([
+    [5001, 4001],
+    [7500, 6000],
+    [10000, 8000]
+  ])(
+    "settles the frozen %i basis-point rate after discounts, partial collection and refunds",
+    (rate, fullCommission) => {
+      const selected = { ...allPaidPolicy, commission_basis_points: rate };
+      for (const collected of [0, 1, 3, 101, 400, 8000]) {
+        for (const refunded of [0, Math.floor(collected / 2), collected]) {
+          const input = {
+            ...invoice(8000),
+            cash_collected_minor: collected,
+            refunds: [{ id: "refund", cash_minor: refunded }]
+          };
+          const earned = calculateReferralCommission(input, selected);
+          const remaining = collected - refunded;
+          expect(earned).toBe(Math.floor((remaining * rate + 5000) / 10000));
+          expect(remaining - earned).toBeGreaterThanOrEqual(0);
+        }
+      }
+      expect(calculateReferralCommission(invoice(8000), selected)).toBe(fullCommission);
+    }
+  );
   it.each([
     [5310, 2655],
     [5900, 2950],
@@ -350,4 +419,33 @@ it("excludes self-referrals, prior paying customers, reserved checkouts and sile
       explicit_correction: true
     })
   ).toBe(true);
+});
+
+it("reports retained base cash without commission-window or double-rounding artefacts", () => {
+  const input = {
+    lines: [line(101), { ...line(99), id: "capacity", kind: "extra_capacity" as const }],
+    cash_collected_minor: 200,
+    refunds: []
+  };
+  expect(calculateCollectedBaseCash(input, ["business"])).toBe(101);
+  expect(calculateCollectedBaseCash({ ...input, cash_collected_minor: 100 }, ["business"])).toBe(
+    51
+  );
+  expect(
+    calculateCollectedBaseCash(
+      {
+        ...input,
+        refunds: [
+          { id: "refund", cash_minor: 101, allocations: [{ line_id: "base", amount_minor: 101 }] }
+        ]
+      },
+      ["business"]
+    )
+  ).toBe(0);
+  expect(
+    calculateCollectedBaseCash(
+      { ...input, lines: input.lines.map((l) => ({ ...l, plan: "solo" as const })) },
+      ["business"]
+    )
+  ).toBe(0);
 });

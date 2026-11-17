@@ -1,3 +1,5 @@
+import { readVerifiedStripeOfferCoupon } from "../../referrals/src/stripe-offer-coupon.js";
+import type { BillingCheckoutOffer } from "../../storage/src/offer-benefit-store.js";
 import { readStripeCustomerPaymentHistory } from "../../referrals/src/stripe-customer-eligibility.js";
 import { readVerifiedStripeReferralCoupon } from "../../referrals/src/stripe-referral-coupon.js";
 import type { BillingCheckoutReferral } from "../../storage/src/billing-checkout-store.js";
@@ -16,6 +18,7 @@ export type CheckoutLinkResult =
   | "checkout_not_allowed"
   | "paid_purchase_locked"
   | "upgrade_confirmation_required"
+  | "offer_confirmation_required"
   | "billing_service_error"
   | "billing_not_configured"
   | null;
@@ -32,6 +35,7 @@ export async function createStripeCheckoutLink(options: {
     additional_capacity_units?: number;
     confirmed_ended_subscription_id?: string;
     expected_owner_user_id?: string;
+    expected_offer?: { claim_id: string; version_id: string; expires_at: string };
   };
 }): Promise<CheckoutLinkResult> {
   const { stripe, store, appBaseUrl, input } = options;
@@ -83,10 +87,14 @@ export async function createStripeCheckoutLink(options: {
     // Only confirmed expiry or an exact completed purchase whose subscription
     // is provider-confirmed terminal permits replacement. Uncertain work stays.
     let referralCoupon: BillingCheckoutReferral | undefined;
+    let offerCoupon: BillingCheckoutOffer | undefined;
     for (let pass = 0; pass < 4; pass += 1) {
       const attempt = await store.claim({
         organization_id: input.organization_id,
         target_plan: input.target_plan,
+        interval: input.interval ?? "month",
+        ...(input.expected_offer ? { expected_offer: input.expected_offer } : {}),
+        ...(offerCoupon ? { offer_coupon: offerCoupon } : {}),
         ...(referralCoupon ? { referral_coupon: referralCoupon } : {}),
         ...(input.expected_owner_user_id === undefined
           ? {}
@@ -94,12 +102,23 @@ export async function createStripeCheckoutLink(options: {
         ...(input.confirmed_ended_subscription_id === undefined
           ? {}
           : { confirmed_ended_subscription_id: input.confirmed_ended_subscription_id }),
-        parameters: (customerId, expiresAt, referral) => ({
+        parameters: (customerId, expiresAt, referral, programmeOffer) => ({
           mode: "subscription",
           client_reference_id: input.organization_id,
           metadata: {
             organization_id: input.organization_id,
-            ...(referral ? { referral_attribution_id: referral.attribution_id } : {})
+            ...(programmeOffer
+              ? {
+                  offer_claim_id: programmeOffer.claim_id,
+                  offer_version_id: programmeOffer.version_id
+                }
+              : {}),
+            ...((referral?.attribution_id ?? programmeOffer?.attribution_id)
+              ? {
+                  referral_attribution_id:
+                    referral?.attribution_id ?? programmeOffer?.attribution_id
+                }
+              : {})
           },
           line_items: lineItems,
           success_url: `${appBaseUrl}/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
@@ -107,15 +126,29 @@ export async function createStripeCheckoutLink(options: {
           automatic_tax: { enabled: true },
           billing_address_collection: "auto",
           tax_id_collection: { enabled: true },
-          ...(referral
-            ? { allow_promotion_codes: false, discounts: [{ coupon: referral.coupon_id }] }
+          ...((referral ?? programmeOffer)
+            ? {
+                allow_promotion_codes: false,
+                discounts: [{ coupon: (referral ?? programmeOffer)!.coupon_id }]
+              }
             : { allow_promotion_codes: true }),
           expires_at: expiresAt,
           payment_method_options: { card: { request_three_d_secure: "any" } },
           subscription_data: {
             metadata: {
               organization_id: input.organization_id,
-              ...(referral ? { referral_attribution_id: referral.attribution_id } : {})
+              ...(programmeOffer
+                ? {
+                    offer_claim_id: programmeOffer.claim_id,
+                    offer_version_id: programmeOffer.version_id
+                  }
+                : {}),
+              ...((referral?.attribution_id ?? programmeOffer?.attribution_id)
+                ? {
+                    referral_attribution_id:
+                      referral?.attribution_id ?? programmeOffer?.attribution_id
+                  }
+                : {})
             }
           },
           ...(customerId === null
@@ -125,6 +158,53 @@ export async function createStripeCheckoutLink(options: {
             : { customer: customerId, customer_update: { address: "auto", name: "auto" } })
         })
       });
+      if (attempt === "offer_coupon_required") {
+        if (!store.getOfferCheckoutContext || !input.expected_owner_user_id)
+          return "billing_not_configured";
+        if (offerCoupon || referralCoupon) return "checkout_in_progress";
+        const context = await store.getOfferCheckoutContext({
+          organization_id: input.organization_id,
+          actor_user_id: input.expected_owner_user_id
+        });
+        if (
+          !context?.required ||
+          !context.discount_eligible ||
+          !context.coupon_id ||
+          context.livemode === null
+        )
+          return "billing_not_configured";
+        if (
+          !context.policy.eligible_plans.includes(input.target_plan) ||
+          !context.policy.eligible_intervals.includes(input.interval ?? "month")
+        )
+          return "checkout_not_allowed";
+        if (
+          await readStripeCustomerPaymentHistory(stripe.client, {
+            customer_id: context.current_customer_id,
+            verified_email: context.verified_owner_email
+          })
+        )
+          return "checkout_not_allowed";
+        try {
+          offerCoupon = {
+            claim_id: context.claim_id,
+            version_id: context.version_id,
+            attribution_id: context.attribution_id,
+            provider_customer_id_checked: context.current_customer_id,
+            verified_owner_email_checked: context.verified_owner_email,
+            coupon_id: await readVerifiedStripeOfferCoupon(
+              stripe,
+              context.coupon_id,
+              basePrice,
+              context.policy,
+              context.livemode
+            )
+          };
+        } catch {
+          return "billing_not_configured";
+        }
+        continue;
+      }
       if (attempt === "referral_coupon_required") {
         if (
           !stripe.referralCouponId ||

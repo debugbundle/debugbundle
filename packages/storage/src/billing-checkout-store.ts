@@ -1,3 +1,13 @@
+import {
+  createOfferBenefitStore,
+  readOfferCheckoutContext,
+  reserveOfferCheckout,
+  releaseOfferCheckout,
+  offerEarlyPurchaseAllowed,
+  consumeOfferEarlyPurchase,
+  type BillingCheckoutOffer,
+  type OfferCheckoutContext
+} from "./offer-benefit-store.js";
 import { z } from "zod";
 import { createReferralBenefitStore } from "./referral-benefit-store.js";
 import { createSavepointQueryable } from "./savepoint-queryable.js";
@@ -23,6 +33,10 @@ export interface BillingCheckoutReferral {
   coupon_id: string;
 }
 export interface BillingCheckoutStore {
+  getOfferCheckoutContext?(input: {
+    organization_id: string;
+    actor_user_id: string;
+  }): Promise<OfferCheckoutContext | null>;
   getReferralCheckoutContext?(input: { organization_id: string; actor_user_id: string }): Promise<{
     attribution_id: string;
     discount_eligible: boolean;
@@ -35,10 +49,14 @@ export interface BillingCheckoutStore {
     confirmed_ended_subscription_id?: string;
     expected_owner_user_id?: string;
     referral_coupon?: BillingCheckoutReferral;
+    offer_coupon?: BillingCheckoutOffer;
+    expected_offer?: { claim_id: string; version_id: string; expires_at: string };
+    interval?: "month" | "year";
     parameters(
       customerId: string | null,
       expiresAt: number,
-      referral?: BillingCheckoutReferral
+      referral?: BillingCheckoutReferral,
+      offer?: BillingCheckoutOffer
     ): Record<string, unknown>;
   }): Promise<
     | BillingCheckoutAttempt
@@ -46,6 +64,8 @@ export interface BillingCheckoutStore {
     | "checkout_not_allowed"
     | "paid_purchase_locked"
     | "referral_coupon_required"
+    | "offer_coupon_required"
+    | "offer_confirmation_required"
   >;
   saveSession(organizationId: string, attemptId: string, sessionId: string): Promise<boolean>;
   retireExpired(organizationId: string, attemptId: string, sessionId: string): Promise<boolean>;
@@ -61,6 +81,7 @@ export interface BillingCheckoutStore {
 // request for idempotent recovery. Never rotate an ambiguous or completed payment.
 export function createPostgresBillingCheckoutStore(db: Queryable): BillingCheckoutStore {
   return {
+    getOfferCheckoutContext: (input) => createOfferBenefitStore(db).context(input),
     getReferralCheckoutContext: (input) => createReferralBenefitStore(db).checkoutContext(input),
     claim: (input) =>
       runInTransaction(db, async (tx) => {
@@ -106,7 +127,8 @@ export function createPostgresBillingCheckoutStore(db: Queryable): BillingChecko
               previously_paid: org.previously_paid === true
             },
             Date.now()
-          ).allowed
+          ).allowed &&
+          !(await offerEarlyPurchaseAllowed(tx, input.organization_id))
         )
           return "paid_purchase_locked";
         const current = (
@@ -122,9 +144,58 @@ export function createPostgresBillingCheckoutStore(db: Queryable): BillingChecko
             ? current
             : "checkout_in_progress";
         }
+        // An unresolved signup hint must not become a full-price purchase. Once
+        // this Owner has durable attribution/claim, its normal checks below are
+        // authoritative even if acknowledgement of intent completion was lost.
+        if (
+          (
+            await tx.query(
+              `SELECT i.id FROM offer_signup_intents i
+               WHERE i.organization_id=$1 AND i.status='pending' AND i.expires_at>clock_timestamp()
+               AND NOT EXISTS(SELECT 1 FROM offer_claims c WHERE c.organization_id=i.organization_id
+                 AND c.owner_user_id=i.user_id AND i.user_id=$2::uuid)
+               AND NOT EXISTS(SELECT 1 FROM referral_attributions a WHERE a.organization_id=i.organization_id
+                 AND i.user_id=$2::uuid) LIMIT 1`,
+              [input.organization_id, input.expected_owner_user_id ?? null]
+            )
+          ).rows.length
+        )
+          return "checkout_in_progress";
         const attemptId = randomUUID();
         let referral: BillingCheckoutReferral | undefined;
-        if (input.target_plan === "business") {
+        let offer: BillingCheckoutOffer | undefined;
+        const offerActor = input.expected_owner_user_id
+          ? { organization_id: input.organization_id, actor_user_id: input.expected_owner_user_id }
+          : null;
+        const offerContext = offerActor ? await readOfferCheckoutContext(tx, offerActor) : null;
+        if (
+          !offerActor &&
+          (
+            await tx.query("SELECT id FROM offer_claims WHERE organization_id=$1", [
+              input.organization_id
+            ])
+          ).rows.length
+        )
+          return "checkout_not_allowed";
+        if (offerContext?.required) {
+          if (
+            !input.expected_offer ||
+            input.expected_offer.claim_id !== offerContext.claim_id ||
+            input.expected_offer.version_id !== offerContext.version_id ||
+            Date.parse(input.expected_offer.expires_at) <= Date.now() ||
+            !Number.isFinite(Date.parse(input.expected_offer.expires_at))
+          )
+            return "offer_confirmation_required";
+          if (
+            !offerContext.discount_eligible ||
+            !offerContext.policy.eligible_plans.includes(input.target_plan) ||
+            !offerContext.policy.eligible_intervals.includes(input.interval ?? "month")
+          )
+            return "checkout_not_allowed";
+          if (!input.offer_coupon) return "offer_coupon_required";
+          offer = input.offer_coupon;
+        } else if (input.offer_coupon) return "checkout_not_allowed";
+        if (!offerContext && input.target_plan === "business") {
           const attributed =
             (
               await tx.query("SELECT id FROM referral_attributions WHERE organization_id=$1", [
@@ -156,8 +227,29 @@ export function createPostgresBillingCheckoutStore(db: Queryable): BillingChecko
         const parameters = input.parameters(
           org.stripe_customer_id,
           Math.floor(Date.now() / 1000) + 3600,
-          referral
+          referral,
+          offer
         );
+        if (offer) {
+          const validated = z
+            .object({
+              discounts: z.tuple([z.object({ coupon: z.literal(offer.coupon_id) }).strict()]),
+              allow_promotion_codes: z.literal(false)
+            })
+            .passthrough()
+            .safeParse(parameters);
+          if (
+            !validated.success ||
+            !(await reserveOfferCheckout(tx, offerActor!, {
+              attempt_id: attemptId,
+              plan: input.target_plan,
+              interval: input.interval ?? "month",
+              offer
+            }))
+          )
+            return "checkout_not_allowed";
+          await consumeOfferEarlyPurchase(tx, input.organization_id, attemptId);
+        }
         if (referral) {
           const validated = z
             .object({
@@ -219,6 +311,7 @@ export function createPostgresBillingCheckoutStore(db: Queryable): BillingChecko
             organization_id: organizationId,
             checkout_attempt_id: attemptId
           });
+        if (result.rows.length) await releaseOfferCheckout(tx, organizationId, attemptId);
         return result.rows.length === 1;
       });
     },
@@ -237,6 +330,7 @@ export function createPostgresBillingCheckoutStore(db: Queryable): BillingChecko
             organization_id: organizationId,
             checkout_attempt_id: attemptId
           });
+        if (result.rows.length) await releaseOfferCheckout(tx, organizationId, attemptId);
         return result.rows.length === 1;
       });
     }

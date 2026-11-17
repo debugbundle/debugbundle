@@ -1,3 +1,4 @@
+import { createDefaultOffers } from "./default-offers.js";
 import { businessSalesReady } from "../../../packages/billing/src/business-sales-policy.js";
 import { createImprovementReviewSettingsStore } from "../../../packages/storage/src/improvement-review-settings.js";
 import { createImprovementReviewStore } from "../../../packages/storage/src/improvement-review-store.js";
@@ -62,6 +63,7 @@ import {
 } from "../../../packages/storage/src/index.js";
 import { createBillingManagement } from "./billing-management.js";
 import { createDefaultReferrals } from "./default-referrals.js";
+import { createDefaultPayoutPreferences } from "./default-payout-preferences.js";
 import { createDefaultAnalyticsDependencies } from "./default-analytics-dependencies.js";
 import { createOpenAiHostedReadDependencies } from "./openai-mcp-dependencies.js";
 import { resolveCredentialServiceScopes } from "../../../packages/storage/src/project-ingestion-scope.js";
@@ -283,6 +285,25 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
     ...(input.referralConfig === undefined ? {} : { config: input.referralConfig }),
     ...(input.stripeConfig === undefined ? {} : { stripeConfig: input.stripeConfig })
   });
+  const offers = input.referralConfig
+    ? createDefaultOffers({
+        db: input.db,
+        config: input.referralConfig,
+        enabled: input.offerProgrammesEnabled === true,
+        operatorEmails: input.adminAnalyticsAccessEmails ?? [],
+        appBaseUrl: input.appBaseUrl ?? "http://localhost:5291",
+        ...(input.stripeConfig ? { stripeConfig: input.stripeConfig } : {})
+      })
+    : undefined;
+  const payoutPreferences = referrals?.finance
+    ? createDefaultPayoutPreferences({
+        db: input.db,
+        finance: referrals.finance,
+        ...(input.referralPayoutEncryptionKey
+          ? { encryptionKey: input.referralPayoutEncryptionKey }
+          : {})
+      })
+    : undefined;
   const inviteEmails =
     authEmails === undefined
       ? undefined
@@ -294,6 +315,8 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
 
   return {
     ...(referrals === undefined ? {} : { referrals }),
+    ...(payoutPreferences === undefined ? {} : { payoutPreferences }),
+    ...(offers === undefined ? {} : { offers }),
     notificationPreferences: createNotificationPreferencesStore(input.db),
     organizationManagement: createPostgresOrganizationManagementStore(input.db),
     reportGenerationEnabled: input.smartReportConfig?.enabled === true,

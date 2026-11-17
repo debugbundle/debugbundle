@@ -1,4 +1,7 @@
 import { REFERRAL_BENEFIT_TABLES } from "./referral-benefit-schema.js";
+import { OFFER_PROGRAMME_TABLES } from "./offer-programme-schema.js";
+import { PAYOUT_PREFERENCE_TABLES } from "./payout-preference-schema.js";
+import { CREATOR_EMAIL_TABLES } from "./creator-email-schema.js";
 import { REPORT_HEALTH_TABLES } from "./report-health-schema.js";
 import { REPORT_COLLECTOR_TABLES } from "./report-collector-schema.js";
 import { REPORT_RUN_TABLES } from "./report-run-schema.js";
@@ -107,6 +110,10 @@ export const PROJECT_MERGE_TABLE_DISPOSITIONS = {
     ...REFERRAL_RECONCILIATION_TABLES,
     ...REFERRAL_TABLES,
     ...REFERRAL_BENEFIT_TABLES,
+    // Commercial promises and protected identity belong to the account, not a project origin.
+    ...OFFER_PROGRAMME_TABLES,
+    ...PAYOUT_PREFERENCE_TABLES,
+    ...CREATOR_EMAIL_TABLES,
     "account_analytics_accounts",
     "account_deletion_challenges",
     "account_metric_events",

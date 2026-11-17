@@ -1,18 +1,18 @@
+import { LoginPage, SignupPage, GithubAuthCallbackPage } from "./pages/email-auth-page.js";
+import { OfferProgrammesPage } from "./pages/offer-programmes-page.js";
 import { resolvePublicStatusRoute } from "./lib/public-status-routing.js";
 import { PublicStatusPage } from "./pages/public-status-page.js";
 import { LoaderCircleIcon } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import {
   BrowserRouter,
-  Link,
   MemoryRouter,
   Navigate,
   Outlet,
   Route,
   Routes,
   useLocation,
-  useNavigate,
-  useSearchParams
+  useNavigate
 } from "react-router-dom";
 import { Toaster } from "sonner";
 
@@ -28,30 +28,16 @@ import { ReferralPayoutsPage } from "./pages/referral-payouts-page.js";
 import { OrganizationAcceptPage } from "./pages/organization-accept-page.js";
 import { createProjectRoutes } from "./app-project-routes.js";
 import { AppUpdateNotifier } from "./components/system/app-update-notifier.js";
-import { AuthLayout } from "./components/system/auth-layout.js";
-import { CalloutCard } from "./components/system/callout-card.js";
 import { LoadErrorCallout } from "./components/system/load-error-callout.js";
 import { DashboardIncidentsToday } from "./components/system/dashboard-incidents-today.js";
 import { RecentProjectsTable } from "./components/system/recent-projects-table.js";
-import { GitHubMark } from "./components/system/github-mark.js";
 import {
   ProjectRouteProvider,
   type ActiveProjectRoute
 } from "./components/system/project-route-context.js";
 import { SectionCards } from "./components/system/section-cards.js";
 import { SiteHeader } from "./components/system/site-header.js";
-import { Button } from "./components/ui/button.js";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "./components/ui/field.js";
-import { Input } from "./components/ui/input.js";
-import { Notice } from "./components/ui/notice.js";
-import { Separator } from "./components/ui/separator.js";
-import {
-  buildApiUrl,
-  logout,
-  requestEmailCode,
-  type SessionRecord,
-  verifyEmailCode
-} from "./lib/api.js";
+import { logout, type SessionRecord } from "./lib/api.js";
 import { showErrorToast, showInfoToast, showSuccessToast } from "./lib/notify.js";
 import {
   setWebDogfoodingAnalyticsAuthState,
@@ -82,96 +68,8 @@ import { ThemeProvider, useTheme } from "./lib/theme.js";
 import { TooltipProvider } from "./components/ui/tooltip.js";
 import { SystemEmailReviewPage } from "./pages/system-email-review-page.js";
 
-const GITHUB_START_HREF = buildApiUrl("/v1/auth/github/start");
-const SIGNUP_TRIAL_STORAGE_KEY = "debugbundle.auth.signup_trial";
-
 interface AppProps {
   initialEntries?: string[];
-}
-
-type AuthStep = "request" | "verify";
-type RequestedTrialPlan = "solo" | "team" | "business";
-
-interface AuthFieldErrors {
-  email?: string;
-  code?: string;
-}
-
-interface AuthRequestError {
-  title: string;
-  description: string;
-}
-
-function parseRequestedTrialPlan(value: string | null): RequestedTrialPlan | null {
-  return value === "solo" || value === "team" || value === "business" ? value : null;
-}
-
-function readStoredSignupTrialPlan(): RequestedTrialPlan | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  return parseRequestedTrialPlan(window.sessionStorage.getItem(SIGNUP_TRIAL_STORAGE_KEY));
-}
-
-function writeStoredSignupTrialPlan(plan: RequestedTrialPlan | null): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  if (plan === null) {
-    window.sessionStorage.removeItem(SIGNUP_TRIAL_STORAGE_KEY);
-    return;
-  }
-
-  window.sessionStorage.setItem(SIGNUP_TRIAL_STORAGE_KEY, plan);
-}
-
-function formatRequestedTrialPlanName(plan: RequestedTrialPlan): string {
-  return plan === "solo" ? "Solo" : plan === "team" ? "Team" : "Business";
-}
-
-function validateEmailAddress(value: string): string | undefined {
-  if (value.length === 0) {
-    return "Enter your email address to receive a sign-in code.";
-  }
-
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-    return "Enter a valid email address so we can send your code.";
-  }
-
-  return undefined;
-}
-
-function validateVerificationCode(value: string): string | undefined {
-  if (value.length === 0) {
-    return "Enter the six-digit code from your email.";
-  }
-
-  if (!/^\d{6}$/.test(value)) {
-    return "Enter all six digits from the code we sent you.";
-  }
-
-  return undefined;
-}
-
-function getAuthFieldErrors(step: AuthStep, email: string, code: string): AuthFieldErrors {
-  const emailError = validateEmailAddress(email);
-  const codeError = step === "verify" ? validateVerificationCode(code) : undefined;
-
-  return {
-    ...(emailError === undefined ? {} : { email: emailError }),
-    ...(codeError === undefined ? {} : { code: codeError })
-  };
-}
-
-function omitAuthFieldError(
-  errors: AuthFieldErrors,
-  field: keyof AuthFieldErrors
-): AuthFieldErrors {
-  const remaining = { ...errors };
-  delete remaining[field];
-  return remaining;
 }
 
 export function App({ initialEntries }: AppProps): JSX.Element {
@@ -195,6 +93,7 @@ export function App({ initialEntries }: AppProps): JSX.Element {
             <Route path="/oauth/reviewer" element={<OpenAiReviewerPage />} />
             {createOpenAiPluginPreviewRoute(<LoadingScreen />)}
             <Route path="/analytics" element={<AdminAnalyticsRoute />} />
+            <Route path="/programmes" element={<AdminAnalyticsRoute programmes />} />
             <Route element={<ProtectedLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/incidents" element={<IncidentsPage />} />
@@ -243,6 +142,7 @@ export function App({ initialEntries }: AppProps): JSX.Element {
             <Route path="/oauth/reviewer" element={<OpenAiReviewerPage />} />
             {createOpenAiPluginPreviewRoute(<LoadingScreen />)}
             <Route path="/analytics" element={<AdminAnalyticsRoute />} />
+            <Route path="/programmes" element={<AdminAnalyticsRoute programmes />} />
             <Route element={<ProtectedLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/incidents" element={<IncidentsPage />} />
@@ -326,16 +226,16 @@ function RootGate(): JSX.Element {
   useEffect(() => {
     if (
       sessionInvalidationCount === 0 ||
-      sessionInvalidationCount === lastHandledInvalidationCount.current ||
-      isPublicAuthPath(location.pathname)
+      sessionInvalidationCount === lastHandledInvalidationCount.current
     ) {
       return;
     }
 
     lastHandledInvalidationCount.current = sessionInvalidationCount;
+    if (session !== null || isPublicAuthPath(location.pathname)) return;
     showInfoToast("Your session expired. Please sign in again.");
     void navigate("/login", { replace: true });
-  }, [location.pathname, navigate, sessionInvalidationCount]);
+  }, [location.pathname, navigate, sessionInvalidationCount, session]);
 
   if (sessionLoadError && session === null) {
     return (
@@ -393,7 +293,7 @@ function ProtectedLayout(): JSX.Element {
   );
 }
 
-function AdminAnalyticsRoute(): JSX.Element {
+function AdminAnalyticsRoute({ programmes = false }: { programmes?: boolean }): JSX.Element {
   const { session, setSession } = useSession();
 
   if (session === null) {
@@ -402,7 +302,7 @@ function AdminAnalyticsRoute(): JSX.Element {
 
   return (
     <ProtectedShell session={session} setSession={setSession}>
-      <AdminAnalyticsPage />
+      {programmes ? <OfferProgrammesPage /> : <AdminAnalyticsPage />}
     </ProtectedShell>
   );
 }
@@ -453,496 +353,6 @@ function ProtectedShell({
         </ProjectRouteProvider>
       </WorkspaceHealthAlertProvider>
     </DashboardSetupProvider>
-  );
-}
-
-function GithubLink({ trialPlan }: { trialPlan?: RequestedTrialPlan | null } = {}): JSX.Element {
-  const href =
-    trialPlan === undefined || trialPlan === null
-      ? GITHUB_START_HREF
-      : `${GITHUB_START_HREF}?trial=${trialPlan}`;
-
-  return (
-    <Button asChild variant="outline" className="w-full justify-center">
-      <a href={href}>
-        <GitHubMark data-icon="inline-start" />
-        Continue with GitHub
-      </a>
-    </Button>
-  );
-}
-
-function AuthMethodDivider(): JSX.Element {
-  return (
-    <div className="relative text-center text-sm">
-      <Separator className="absolute inset-x-0 top-1/2 -translate-y-1/2" />
-      <span className="bg-card text-muted-foreground relative z-10 px-2">or</span>
-    </div>
-  );
-}
-
-function resolvePostAuthPath(nextPath: string | null): string {
-  if (nextPath === null || nextPath.length === 0) {
-    return "/dashboard";
-  }
-
-  if (!nextPath.startsWith("/") || nextPath.startsWith("//")) {
-    return "/dashboard";
-  }
-
-  return nextPath;
-}
-
-function appendAuthPath(
-  pathname: string,
-  options: {
-    nextPath: string;
-    trialPlan?: RequestedTrialPlan | null;
-  }
-): string {
-  const searchParams = new URLSearchParams();
-
-  if (options.nextPath !== "/dashboard") {
-    searchParams.set("next", options.nextPath);
-  }
-  if (
-    options.trialPlan === "solo" ||
-    options.trialPlan === "team" ||
-    options.trialPlan === "business"
-  ) {
-    searchParams.set("trial", options.trialPlan);
-  }
-
-  const queryString = searchParams.toString();
-  return queryString.length === 0 ? pathname : `${pathname}?${queryString}`;
-}
-
-function EmailAuthPage({
-  title,
-  heading,
-  description,
-  alternateLinkHref,
-  alternateLinkLabel,
-  alternatePrompt,
-  showTrialIntentPanel = false
-}: {
-  title: string;
-  heading: string;
-  description: string;
-  alternateLinkHref: string;
-  alternateLinkLabel: string;
-  alternatePrompt: string;
-  showTrialIntentPanel?: boolean;
-}): JSX.Element {
-  const { session, setSession } = useSession();
-  const [searchParams] = useSearchParams();
-  const emailInputRef = useRef<HTMLInputElement>(null);
-  const codeInputRef = useRef<HTMLInputElement>(null);
-  const [email, setEmail] = useState("");
-  const [code, setCode] = useState("");
-  const [step, setStep] = useState<AuthStep>("request");
-  const [fieldErrors, setFieldErrors] = useState<AuthFieldErrors>({});
-  const [requestError, setRequestError] = useState<AuthRequestError | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [postVerifyRedirectPath, setPostVerifyRedirectPath] = useState<string | null>(null);
-  const postAuthPath = resolvePostAuthPath(searchParams.get("next"));
-  const hasTrialQuery = searchParams.has("trial");
-  const requestedTrialPlan =
-    parseRequestedTrialPlan(searchParams.get("trial")) ??
-    (hasTrialQuery ? null : readStoredSignupTrialPlan());
-  const alternateHref = appendAuthPath(alternateLinkHref, {
-    nextPath: postAuthPath,
-    trialPlan: requestedTrialPlan
-  });
-  const trialIntentRedirectPath =
-    requestedTrialPlan === null
-      ? postAuthPath
-      : appendAuthPath("/billing", {
-          nextPath: postAuthPath,
-          trialPlan: requestedTrialPlan
-        });
-  const isVerifyStep = step === "verify";
-
-  useEffect(() => {
-    if (document.body.style.pointerEvents === "none") {
-      document.body.style.pointerEvents = "";
-    }
-
-    document.body.removeAttribute("data-scroll-locked");
-  }, []);
-
-  useEffect(() => {
-    if (isVerifyStep) {
-      codeInputRef.current?.focus();
-      return;
-    }
-
-    emailInputRef.current?.focus();
-  }, [isVerifyStep]);
-
-  useEffect(() => {
-    writeStoredSignupTrialPlan(requestedTrialPlan);
-  }, [requestedTrialPlan]);
-
-  if (session !== null) {
-    return <Navigate replace to={postVerifyRedirectPath ?? trialIntentRedirectPath} />;
-  }
-
-  function focusFirstInvalidField(errors: AuthFieldErrors): void {
-    if (errors.email !== undefined) {
-      emailInputRef.current?.focus();
-      return;
-    }
-
-    if (errors.code !== undefined) {
-      codeInputRef.current?.focus();
-    }
-  }
-
-  function clearFieldError(field: keyof AuthFieldErrors): void {
-    setFieldErrors((current) =>
-      current[field] === undefined ? current : omitAuthFieldError(current, field)
-    );
-  }
-
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-    const normalizedEmail = email.trim();
-    const normalizedCode = code.trim();
-    const nextFieldErrors = getAuthFieldErrors(step, normalizedEmail, normalizedCode);
-
-    setFieldErrors(nextFieldErrors);
-    setRequestError(null);
-    setEmail(normalizedEmail);
-    setCode(normalizedCode);
-
-    if (nextFieldErrors.email !== undefined || nextFieldErrors.code !== undefined) {
-      focusFirstInvalidField(nextFieldErrors);
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      if (step === "request") {
-        await requestEmailCode({
-          email: normalizedEmail,
-          accepted_terms: true,
-          ...(requestedTrialPlan === null ? {} : { requested_trial_plan: requestedTrialPlan })
-        });
-        setStep("verify");
-        setCode("");
-        showSuccessToast("Sign-in code sent successfully.");
-      } else {
-        const nextPath = trialIntentRedirectPath;
-        const nextSession = await verifyEmailCode({
-          email: normalizedEmail,
-          code: normalizedCode,
-          ...(requestedTrialPlan === null ? {} : { requested_trial_plan: requestedTrialPlan })
-        });
-        setPostVerifyRedirectPath(nextPath);
-        setSession(nextSession);
-        writeStoredSignupTrialPlan(null);
-        showSuccessToast("Signed in successfully.");
-      }
-    } catch {
-      setRequestError(
-        step === "request"
-          ? {
-              title: "Code could not be sent",
-              description:
-                "We could not send a sign-in code right now. Check the address and try again."
-            }
-          : {
-              title: "Code was not accepted",
-              description: "That code is invalid or expired. Request a new code and try again."
-            }
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  async function handleResendCode(): Promise<void> {
-    const normalizedEmail = email.trim();
-    const nextFieldErrors = getAuthFieldErrors("request", normalizedEmail, code);
-
-    setFieldErrors(nextFieldErrors);
-    setRequestError(null);
-    setEmail(normalizedEmail);
-
-    if (nextFieldErrors.email !== undefined) {
-      focusFirstInvalidField(nextFieldErrors);
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      await requestEmailCode({
-        email: normalizedEmail,
-        accepted_terms: true,
-        ...(requestedTrialPlan === null ? {} : { requested_trial_plan: requestedTrialPlan })
-      });
-      setCode("");
-      showSuccessToast("New sign-in code sent successfully.");
-    } catch {
-      setRequestError({
-        title: "Code could not be resent",
-        description: "We could not resend the sign-in code right now. Try again in a moment."
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  function handleUseDifferentEmail(): void {
-    setStep("request");
-    setCode("");
-    setFieldErrors({});
-    setRequestError(null);
-  }
-
-  const emailErrorId = fieldErrors.email === undefined ? undefined : "email-auth-email-error";
-  const codeErrorId = fieldErrors.code === undefined ? undefined : "email-auth-code-error";
-  const requestErrorId = requestError === null ? undefined : "email-auth-request-error";
-
-  const layoutTitle = isVerifyStep ? "Check your inbox" : title;
-  const layoutHeading = isVerifyStep ? "Check your inbox" : heading;
-  const layoutDescription = isVerifyStep
-    ? `Enter the six-digit code we sent to ${email}.`
-    : description;
-
-  return (
-    <AuthLayout title={layoutTitle} heading={layoutHeading} description={layoutDescription}>
-      <form className="flex flex-col gap-6" onSubmit={(event) => void handleSubmit(event)}>
-        <FieldGroup>
-          {!showTrialIntentPanel || requestedTrialPlan === null ? null : (
-            <Notice
-              title={`${formatRequestedTrialPlanName(requestedTrialPlan)} trial selected`}
-              tone="info"
-            >
-              You&apos;re starting with a 30-day no-card trial.
-            </Notice>
-          )}
-          {isVerifyStep ? (
-            <Field data-invalid={fieldErrors.code !== undefined || undefined}>
-              <FieldLabel htmlFor="email-auth-code">Six-digit code</FieldLabel>
-              <Input
-                ref={codeInputRef}
-                id="email-auth-code"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                value={code}
-                aria-invalid={fieldErrors.code !== undefined || undefined}
-                aria-describedby={codeErrorId}
-                onChange={(event) => {
-                  setCode(event.currentTarget.value.replace(/\D+/g, "").slice(0, 6));
-                  clearFieldError("code");
-                  setRequestError(null);
-                }}
-              />
-              <FieldDescription>
-                Codes expire quickly. Request a new one if you switch emails or wait too long.
-              </FieldDescription>
-              {fieldErrors.code === undefined ? null : (
-                <Notice id={codeErrorId} tone="destructive">
-                  {fieldErrors.code}
-                </Notice>
-              )}
-            </Field>
-          ) : (
-            <>
-              <Field>
-                <GithubLink trialPlan={requestedTrialPlan} />
-              </Field>
-              <AuthMethodDivider />
-              <div className="space-y-1">
-                <p className="text-sm font-medium">Continue with email</p>
-                <FieldDescription>
-                  We&apos;ll send a six-digit code so you can sign in without a password.
-                </FieldDescription>
-              </div>
-              <Field data-invalid={fieldErrors.email !== undefined || undefined}>
-                <FieldLabel htmlFor="email-auth-email">
-                  Email<span className="sr-only"> address</span>
-                </FieldLabel>
-                <Input
-                  ref={emailInputRef}
-                  id="email-auth-email"
-                  type="email"
-                  autoComplete="email"
-                  value={email}
-                  aria-invalid={fieldErrors.email !== undefined || undefined}
-                  aria-describedby={emailErrorId}
-                  onChange={(event) => {
-                    setEmail(event.currentTarget.value);
-                    clearFieldError("email");
-                    setRequestError(null);
-                  }}
-                />
-                {fieldErrors.email === undefined ? null : (
-                  <Notice id={emailErrorId} tone="destructive">
-                    {fieldErrors.email}
-                  </Notice>
-                )}
-              </Field>
-            </>
-          )}
-          {requestError === null ? null : (
-            <Notice id={requestErrorId} tone="destructive" title={requestError.title}>
-              {requestError.description}
-            </Notice>
-          )}
-          <Field>
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={isSubmitting}
-              aria-describedby={requestErrorId}
-            >
-              {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
-              <span>{isVerifyStep ? "Verify code" : "Send code"}</span>
-            </Button>
-            {isVerifyStep ? (
-              <div className="mt-3 flex flex-col gap-3 sm:flex-row">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="sm:flex-1"
-                  disabled={isSubmitting}
-                  onClick={() => void handleResendCode()}
-                >
-                  Resend code
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="sm:flex-1"
-                  disabled={isSubmitting}
-                  onClick={handleUseDifferentEmail}
-                >
-                  Use a different email
-                </Button>
-              </div>
-            ) : (
-              <FieldDescription className="text-center">
-                {alternatePrompt}{" "}
-                <Link
-                  className="underline underline-offset-4 hover:text-foreground"
-                  to={alternateHref}
-                >
-                  {alternateLinkLabel}
-                </Link>
-              </FieldDescription>
-            )}
-          </Field>
-        </FieldGroup>
-      </form>
-    </AuthLayout>
-  );
-}
-
-function LoginPage(): JSX.Element {
-  return (
-    <EmailAuthPage
-      title="Continue to DebugBundle"
-      heading="Continue to DebugBundle"
-      description="Choose a login option below to access your account."
-      alternatePrompt="Don't have an account?"
-      alternateLinkHref="/signup"
-      alternateLinkLabel="Sign up here"
-    />
-  );
-}
-
-function SignupPage(): JSX.Element {
-  return (
-    <EmailAuthPage
-      title="Create your DebugBundle account"
-      heading="Create your DebugBundle account"
-      description="Choose a sign up option below to create your account."
-      alternatePrompt="Already have an account?"
-      alternateLinkHref="/login"
-      alternateLinkLabel="Login here"
-      showTrialIntentPanel
-    />
-  );
-}
-
-function GithubAuthCallbackPage(): JSX.Element {
-  const { session, refreshSession } = useSession();
-  const [searchParams] = useSearchParams();
-  const error = searchParams.get("error");
-  const [isRefreshing, setIsRefreshing] = useState(error === null);
-
-  useEffect(() => {
-    if (error !== null) {
-      setIsRefreshing(false);
-      return;
-    }
-
-    void (async () => {
-      try {
-        await refreshSession();
-      } finally {
-        setIsRefreshing(false);
-      }
-    })();
-  }, [error, refreshSession]);
-
-  if (session !== null) {
-    return <Navigate replace to="/dashboard" />;
-  }
-
-  const descriptionByError: Record<string, string> = {
-    invalid_oauth_state:
-      "The GitHub sign-in state expired or did not match this browser session. Start the sign-in flow again.",
-    oauth_exchange_failed:
-      "GitHub sign-in could not be completed. Check the local OAuth app configuration and try again."
-  };
-
-  return (
-    <AuthLayout
-      title="Continue with GitHub"
-      description="Complete GitHub sign-in to start a browser session."
-    >
-      <div className="space-y-5">
-        {isRefreshing ? (
-          <CalloutCard
-            eyebrow="GitHub sign-in"
-            title="Completing sign-in"
-            description="We are finalizing your GitHub session now."
-          >
-            <div className="flex items-center gap-3 text-sm text-muted-foreground">
-              <LoaderCircleIcon className="animate-spin" />
-              Finalizing browser session
-            </div>
-          </CalloutCard>
-        ) : (
-          <CalloutCard
-            eyebrow="GitHub sign-in"
-            title="Sign-in was not completed"
-            description={
-              error === null
-                ? "No active browser session was created. Start GitHub sign-in again."
-                : (descriptionByError[error] ??
-                  "GitHub sign-in could not be completed. Start the flow again.")
-            }
-            tone="warning"
-          />
-        )}
-
-        {!isRefreshing ? (
-          <div className="flex flex-col gap-3">
-            <GithubLink />
-            <Button asChild variant="ghost" className="w-full justify-center">
-              <Link to="/login">Back to login</Link>
-            </Button>
-          </div>
-        ) : null}
-      </div>
-    </AuthLayout>
   );
 }
 

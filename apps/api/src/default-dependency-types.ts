@@ -55,6 +55,8 @@ export interface CreateApiDependenciesInput {
   githubAppClient?: GitHubAppClient;
   stripeConfig?: StripeConfig;
   referralConfig?: ReferralConfig;
+  referralPayoutEncryptionKey?: string;
+  offerProgrammesEnabled?: boolean;
   smartReportConfig?: ReportRuntimeConfiguration;
   smartImprovementReviewsEnabled?: boolean;
   appBaseUrl?: string;
@@ -119,7 +121,8 @@ export interface DefaultApiDependencies extends Omit<
     | "acceptInviteForSession"
     | "resolveSessionByToken"
     | "revokeSessionByToken"
-  >;
+  > &
+    Partial<Pick<WebSessionAuthService, "renewSessionByToken">>;
   githubCliAuth: Pick<
     GitHubCliAuthService,
     "beginDeviceAuth" | "pollDeviceAuth" | "claimDeviceAuth" | "exchangeGitHubAccessToken"

@@ -19,7 +19,7 @@ export async function readReferralBenefitContext(
   z.uuid().parse(organization);
   const row = (
     await db.query<Record<string, unknown>>(
-      "SELECT organization_external_id,attribution_id,coupon_id,provider_customer_id,provider_subscription_id,eligible_invoice_id FROM referral_invoice_benefits WHERE organization_external_id=$1",
+      "SELECT organization_external_id,attribution_id,coupon_id,provider_customer_id,provider_subscription_id,eligible_invoice_id FROM referral_invoice_benefits WHERE organization_external_id=$1 AND (checkout_attempt_id IS NOT NULL OR eligible_invoice_id IS NOT NULL OR recovery_requested_at IS NOT NULL)",
       [organization]
     )
   ).rows[0];

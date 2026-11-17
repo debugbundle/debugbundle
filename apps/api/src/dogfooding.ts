@@ -1,3 +1,4 @@
+import { REFERRAL_PAYOUT_REDACT_FIELDS } from "../../../packages/referrals/src/payout-privacy.js";
 import type { FastifyBaseLogger, FastifyInstance } from "fastify";
 
 import {
@@ -258,6 +259,7 @@ export function registerApiDogfooding(
 
     if (config.projectToken !== null && config.endpoint !== null) {
       sdk.init({
+        redactFields: [...REFERRAL_PAYOUT_REDACT_FIELDS],
         projectToken: config.projectToken,
         endpoint: config.endpoint,
         environment: config.environment,

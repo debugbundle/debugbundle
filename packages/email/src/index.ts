@@ -14,6 +14,8 @@ import {
 import {
   formatAlertDigestPreheader,
   formatAlertPreheader,
+  formatCount,
+  formatPlural,
   formatWeeklyReportPreheader,
   titleCase
 } from "./email-preheaders.js";
@@ -151,7 +153,7 @@ function formatTopSpikesText(input: WeeklyReportProjectInput["topSpikingIncident
   return input
     .map(
       (incident, index) =>
-        `${index + 1}. ${incident.title} (${incident.occurrence_count} occurrences, spike at ${formatEmailDate(incident.spike_detected_at)})`
+        `${index + 1}. ${incident.title} (${formatCount(incident.occurrence_count, "occurrence")}, spike at ${formatEmailDate(incident.spike_detected_at)})`
     )
     .join("\n");
 }
@@ -182,20 +184,30 @@ function normalizeWeeklyReportInput(
   };
 }
 
+function formatOpenedIncidentOutcome(opened: number, resolved: number): string {
+  if (opened === 1) {
+    return resolved >= opened
+      ? "you resolved the only incident opened this week."
+      : "the only incident opened this week is still open.";
+  }
+
+  return resolved >= opened
+    ? `you resolved all ${formatCount(opened, "incident")} opened this week.`
+    : `you closed ${resolved} of the ${formatCount(opened, "incident")} opened this week.`;
+}
+
 function formatIncidentOutcome(project: WeeklyReportProjectInput): string {
   if (project.newIncidents === 0) {
     if (project.resolvedIncidents === 0) {
       return "No new incidents opened this week.";
     }
 
-    return `You resolved ${project.resolvedIncidents} existing ${project.resolvedIncidents === 1 ? "incident" : "incidents"} this week.`;
+    return `You resolved ${formatCount(project.resolvedIncidents, "existing incident")} this week.`;
   }
 
-  if (project.openedIncidentsResolved >= project.newIncidents) {
-    return `You resolved all ${project.newIncidents} ${project.newIncidents === 1 ? "incident" : "incidents"} opened this week.`;
-  }
-
-  return `You closed ${project.openedIncidentsResolved} of the ${project.newIncidents} incidents opened this week.`;
+  return titleCase(
+    formatOpenedIncidentOutcome(project.newIncidents, project.openedIncidentsResolved)
+  );
 }
 
 function formatWeeklyReportLead(projects: WeeklyReportProjectInput[]): string {
@@ -217,14 +229,10 @@ function formatWeeklyReportLead(projects: WeeklyReportProjectInput[]): string {
   if (opened === 0) {
     return resolved === 0
       ? `${projects.length} projects had reportable activity and no new incidents opened this week.`
-      : `Across ${projects.length} projects, you resolved ${resolved} existing ${resolved === 1 ? "incident" : "incidents"} this week.`;
+      : `Across ${projects.length} projects, you resolved ${formatCount(resolved, "existing incident")} this week.`;
   }
 
-  if (openedResolved >= opened) {
-    return `Across ${projects.length} projects, you resolved all ${opened} ${opened === 1 ? "incident" : "incidents"} opened this week.`;
-  }
-
-  return `Across ${projects.length} projects, you closed ${openedResolved} of the ${opened} incidents opened this week.`;
+  return `Across ${projects.length} projects, ${formatOpenedIncidentOutcome(opened, openedResolved)}`;
 }
 
 function formatAlertConditionLabel(conditionType: string): string {
@@ -435,13 +443,13 @@ export function renderWeeklyReportEmail(
     "",
     ...normalized.projects.flatMap((project) => [
       `Project: ${project.projectName}`,
-      `Failure bundles: ${project.bundleCounts.failure}`,
-      `Improvement bundles: ${project.bundleCounts.improvement}`,
-      `New incidents: ${project.newIncidents}`,
-      `Resolved incidents: ${project.resolvedIncidents}`,
-      `Opened incidents resolved: ${project.openedIncidentsResolved}`,
-      `Regressions: ${project.regressions}`,
-      "Top spiking incidents:",
+      `${formatPlural(project.bundleCounts.failure, "Failure bundle")}: ${project.bundleCounts.failure}`,
+      `${formatPlural(project.bundleCounts.improvement, "Improvement bundle")}: ${project.bundleCounts.improvement}`,
+      `${formatPlural(project.newIncidents, "New incident")}: ${project.newIncidents}`,
+      `${formatPlural(project.resolvedIncidents, "Resolved incident")}: ${project.resolvedIncidents}`,
+      `${formatPlural(project.openedIncidentsResolved, "Opened incident resolved", "Opened incidents resolved")}: ${project.openedIncidentsResolved}`,
+      `${formatPlural(project.regressions, "Regression")}: ${project.regressions}`,
+      `${formatPlural(project.topSpikingIncidents.length, "Top spiking incident")}:`,
       formatTopSpikesText(project.topSpikingIncidents),
       ""
     ])
@@ -457,7 +465,7 @@ export function renderWeeklyReportEmail(
     bodyHtml: [
       renderEmailKeyValueList([
         { label: "Window", valueHtml: escapeHtml(formattedWindow) },
-        { label: "Projects", valueHtml: projectCount.toString() }
+        { label: formatPlural(projectCount, "Project"), valueHtml: projectCount.toString() }
       ]),
       ...normalized.projects.map((project) =>
         renderEmailPanel(
@@ -466,22 +474,36 @@ export function renderWeeklyReportEmail(
             renderEmailParagraph(escapeHtml(formatIncidentOutcome(project))),
             renderEmailKeyValueList([
               { label: "Project", valueHtml: escapeHtml(project.projectName) },
-              { label: "Failure bundles", valueHtml: project.bundleCounts.failure.toString() },
               {
-                label: "Improvement bundles",
+                label: formatPlural(project.bundleCounts.failure, "Failure bundle"),
+                valueHtml: project.bundleCounts.failure.toString()
+              },
+              {
+                label: formatPlural(project.bundleCounts.improvement, "Improvement bundle"),
                 valueHtml: project.bundleCounts.improvement.toString()
               },
-              { label: "New incidents", valueHtml: project.newIncidents.toString() },
-              { label: "Resolved incidents", valueHtml: project.resolvedIncidents.toString() },
-              { label: "Regressions", valueHtml: project.regressions.toString() }
+              {
+                label: formatPlural(project.newIncidents, "New incident"),
+                valueHtml: project.newIncidents.toString()
+              },
+              {
+                label: formatPlural(project.resolvedIncidents, "Resolved incident"),
+                valueHtml: project.resolvedIncidents.toString()
+              },
+              {
+                label: formatPlural(project.regressions, "Regression"),
+                valueHtml: project.regressions.toString()
+              }
             ]),
-            renderEmailSubheading("Top spiking incidents"),
+            renderEmailSubheading(
+              formatPlural(project.topSpikingIncidents.length, "Top spiking incident")
+            ),
             project.topSpikingIncidents.length === 0
               ? renderEmailParagraph("None")
               : renderEmailOrderedList(
                   project.topSpikingIncidents.map(
                     (incident) =>
-                      `<strong>${escapeHtml(incident.title)}</strong> (${incident.occurrence_count} occurrences, spike at ${escapeHtml(formatEmailDate(incident.spike_detected_at))})`
+                      `<strong>${escapeHtml(incident.title)}</strong> (${formatCount(incident.occurrence_count, "occurrence")}, spike at ${escapeHtml(formatEmailDate(incident.spike_detected_at))})`
                   )
                 )
           ].join("")

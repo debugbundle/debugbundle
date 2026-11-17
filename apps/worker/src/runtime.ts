@@ -1,5 +1,4 @@
-import { createStripeConfig } from "../../../packages/billing/src/stripe-config.js";
-import { createReferralReceiptProcessor } from "./referral-receipt-processor.js";
+import { createReferralProcessingLane } from "./referral-processing-lane.js";
 import { createSmartReportProcessor } from "./smart-report-runtime.js";
 import { createBillingContactProcessor } from "./billing-contact-processor.js";
 import { createWorkerActivationState } from "./worker-activation.js";
@@ -80,6 +79,7 @@ import {
 } from "./analytics-opportunity-evaluation.js";
 import { processAvailabilityCheckBatch } from "./availability-checks.js";
 import { processNextDeliverOperationalEmailJob } from "./operational-email-processor.js";
+import { createCreatorEmailProcessor } from "./creator-email-processor.js";
 import {
   processNextBuildImprovementBundleJob,
   type ImprovementBundleJobQueue
@@ -403,10 +403,11 @@ export async function runWorkerFromEnv(
     queryable,
     envInput["STRIPE_SECRET_KEY"]
   );
-  const processReferralReceipts = createReferralReceiptProcessor({
+  const processReferralReceipts = createReferralProcessingLane({ db: queryable, env: envInput });
+  const processCreatorEmails = createCreatorEmailProcessor({
     db: queryable,
-    provider: createStripeConfig(envInput, { requireWebhookSecret: false }),
-    secret: envInput["REFERRAL_SECRET"]
+    env: envInput,
+    logger
   });
   const processSmartReports = createSmartReportProcessor({
     db: queryable,
@@ -602,6 +603,10 @@ export async function runWorkerFromEnv(
         });
       });
     }
+    if (processCreatorEmails)
+      await runWorkerStep(logger, "creator-referral-emails", async () => {
+        await processCreatorEmails();
+      });
     await runDeliveryProcessStep("deliver-alert-email-digest", async () =>
       processNextDeliverAlertEmailDigestJob({
         queue,

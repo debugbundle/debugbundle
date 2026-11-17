@@ -367,6 +367,37 @@ describe("web api client", () => {
     );
   });
 
+  it.each(["invalid_session", "invalid_member_token"])(
+    "normalizes %s from cookie-backed management reads",
+    async (error) => {
+      const listener = vi.fn();
+      const unsubscribe = subscribeToBrowserSessionInvalidation(listener);
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(new Response(JSON.stringify({ error }), { status: 401 }))
+      );
+      await expect(listProjects()).rejects.toBeInstanceOf(InvalidSessionError);
+      expect(listener).toHaveBeenCalledOnce();
+      unsubscribe();
+    }
+  );
+
+  it.each([
+    [401, "invalid_code"],
+    [403, "forbidden"],
+    [503, "unavailable"]
+  ])("does not invalidate a session for %s %s", async (status, error) => {
+    const listener = vi.fn();
+    const unsubscribe = subscribeToBrowserSessionInvalidation(listener);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({ error }), { status }))
+    );
+    await expect(listProjects()).rejects.toThrow(String(error));
+    expect(listener).not.toHaveBeenCalled();
+    unsubscribe();
+  });
+
   it("notifies invalid-session listeners once until a new session is remembered", async () => {
     const notifications: number[] = [];
     const unsubscribe = subscribeToBrowserSessionInvalidation(() => {

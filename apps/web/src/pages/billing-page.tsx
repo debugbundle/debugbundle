@@ -1,5 +1,6 @@
+import type { WorkspaceOfferState } from "../lib/use-workspace-offer.js";
 import { LoadErrorCallout } from "../components/system/load-error-callout.js";
-import { CustomerReferralControl } from "../components/system/customer-referral-control.js";
+import { CustomerOfferControl } from "../components/system/customer-offer-control.js";
 import { useBillingCheckoutSync } from "./use-billing-checkout-sync.js";
 import { BillingSubscriptionControl } from "../components/system/billing-subscription-control.js";
 import { LocalBillingPreview } from "../components/system/local-billing-preview.js";
@@ -63,6 +64,7 @@ const BILLING_BACKGROUND_REFRESH_MIN_INTERVAL_MS = 1_000;
 
 export function BillingPage(): JSX.Element {
   const { session, refreshSession } = useSession();
+  const [workspaceOffer, setWorkspaceOffer] = useState<WorkspaceOfferState | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [billing, setBilling] = useState<BillingSummaryRecord | null>(null);
   const [subscription, setSubscription] = useState<BillingSubscriptionOffer | null>(null);
@@ -113,7 +115,9 @@ export function BillingPage(): JSX.Element {
   }, [requestedPaidPlan, requestedInterval, setSearchParams]);
   const purchaseEligibility = billing === null ? null : getBillingFirstPurchaseEligibility(billing);
   const purchaseUnlocksAt =
-    purchaseEligibility?.allowed === false ? purchaseEligibility.unlocks_at : null;
+    purchaseEligibility?.allowed === false && !workspaceOffer?.early_purchase_allowed
+      ? purchaseEligibility.unlocks_at
+      : null;
 
   const { loadError, isRetrying, retry } = useBillingCheckoutSync({
     checkoutSessionId,
@@ -272,7 +276,8 @@ export function BillingPage(): JSX.Element {
   }
 
   const canChangeBilling = billing !== null;
-  const isPurchaseLocked = purchaseEligibility?.allowed === false;
+  const isPurchaseLocked =
+    purchaseEligibility?.allowed === false && !workspaceOffer?.early_purchase_allowed;
   const isTrialActive = billing?.trial.active === true;
   const canShowCustomerReferral = billing !== null && (billing.plan === "free" || isTrialActive);
   const activeTrialPlan = billing?.trial.plan;
@@ -393,9 +398,10 @@ export function BillingPage(): JSX.Element {
       <PageHeader description="" />
       <LocalBillingPreview />
       {session?.role === "owner" && canShowCustomerReferral ? (
-        <CustomerReferralControl
+        <CustomerOfferControl
           key={session.organization_id}
           organizationId={session.organization_id}
+          onState={setWorkspaceOffer}
         />
       ) : null}
       {loadError ? (
@@ -507,6 +513,12 @@ export function BillingPage(): JSX.Element {
 
                 {!isBillingManagedInternally ? (
                   <BillingSubscriptionControl
+                    offerReady={
+                      workspaceOffer?.status === "ready" || workspaceOffer?.status === "disabled"
+                    }
+                    offerClaim={workspaceOffer?.claim ?? null}
+                    legacyDiscountEligible={workspaceOffer?.legacy_discount_eligible === true}
+                    earlyPurchaseAllowed={workspaceOffer?.early_purchase_allowed === true}
                     billing={billing}
                     requestedPlan={checkoutRequest}
                     onSubscriptionChange={setSubscription}

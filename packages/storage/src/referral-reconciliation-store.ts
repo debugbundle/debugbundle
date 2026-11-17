@@ -100,8 +100,9 @@ export function createReferralReconciliationStore(
         owner_identity_hash: string | null;
         email: string | null;
       }>(
-        `SELECT o.id AS organization_external_id,a.owner_identity_hash,u.email FROM organizations o
+        `SELECT o.id AS organization_external_id,COALESCE(a.owner_identity_hash,offer.owner_identity_hash) AS owner_identity_hash,u.email FROM organizations o
        LEFT JOIN referral_attributions a ON a.organization_external_id=o.id
+       LEFT JOIN offer_claims offer ON offer.organization_external_id=o.id
        LEFT JOIN organization_members m ON m.organization_id=o.id AND m.role='owner'
        LEFT JOIN users u ON u.id=m.user_id
        WHERE o.stripe_customer_id=$1 LIMIT 2`,
@@ -133,13 +134,14 @@ export function createReferralReconciliationStore(
           owner_identity_hash: string | null;
           email: string | null;
         }>(
-          `SELECT $2::uuid AS organization_external_id,COALESCE(a.owner_identity_hash,h.owner_identity_hash) AS owner_identity_hash,u.email
+          `SELECT $2::uuid AS organization_external_id,COALESCE(a.owner_identity_hash,offer.owner_identity_hash,h.owner_identity_hash) AS owner_identity_hash,u.email
         FROM (SELECT 1) seed LEFT JOIN organizations o ON o.id=$2::uuid
         LEFT JOIN referral_attributions a ON a.organization_external_id=$2::uuid
+        LEFT JOIN offer_claims offer ON offer.organization_external_id=$2::uuid
         LEFT JOIN billing_customer_history h ON h.organization_external_id=$2::uuid
         LEFT JOIN organization_members m ON m.organization_id=o.id AND m.role='owner'
         LEFT JOIN users u ON u.id=m.user_id
-        WHERE (o.id IS NOT NULL OR a.id IS NOT NULL OR h.organization_external_id IS NOT NULL)
+        WHERE (o.id IS NOT NULL OR a.id IS NOT NULL OR offer.id IS NOT NULL OR h.organization_external_id IS NOT NULL)
           AND (o.stripe_customer_id IS NULL OR o.stripe_customer_id=$1) LIMIT 2`,
           [customerId, verifiedOrganizationId]
         )
@@ -184,7 +186,7 @@ export function createReferralReconciliationStore(
         );
         if (secret === null) {
           const history = await tx.query<{ retained: boolean }>(
-            `SELECT EXISTS(SELECT 1 FROM referral_attributions) OR EXISTS(SELECT 1 FROM referral_commission_ledger) AS retained`,
+            `SELECT EXISTS(SELECT 1 FROM referral_attributions) OR EXISTS(SELECT 1 FROM referral_commission_ledger) OR EXISTS(SELECT 1 FROM offer_claims) AS retained`,
             []
           );
           if (history.rows[0]?.retained !== true) return;

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Pool } from "pg";
 import { bootstrapStorageSchema } from "../../packages/storage/src/migrations.js";
+import { migrateStorageSchema } from "../../packages/storage/src/schema-migrations.js";
 import { createReportDefinitionStore } from "../../packages/storage/src/report-definition-store.js";
 import { createReportRunAdmissionStore } from "../../packages/storage/src/report-run-admission.js";
 import { reportModelProfile } from "../../packages/smart-reports/src/model-request.js";
@@ -41,6 +42,7 @@ export async function resetReportRunFixture(
   await pool.query("DROP SCHEMA public CASCADE");
   await pool.query("CREATE SCHEMA public");
   await bootstrapStorageSchema(db);
+  await migrateStorageSchema(db);
   const org = randomUUID();
   const project = randomUUID();
   const owner = randomUUID();

@@ -12,3 +12,4 @@ export * from "./openai-cimd-fetch.js";
 export * from "./openai-oidc-provider.js";
 export * from "./project-authorization.js";
 export * from "./member-token-scope.js";
+export * from "./browser-session-policy.js";
