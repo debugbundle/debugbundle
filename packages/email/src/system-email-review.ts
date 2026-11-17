@@ -52,7 +52,6 @@ const SAMPLE_BUNDLE_URL = "https://app.debugbundle.local/incidents/inc_123/bundl
 const SAMPLE_EMAIL_BRAND_MARK_URL = "https://app.debugbundle.local/email/debugbundle-mark.png";
 
 export const SYSTEM_EMAIL_REVIEW_ENTRIES: readonly SystemEmailReviewEntry[] = [
-  ...CREATOR_EMAIL_REVIEW_ENTRIES,
   {
     id: "email-sign-in-code",
     title: "Email sign-in code",
@@ -570,7 +569,8 @@ export const SYSTEM_EMAIL_REVIEW_ENTRIES: readonly SystemEmailReviewEntry[] = [
         ]
       });
     }
-  }
+  },
+  ...CREATOR_EMAIL_REVIEW_ENTRIES
 ] as const;
 
 export function getSystemEmailReviewEntry(id: string): SystemEmailReviewEntry | null {

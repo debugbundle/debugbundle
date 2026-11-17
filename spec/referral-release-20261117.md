@@ -7,17 +7,17 @@ outside this release.
 
 ## Distribution eligibility
 
-| Surface | Decision | Version | Shipped change |
-| --- | --- | --- | --- |
-| Hosted core | Publish | 1.28.0 | Versioned referral offers, payout preferences, creator emails and browser-session renewal. |
-| Public site | Publish | 1.11.0 | Affiliate programme discovery, pricing/offers and introduction article. |
-| CLI | Publish | 1.26.0 | New referral/offer and payout-preference commands with delegated operator authority. |
-| Standard MCP | Publish | 1.26.0 | Matching schemas and tools; restricted hosted catalogues remain unchanged. |
-| OpenClaw companion | Publish | 1.26.0 | Bundled MCP functionality and optional referral/payout tools. |
-| Codex developer plugin | Publish | 1.9.0 | Exact MCP pin adopts new tools. |
-| Gemini extension | Publish | 1.8.0 | Exact MCP pin adopts new tools. |
-| Claude Code plugin | Publish | 1.25.0 | Exact MCP pin adopts new tools. |
-| SDKs, shared JS, hosted OpenAI plugin | Retain | Existing | No changed shipped SDK/schema/redaction or restricted hosted tool behaviour. |
+| Surface                               | Decision | Version  | Shipped change                                                                             |
+| ------------------------------------- | -------- | -------- | ------------------------------------------------------------------------------------------ |
+| Hosted core                           | Publish  | 1.28.0   | Versioned referral offers, payout preferences, creator emails and browser-session renewal. |
+| Public site                           | Publish  | 1.11.0   | Affiliate programme discovery, pricing/offers and introduction article.                    |
+| CLI                                   | Publish  | 1.26.0   | New referral/offer and payout-preference commands with delegated operator authority.       |
+| Standard MCP                          | Publish  | 1.26.0   | Matching schemas and tools; restricted hosted catalogues remain unchanged.                 |
+| OpenClaw companion                    | Publish  | 1.26.0   | Bundled MCP functionality and optional referral/payout tools.                              |
+| Codex developer plugin                | Publish  | 1.9.0    | Exact MCP pin adopts new tools.                                                            |
+| Gemini extension                      | Publish  | 1.8.0    | Exact MCP pin adopts new tools.                                                            |
+| Claude Code plugin                    | Publish  | 1.25.0   | Exact MCP pin adopts new tools.                                                            |
+| SDKs, shared JS, hosted OpenAI plugin | Retain   | Existing | No changed shipped SDK/schema/redaction or restricted hosted tool behaviour.               |
 
 ## Release sequence and safeguards
 
@@ -77,3 +77,25 @@ No other dependency package identity changes.
 
 Further immutable workflow/artifact references are added as each gate completes. Historical local review records retain their original
 scope and do not establish production payment or mail acceptance.
+
+The first complete coverage run found a stale Claude marketplace version and
+distribution-ledger rows, an outdated referral consent/link test, and new email
+previews changing the established sign-in preview selection. The marketplace and
+ledger now match the selected independent versions, the referral assertions follow
+the approved card and local-site link contract, and the new previews are appended
+without changing the default. All existing consent, retry, CSRF and code-sharing
+assertions remain enforced. Full CI must qualify the corrected source before merge.
+
+The public ClawHub companion 1.26.0 installs normally on OpenClaw 2026.11.5 with
+no force override. Both distributions have a final benign security review; the
+provider adjudicated individual Skillspector warnings as expected for the stated
+purpose. A separate description-only skill patch 1.26.1 improves broad live-app
+discovery to rank 1. Six of seven bounded search checks pass; incident response
+remains rank 17 against the top-10 gate. This limitation is retained explicitly.
+
+The live configured Stripe catalogue was read without writes: all six base
+plan/interval prices and purchasable capacity match advertised USD amounts,
+with separate base and capacity products. No coupons, customer subscriptions,
+payments or test emails were created. Cloud deployment guards additionally exclude
+temporary operator evidence from image contexts and clear the API-only payout
+encryption key from worker containers in every rollout path.

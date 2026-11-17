@@ -274,7 +274,7 @@ it("refreshes payment setup after joining from the Programme tab", async () => {
     await screen.findByText(/Join a referral programme to add payout preferences/)
   ).toBeVisible();
   await user.click(screen.getByRole("tab", { name: "Programme" }));
-  await user.click(screen.getByRole("checkbox", { name: /accept.*referral.*terms/i }));
+  await user.click(screen.getByRole("checkbox", { name: /accept.*programme.*terms/i }));
   await user.click(join);
   await screen.findByLabelText("Referral code");
   await user.click(screen.getByRole("tab", { name: "Payments" }));
@@ -404,7 +404,7 @@ it("requires explicit terms, retains the join choice after failure and shares on
   ).not.toBeChecked();
   expect(screen.getByRole("link", { name: "referral programme terms" })).toHaveAttribute(
     "href",
-    "https://debugbundle.com/terms/#referrals"
+    "http://localhost:5292/terms/#referrals"
   );
   await user.click(screen.getByRole("checkbox", { name: /accept.*referral.*terms/i }));
   await user.click(button);
