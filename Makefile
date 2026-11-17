@@ -186,6 +186,11 @@ lint:
 audit:
 	$(NODE_RUN) "corepack enable && node scripts/dependency-audit.mjs --audit-level=high"
 
+# Preserve the full upstream advisory for investigating a failed release gate.
+.PHONY: audit-report
+audit-report:
+	$(NODE_RUN) "corepack enable && mkdir -p .tmp && corepack pnpm audit --json > .tmp/dependency-audit.json"
+
 .PHONY: typecheck
 typecheck:
 	$(NODE_RUN) "corepack enable && NODE_OPTIONS=$(TYPECHECK_NODE_OPTIONS) corepack pnpm typecheck"

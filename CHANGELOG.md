@@ -8,6 +8,8 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [1.28.0] - 2026-11-17
 
+- Bound vulnerable repeated-extglob patterns in the core/site build dependency,
+  with exact installed-file verification and timeout-based audit regressions.
 - Add configurable affiliate programmes and promotions, branded creator codes,
   trial-safe saved discounts and all-plan commission accounting through API, CLI,
   standard MCP and the dashboard. Preserve existing Business referral agreements.

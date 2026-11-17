@@ -2577,3 +2577,29 @@ branches and executing normal releases. Planned versions and rollout gates are i
 database and hosted-source qualification is running before publication. This
 heading supersedes earlier local-only status for this authorised release; those
 historical test records retain their original evidence scope.
+
+Checkpoint: core commit `b34e7ec8` and site `79e2a11` are pushed for PRs #18 and
+#7. Cloud PR #5 is merged at `3f34113`. CLI and MCP 1.26.0 publication workflows
+44181480908 / 44181485357 pass, including actual registry installs and native
+Codex; CLI compatibility 44181412639 also passes. No hosted deployment occurred.
+
+Fresh full lint, core types/format/build, site tests and 71 cloud source checks
+pass. The broader DB run passed 158 cases; its two reproduced fixture issues
+were corrected and both owning files pass all 24 cases. The 491-case focused
+unit run had only stale generated release metadata; regeneration and all four
+projection tests pass. Both minimum and current OpenClaw 2026.11.5 installed
+plugin checks pass.
+
+The owner explicitly approved the targeted picomatch patch/lockfiles and payout
+key setup after automatic review requested separate consent. Both dependency
+installations are complete, the strict root audit and regression pass, and only
+picomatch package identities change in the locks. The dedicated payout-encryption
+GitHub secret is configured with a protected recovery copy; the existing referral
+secret is preserved. Core/site CI will rerun on the qualified security commit.
+
+MCP ecosystem follow-through reached the official Registry but its saved JWT is
+expired (401); no ecosystem publisher succeeded. Restore the existing DNS
+publisher authentication before retrying supported targets. Smithery remains
+excluded as retired. Gemini native checks need rerun now that MCP is published.
+Continue from `.tmp/release-20261117/HANDOFF.md`; main core/site merges, canonical
+releases, reader bridge, capability enablement and production verification remain.

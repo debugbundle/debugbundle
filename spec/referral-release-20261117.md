@@ -38,8 +38,42 @@ outside this release.
    deployment health. Record provider/customer checks separately from source and
    HTTP evidence. Real campaign configuration remains an operator decision.
 
+## Dependency advisory discovered by CI
+
+The 17 November audit reports GHSA-fc5q-39xc-vjpf for transitive picomatch 4.x
+in core build tooling and site content compilation. Upstream has no published
+fixed version. The prepared 4.0.7 patch extends the existing repeated-extglob
+risk fallback to unbounded wildcards in single and nested branches, preserving
+escaped literals, character classes and safe nested-extglob rewrites. Risky
+patterns follow the library's existing literal fallback instead of producing
+nested unbounded regex quantifiers.
+
+Exact patch/file hashes and bounded child-process semantic checks are required
+before the audit accounts for this one advisory at this exact version. Unpatched,
+drifted, mixed-version and unrelated findings remain failing. The site vendors
+identical policy, tests, patch and upstream MIT licence. This is a local security
+patch, not an upstream fixed-release claim or a blanket advisory exception.
+
+The owner explicitly approved both the dependency patch/lockfile updates and the
+dedicated payout-key setup. Installation is complete in both Docker workspaces;
+both high-severity audit gates pass with the exact verified patch. The dedicated GitHub secret
+is configured and its protected recovery copy is retained. Existing referral
+signing credentials are preserved. The lockfile package identities change only
+from picomatch 4.0.4 to patched 4.0.7; other package versions are retained.
+
+Sources: [upstream advisory](https://github.com/advisories/GHSA-fc5q-39xc-vjpf),
+[current parser](https://github.com/micromatch/picomatch/blob/4.0.7/lib/parse.js),
+[related proposed branch analysis](https://github.com/micromatch/picomatch/pull/194).
+
 ## Evidence
 
-Release qualification and final immutable workflow/artifact references are added
-as each gate completes. Historical local review records retain their original
+CLI 1.26.0 ([workflow 44181480908](https://github.com/debugbundle/debugbundle/actions/runs/44181480908))
+and MCP 1.26.0 ([workflow 44181485357](https://github.com/debugbundle/debugbundle/actions/runs/44181485357))
+are published with actual registry-install and native-client checks passing.
+The official Registry accepted and read back `com.debugbundle/mcp` 1.26.0 using
+renewed existing DNS authentication. Both direct and nested wildcard attack
+probes, ordinary glob compatibility and exact installed hashes pass in core/site.
+No other dependency package identity changes.
+
+Further immutable workflow/artifact references are added as each gate completes. Historical local review records retain their original
 scope and do not establish production payment or mail acceptance.

@@ -5,7 +5,13 @@ import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
-import { collectLegacyRoots, evaluateAudit, verifyLegacyBackport } from "./dependency-audit.mjs";
+import {
+  collectLegacyRoots,
+  collectPicomatchRoots,
+  evaluateAudit,
+  verifyLegacyBackport,
+  verifyPicomatchBackport
+} from "./dependency-audit.mjs";
 
 const root = process.cwd();
 function report(versions = ["3.25.76"], options = {}) {
@@ -124,4 +130,32 @@ test("unknown CLI options fail before any audit request", () => {
   );
   assert.equal(result.status, 1);
   assert.match(result.stderr, /invalid_audit_options/u);
+});
+
+test("the repeated-extglob advisory requires the exact installed picomatch patch", () => {
+  const result = spawnSync(
+    "pnpm",
+    ["list", "picomatch", "--depth", "Infinity", "--recursive", "--json"],
+    { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 }
+  );
+  assert.equal(result.status, 0);
+  const roots = collectPicomatchRoots(JSON.parse(result.stdout));
+  assert.ok(roots.length > 0);
+  assert.equal(verifyPicomatchBackport(root, roots), roots.length);
+  assert.throws(() =>
+    verifyPicomatchBackport(root, [join(root, "node_modules/missing-picomatch")])
+  );
+});
+
+test("picomatch accounting is limited to its exact verified advisory and version", () => {
+  const input = report(["4.0.7"], { id: "GHSA-fc5q-39xc-vjpf", module: "picomatch" });
+  assert.equal(evaluateAudit(input).passed, false);
+  assert.equal(evaluateAudit(input, { verifiedPicomatchBackport: true }).passed, true);
+  for (const invalid of [
+    report(["4.0.4"], { id: "GHSA-fc5q-39xc-vjpf", module: "picomatch" }),
+    report(["4.0.7"], { id: "GHSA-other", module: "picomatch" }),
+    report(["4.0.7"], { id: "GHSA-fc5q-39xc-vjpf", module: "other" })
+  ]) {
+    assert.equal(evaluateAudit(invalid, { verifiedPicomatchBackport: true }).passed, false);
+  }
 });

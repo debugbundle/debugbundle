@@ -1,0 +1,25 @@
+--- a/lib/parse.js
++++ b/lib/parse.js
+@@ -286,0 +287,20 @@
++// Wildcards anywhere in a repeated branch can nest unbounded quantifiers.
++// Known-safe nested extglobs are flattened before this conservative fallback.
++const hasUnboundedWildcard = branch => {
++  let escaped = false;
++  let bracket = 0;
++  let quote = false;
++  for (let i = 0; i < branch.length; i++) {
++    const ch = branch[i];
++    if (escaped) { escaped = false; continue; }
++    if (ch === '\\') { escaped = true; continue; }
++    if (ch === '"') { quote = !quote; continue; }
++    if (quote) continue;
++    if (ch === '[') { bracket++; continue; }
++    if (ch === ']' && bracket > 0) { bracket--; continue; }
++    if (bracket > 0) continue;
++    if (ch === '*') return true;
++  }
++  return false;
++};
++
+@@ -345,0 +366 @@
++  if (branches.some(hasUnboundedWildcard)) return { risky: true };
