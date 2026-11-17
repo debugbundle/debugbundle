@@ -99,3 +99,11 @@ with separate base and capacity products. No coupons, customer subscriptions,
 payments or test emails were created. Cloud deployment guards additionally exclude
 temporary operator evidence from image contexts and clear the API-only payout
 encryption key from worker containers in every rollout path.
+
+The corrected full run passed every executed test but caught a missing CI
+registration for the existing creator-email database integration suite. That file
+now runs in the regular isolated Postgres coverage shards. Its delivery, digest,
+deduplication, retry, recipient and migration checks pass with the worker/template
+tests (33 cases). Delivery has 100% statement/line/function coverage; event recording
+has 92.68% statements and 100% lines/functions. No coverage threshold or assertion
+was weakened, and no application logic changed for this correction.
