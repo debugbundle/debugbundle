@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 type VerificationHelpers = {
   verifyClawHubPluginRecord: (
@@ -21,7 +21,14 @@ type TargetVerifier = {
     }
   ) => Promise<{
     verify: {
-      clawhub: { security: { passed: boolean } };
+      clawhub: {
+        security: { passed: boolean };
+        discoverySummary: {
+          totalQueries: number;
+          passingQueries: number;
+          minimumPassingQueries: number;
+        };
+      };
       clawhubPlugin: { security: { passed: boolean } };
     };
   }>;
@@ -30,6 +37,8 @@ type TargetVerifier = {
 const helperUrl = pathToFileURL(join(process.cwd(), "scripts/mcp-ecosystem-verification.mjs")).href;
 const target = { packageName: "@debugbundle/openclaw-plugin", pluginId: "debugbundle" };
 const version = "1.16.0";
+
+afterEach(() => vi.unstubAllGlobals());
 
 function pluginRecord() {
   return {
@@ -214,7 +223,11 @@ describe("ClawHub release security acceptance", () => {
       owner: "debugbundle",
       cliPackage: "clawhub",
       cliVersion: "0.22.0",
-      discoveryQueries: []
+      discoveryQueries: Array.from({ length: 7 }, (_, index) => ({
+        query: `capability ${index}`,
+        maxRank: 10
+      })),
+      discoveryVerification: { minimumPassingQueries: 5, attempts: 1 }
     };
     const pluginTarget = { ...target, type: "push", cliPackage: "clawhub", cliVersion: "0.22.0" };
     const context = {
@@ -224,6 +237,15 @@ describe("ClawHub release security acceptance", () => {
       manifest: { publishTargets: { clawhub: skillTarget, clawhubPlugin: pluginTarget } }
     };
     const calls: string[][] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        const index = Number(new URL(url).searchParams.get("q")?.split(" ").at(-1));
+        return new Response(
+          JSON.stringify({ results: index < 5 ? [{ slug: "debugbundle" }] : [] })
+        );
+      })
+    );
     const reviewedPlugin = pluginRecord();
     reviewedPlugin.version.llmAnalysis.status = "suspicious";
     const dependencies = {
@@ -239,6 +261,11 @@ describe("ClawHub release security acceptance", () => {
     expect(calls).toHaveLength(2);
     for (const args of calls) expect(args[args.indexOf("--version") + 1]).toBe(version);
     expect(report.verify.clawhub.security.passed).toBe(true);
+    expect(report.verify.clawhub.discoverySummary).toEqual({
+      totalQueries: 7,
+      passingQueries: 5,
+      minimumPassingQueries: 5
+    });
     expect(report.verify.clawhubPlugin.security.passed).toBe(false);
     expect(collectVerificationFailures(context, report)).toEqual(["clawhubPlugin:partial"]);
     reviewedPlugin.version.llmAnalysis.status = "clean";

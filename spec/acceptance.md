@@ -1221,6 +1221,15 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** scanner details, including findings adjudicated benign by ClawHub, remain in the report; there is no local bypass or conversion of warnings into passes
 - **And** a partial publication verifies its unchanged companion without republishing it
 
+### AC-OPENCLAW-05: Directory Search Coverage
+
+- **Given** the seven configured, distinct capability-first ClawHub search queries
+- **When** post-publication discovery verification runs
+- **Then** at least five queries placing DebugBundle in the top 10 pass discovery; four or fewer fail after bounded retries
+- **And** all seven individual ranks/misses and the passing/required counts remain in the report
+- **And** invalid minima, empty/duplicate query configurations and provider request errors fail closed
+- **And** exact-version security and native installation remain independently required; a five-query discovery pass cannot clear a failing security result
+
 ---
 
 ## 10. Auth Acceptance

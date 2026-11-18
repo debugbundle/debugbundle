@@ -1,6 +1,6 @@
 # Agent distribution ledger
 
-## Affiliate release - published 18 November 2026, discovery partial
+## Affiliate release - published 18 November 2026, discovery accepted
 
 CLI and MCP 1.26.0 are published with registry-install and native client checks.
 Codex 1.9.0 and Claude Code 1.25.0 are public on core main with the exact published
@@ -14,8 +14,10 @@ Node 22/24/26 checks pass. The official Registry resolves MCP 1.26.0.
 
 ClawHub companion 1.26.0 passes final security review and normal public-host
 installation. The separate description-only skill patch 1.26.1 passes final
-ClawScan review; bounded discovery is 6/7, with incident response at rank 17
-against the top-10 gate. These are separate from core CI and hosted promotion.
+ClawScan review; bounded discovery is 6/7, with incident response at rank 17.
+The owner approved this release and a permanent minimum of five of the seven
+queries in the top 10 on 18 November. All individual ranks remain recorded;
+security and installation gates are unchanged. These are separate from core CI and hosted promotion.
 See [the coordinated release record](referral-release-20261117.md).
 
 ## Rust release - published 14 November 2026

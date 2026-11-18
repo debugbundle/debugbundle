@@ -657,6 +657,8 @@ When a collaborator is removed from a project or leaves a shared project, DebugB
 
 **FR-PROF-13:** Generated and portable DebugBundle skills plus MCP/OpenClaw publication metadata must use truthful, capability-first discovery language for runtime error reporting, crash reporting, incident reporting and response, live-app/production monitoring, health checks, debug bundles, and product analytics. Monitoring and observability language must be explicitly scoped to runtime failures, customer-facing incidents, and endpoint health; DebugBundle must not be represented as a generic infrastructure-monitoring platform. The portable source under `apps/mcp/clawhub/debugbundle/` remains shared by ClawHub and Smithery Skills, while MCP package/registry metadata remains suitable for Claude and other MCP clients.
 
+ClawHub directory acceptance requires at least five of the seven configured capability queries to rank in the top 10. Every individual result and the aggregate minimum remain recorded, including misses. Exact-version security and native installation are independent mandatory gates; directory coverage cannot override them. See `rules/release-governance.md` and AC-OPENCLAW-05.
+
 ### 1.15 Verification System
 
 **FR-VER-01:** Local verification: send synthetic event → confirm ingestion → confirm bundle generation → confirm CLI retrieval.

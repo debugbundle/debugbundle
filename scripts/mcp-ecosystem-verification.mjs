@@ -121,9 +121,23 @@ export async function verifyClawHubDiscovery(target, dependencies = {}) {
   const attempts = positiveInteger(target.discoveryVerification?.attempts, 6);
   const retryDelayMs = positiveInteger(target.discoveryVerification?.retryDelayMs, 5000);
   const limit = positiveInteger(target.discoveryVerification?.limit, 25);
+  const configuredMinimum = target.discoveryVerification?.minimumPassingQueries;
+  const minimumPassingQueries =
+    configuredMinimum === undefined ? queries.length : configuredMinimum;
+  const distinctQueries = new Set(queries.map((entry) => entry.query.trim().toLowerCase()));
+  if (
+    queries.length === 0 ||
+    distinctQueries.size !== queries.length ||
+    !Number.isInteger(minimumPassingQueries) ||
+    minimumPassingQueries < 1 ||
+    minimumPassingQueries > queries.length
+  ) {
+    throw new Error("clawhub_discovery_policy_invalid");
+  }
   const fetcher = dependencies.fetchJson ?? fetchJson;
   const pause = dependencies.wait ?? wait;
   let discoveryChecks = [];
+  let discoverySummary;
 
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     discoveryChecks = await Promise.all(
@@ -143,8 +157,15 @@ export async function verifyClawHubDiscovery(target, dependencies = {}) {
       })
     );
 
-    if (discoveryChecks.every((check) => check.passed)) {
-      return { status: "found", discoveryChecks };
+    // Ranking coverage is independent from exact-version security and installation.
+    // Preserve every query, including misses, when the configured minimum passes.
+    discoverySummary = {
+      totalQueries: queries.length,
+      passingQueries: discoveryChecks.filter((check) => check.passed).length,
+      minimumPassingQueries
+    };
+    if (discoverySummary.passingQueries >= minimumPassingQueries) {
+      return { status: "found", discoveryChecks, discoverySummary };
     }
 
     if (attempt < attempts) {
@@ -152,7 +173,7 @@ export async function verifyClawHubDiscovery(target, dependencies = {}) {
     }
   }
 
-  return { status: "partial", discoveryChecks };
+  return { status: "partial", discoveryChecks, discoverySummary };
 }
 
 export function verificationTargetEntries(context) {

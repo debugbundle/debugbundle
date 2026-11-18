@@ -7,6 +7,22 @@ import { describe, expect, it, vi } from "vitest";
 
 const repoRoot = process.cwd();
 
+type DiscoveryVerifier = (
+  target: Record<string, unknown>,
+  dependencies: {
+    fetchJson: (url: string) => Promise<unknown>;
+    wait: (milliseconds: number) => Promise<void>;
+  }
+) => Promise<{
+  status: string;
+  discoveryChecks: Array<{ query: string; rank: number | null; passed: boolean }>;
+  discoverySummary: {
+    totalQueries: number;
+    passingQueries: number;
+    minimumPassingQueries: number;
+  };
+}>;
+
 describe("mcp ecosystem release pipeline", () => {
   it("ships a repo-owned ecosystem release manifest and planning script", () => {
     const manifestPath = join(repoRoot, "apps", "mcp", "ecosystem-release-manifest.json");
@@ -30,6 +46,7 @@ describe("mcp ecosystem release pipeline", () => {
         {
           type?: string;
           discoveryQueries?: Array<{ query?: string; maxRank?: number }>;
+          discoveryVerification?: { minimumPassingQueries?: number };
           catalog?: { categories?: string[]; topics?: string[] };
         }
       >;
@@ -97,6 +114,9 @@ describe("mcp ecosystem release pipeline", () => {
       { query: "health checks", maxRank: 10 },
       { query: "debug bundles", maxRank: 10 }
     ]);
+    expect(manifest.publishTargets?.["clawhub"]?.discoveryVerification?.minimumPassingQueries).toBe(
+      5
+    );
 
     expect(script).toContain(
       '["pack", context.packageIdentifier, "--pack-destination", context.tarballDirectory]'
@@ -270,16 +290,7 @@ describe("mcp ecosystem release pipeline", () => {
     ).href;
     const { findClawHubSearchRank, verifyClawHubDiscovery } = (await import(helperUrl)) as {
       findClawHubSearchRank: (payload: unknown, slug: string) => number | null;
-      verifyClawHubDiscovery: (
-        target: Record<string, unknown>,
-        dependencies: {
-          fetchJson: (url: string) => Promise<unknown>;
-          wait: (milliseconds: number) => Promise<void>;
-        }
-      ) => Promise<{
-        status: string;
-        discoveryChecks: Array<{ query: string; rank: number | null; passed: boolean }>;
-      }>;
+      verifyClawHubDiscovery: DiscoveryVerifier;
     };
 
     expect(
@@ -308,10 +319,126 @@ describe("mcp ecosystem release pipeline", () => {
 
     expect(result).toEqual({
       status: "found",
-      discoveryChecks: [{ query: "runtime error reporting", maxRank: 10, rank: 1, passed: true }]
+      discoveryChecks: [{ query: "runtime error reporting", maxRank: 10, rank: 1, passed: true }],
+      discoverySummary: { totalQueries: 1, passingQueries: 1, minimumPassingQueries: 1 }
     });
     expect(fetchJson).toHaveBeenCalledTimes(2);
     expect(wait).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    { passingQueries: 5, status: "found" },
+    { passingQueries: 6, status: "found" },
+    { passingQueries: 4, status: "partial" }
+  ])("requires five top-ten queries, with $passingQueries passing", async (expected) => {
+    const { verifyClawHubDiscovery } = (await import(
+      pathToFileURL(join(repoRoot, "scripts/mcp-ecosystem-verification.mjs")).href
+    )) as { verifyClawHubDiscovery: DiscoveryVerifier };
+    const queries = Array.from({ length: 7 }, (_, index) => ({
+      query: `capability ${index}`,
+      maxRank: 10
+    }));
+    const fetchJson = vi.fn(async (url: string) => {
+      const index = Number(new URL(url).searchParams.get("q")?.split(" ").at(-1));
+      const rank = index < expected.passingQueries ? 10 : 11;
+      return {
+        results: Array.from({ length: rank }, (_, offset) => ({
+          slug: offset === rank - 1 ? "debugbundle" : `other-${offset}`
+        }))
+      };
+    });
+    const wait = vi.fn(async () => undefined);
+    const result = await verifyClawHubDiscovery(
+      {
+        slug: "debugbundle",
+        discoveryQueries: queries,
+        discoveryVerification: { minimumPassingQueries: 5, attempts: 1 }
+      },
+      { fetchJson, wait }
+    );
+    expect(result.status).toBe(expected.status);
+    expect(result.discoverySummary).toEqual({
+      totalQueries: 7,
+      passingQueries: expected.passingQueries,
+      minimumPassingQueries: 5
+    });
+    expect(result.discoveryChecks).toHaveLength(7);
+    expect(result.discoveryChecks.filter((check) => check.passed)).toHaveLength(
+      expected.passingQueries
+    );
+    expect(result.discoveryChecks.filter((check) => !check.passed)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ rank: 11, passed: false })])
+    );
+    expect(fetchJson).toHaveBeenCalledTimes(7);
+    expect(wait).not.toHaveBeenCalled();
+  });
+
+  it.each([0, -1, 1.5, 8, "5", null])(
+    "rejects invalid discovery minima before querying: %s",
+    async (minimumPassingQueries) => {
+      const { verifyClawHubDiscovery } = (await import(
+        pathToFileURL(join(repoRoot, "scripts/mcp-ecosystem-verification.mjs")).href
+      )) as { verifyClawHubDiscovery: DiscoveryVerifier };
+      const fetchJson = vi.fn(async () => ({ results: [] }));
+      await expect(
+        verifyClawHubDiscovery(
+          {
+            slug: "debugbundle",
+            discoveryQueries: Array.from({ length: 7 }, (_, index) => ({
+              query: `capability ${index}`,
+              maxRank: 10
+            })),
+            discoveryVerification: { minimumPassingQueries, attempts: 1 }
+          },
+          { fetchJson, wait: async () => undefined }
+        )
+      ).rejects.toThrow("clawhub_discovery_policy_invalid");
+      expect(fetchJson).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    { queries: [] },
+    { queries: [{ query: "crash reporting" }, { query: "crash reporting" }] }
+  ])("rejects empty or duplicate discovery queries", async ({ queries }) => {
+    const { verifyClawHubDiscovery } = (await import(
+      pathToFileURL(join(repoRoot, "scripts/mcp-ecosystem-verification.mjs")).href
+    )) as { verifyClawHubDiscovery: DiscoveryVerifier };
+    const fetchJson = vi.fn(async () => ({ results: [] }));
+    await expect(
+      verifyClawHubDiscovery(
+        { slug: "debugbundle", discoveryQueries: queries },
+        { fetchJson, wait: async () => undefined }
+      )
+    ).rejects.toThrow("clawhub_discovery_policy_invalid");
+    expect(fetchJson).not.toHaveBeenCalled();
+  });
+
+  it("does not turn a provider request failure into a discovery pass", async () => {
+    const { verifyClawHubDiscovery } = (await import(
+      pathToFileURL(join(repoRoot, "scripts/mcp-ecosystem-verification.mjs")).href
+    )) as { verifyClawHubDiscovery: DiscoveryVerifier };
+    await expect(
+      verifyClawHubDiscovery(
+        {
+          slug: "debugbundle",
+          discoveryQueries: Array.from({ length: 7 }, (_, index) => ({
+            query: `capability ${index}`,
+            maxRank: 10
+          })),
+          discoveryVerification: { minimumPassingQueries: 5, attempts: 1 }
+        },
+        {
+          fetchJson: async (url) => {
+            if (new URL(url).searchParams.get("q") === "capability 6") {
+              throw new Error("http_503");
+            }
+            return { results: [{ slug: "debugbundle" }] };
+          },
+          wait: async () => undefined
+        }
+      )
+    ).rejects.toThrow("http_503");
   });
 
   it("renders a machine-readable ecosystem release plan", () => {

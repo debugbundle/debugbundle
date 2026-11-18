@@ -132,7 +132,8 @@ export async function verifyTargets(context, report, { runCommand, parseJsonFrom
           expectedCatalog: target.catalog ?? null,
           moderationVerdict: moderation?.verdict ?? null,
           moderationSummary: moderation?.summary ?? null,
-          discoveryChecks: discovery.discoveryChecks
+          discoveryChecks: discovery.discoveryChecks,
+          discoverySummary: discovery.discoverySummary
         };
         continue;
       }

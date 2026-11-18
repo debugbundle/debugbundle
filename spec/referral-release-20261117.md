@@ -94,7 +94,8 @@ no force override. Both distributions have a final benign security review; the
 provider adjudicated individual Skillspector warnings as expected for the stated
 purpose. A separate description-only skill patch 1.26.1 improves broad live-app
 discovery to rank 1. Six of seven bounded search checks pass; incident response
-remains rank 17 against the top-10 gate. This limitation is retained explicitly.
+remains rank 17. The owner accepted this release and the permanent five-of-seven
+top-10 discovery policy on 18 November; all individual results remain visible.
 
 The live configured Stripe catalogue was read without writes: all six base
 plan/interval prices and purchasable capacity match advertised USD amounts,
@@ -187,7 +188,7 @@ published package bytes. SDK/shared versions and OpenAI plugin 1.1.0 are retaine
 the latter's local release packet is refreshed against the verified live API
 digest without a portal publication or restricted-tool change.
 
-## Explicit boundaries and remaining external discovery
+## Explicit boundaries and directory acceptance
 
 No commercial or synthetic programme was created/activated; the live public
 programme list is empty until an operator publishes an agreement. Capability is
@@ -199,9 +200,13 @@ retained after account unlinking under the existing contract; rejected destructi
 cleanup remains a separate owner decision, not an added deletion trigger.
 
 Exact ClawHub skill 1.26.1 and companion 1.26.0 pass completed final security review
-and normal installation. The latest bounded discovery read remains 6/7: incident
-response is rank 17 against the top-10 gate. The external search gate is partial,
-and its release-command failure is retained honestly. No rank threshold was
-relaxed, old package silently republished, or scanner finding hidden. Pull-based
+and normal installation. The bounded discovery read is 6/7: incident response is
+rank 17. The original all-seven release-command failure remains in historical
+receipts. On 18 November the owner explicitly accepted this release and changed
+future acceptance to at least five of the seven queries in the top 10. The
+manifest, verifier, regression tests and release policy implement that decision;
+every rank/miss and the required/passing counts remain visible. Security and
+installation gates are unchanged. This release-tooling change retains all package
+and hosted runtime versions. No package was republished or scanner finding hidden. Pull-based
 directory follow-up and Gemini gallery indexing are separate from verified public
 Git/registry availability.

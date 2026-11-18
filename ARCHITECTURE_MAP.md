@@ -4,6 +4,11 @@ offer/email readers and API-only payout encryption. The private cloud repository
 owns rollout, `/r/<code>` edge routing, static publication and retention. Public
 pages use the hosted API; disposable local simulators remain separate.
 
+MCP directory verification is owned by `scripts/mcp-ecosystem-verification.mjs` and
+`apps/mcp/ecosystem-release-manifest.json`: at least five of seven ClawHub queries
+must rank in the top 10. Reports preserve all ranks and required/passing counts;
+exact-version security and native installation remain independent release gates.
+
 OpenAI reviewer startup validation in `apps/api/src/openai-plugin-runtime.ts`
 checks configuration structure without a moving lifetime threshold. The existing
 `openai-reviewer-access.ts` authorization boundary enforces the unchanged expiry

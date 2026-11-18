@@ -32,8 +32,9 @@ Current encrypted preferences remain retained after account unlinking under the
 documented contract; automatic destructive cleanup still requires separate approval.
 
 ClawHub's exact skill/plugin versions pass final security review and normal
-installation. Strict external search remains 6/7 (incident response rank 17
-against top 10), so that separate discovery gate is still partial. Historical
+installation. External search is 6/7 (incident response rank 17); the owner's
+18 November policy accepts at least five of seven queries in the top 10. This
+release is accepted, and all individual ranks remain recorded. Historical
 dated local-review entries below retain their original scope and are superseded
 by this publication record for current release status.
 

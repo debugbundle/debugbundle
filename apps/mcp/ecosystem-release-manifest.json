@@ -69,6 +69,7 @@
         { "query": "debug bundles", "maxRank": 10 }
       ],
       "discoveryVerification": {
+        "minimumPassingQueries": 5,
         "attempts": 6,
         "retryDelayMs": 5000,
         "limit": 25

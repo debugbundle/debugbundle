@@ -5,6 +5,10 @@ or sample campaign was activated. The affiliate page and introduction article
 are public. Existing credentials, settings, migration checksums and financial
 obligations remain preserved. SDK/shared-library versions are retained.
 
+ClawHub discovery passes when at least five of seven configured capability queries
+rank in the top 10, with every result retained. Exact-version security and native
+installation remain independent mandatory gates; see `rules/release-governance.md`.
+
 API startup validates the temporary OpenAI reviewer configuration structurally,
 without requiring a fresh remaining lifetime. The original expiry remains enforced
 at authorization; expired access cannot create a grant or block unrelated API/MCP
