@@ -122,9 +122,7 @@ describe("OpenAI plugin runtime configuration", () => {
     expect(() =>
       parseOpenAiPluginRuntimeConfig({
         ...reviewerEnv,
-        OPENAI_REVIEWER_CREDENTIAL_EXPIRES_AT: new Date(
-          Date.now() + 24 * 60 * 60 * 1_000
-        ).toISOString()
+        OPENAI_REVIEWER_CREDENTIAL_EXPIRES_AT: "not-a-timestamp"
       })
     ).toThrow("openai_plugin_runtime_config_invalid:OPENAI_REVIEWER_ACCESS");
     expect(() =>
@@ -134,6 +132,25 @@ describe("OpenAI plugin runtime configuration", () => {
       })
     ).toThrow("openai_plugin_runtime_config_invalid:OPENAI_REVIEWER_ACCESS");
   });
+
+  it.each([5, 0, -1])(
+    "preserves reviewer expiry without preventing API restart (%s days remaining)",
+    (daysRemaining) => {
+      const expiresAt = new Date(Date.now() + daysRemaining * 86_400_000).toISOString();
+      const config = parseOpenAiPluginRuntimeConfig({
+        ...enabledEnv(),
+        OPENAI_REVIEWER_ACCESS_ENABLED: "true",
+        OPENAI_REVIEWER_CREDENTIAL_HASH:
+          "$argon2id$v=19$m=65536,t=3,p=1$fixture-salt$fixture-credential-hash",
+        OPENAI_REVIEWER_CREDENTIAL_EXPIRES_AT: expiresAt,
+        OPENAI_REVIEWER_USER_ID: "10000000-0000-4000-8000-000000000001",
+        OPENAI_REVIEWER_ORGANIZATION_ID: "20000000-0000-4000-8000-000000000002",
+        OPENAI_REVIEWER_PROJECT_ID: "30000000-0000-4000-8000-000000000003"
+      });
+      expect(config.reviewer?.expiresAt).toBe(expiresAt);
+      expect(config.hostedMcpEnabled).toBe(true);
+    }
+  );
 
   it("derives the MCP bulkhead from the configured database pool", () => {
     expect(resolveApiDatabasePoolMax({})).toBe(10);

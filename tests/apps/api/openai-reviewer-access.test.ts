@@ -209,4 +209,38 @@ describe("OpenAI synthetic reviewer authorization", () => {
     ).rejects.toThrow("openai_reviewer_access_denied");
     expect(provider.interactionResult).not.toHaveBeenCalled();
   });
+
+  it.each(["2026-11-23T07:53:34.795Z", "2026-11-24T07:53:34.795Z"])(
+    "denies reviewer access at and after the unchanged expiry (%s)",
+    async (now) => {
+      const provider = createProvider("login");
+      const boundary = {
+        assertSyntheticBoundary: vi.fn(),
+        audit: vi.fn(async () => undefined)
+      };
+      const createGrant = vi.fn();
+      const authorization = createOpenAiReviewerAuthorization({
+        provider: provider.provider,
+        oauthStore: { createGrant, revokeGrant: vi.fn() },
+        boundary,
+        credentialHash,
+        expiresAt: "2026-11-23T07:53:34.795Z",
+        userId: REVIEWER_USER_ID,
+        organizationId: REVIEWER_ORGANIZATION_ID
+      });
+      await expect(
+        authorization.complete({
+          interactionId: "reviewer-interaction",
+          credential: CREDENTIAL,
+          now: new Date(now),
+          ...transport()
+        })
+      ).rejects.toThrow("openai_reviewer_access_denied");
+      expect(boundary.audit).toHaveBeenCalledWith({ action: "expiry", status: "failure" });
+      expect(boundary.assertSyntheticBoundary).not.toHaveBeenCalled();
+      expect(createGrant).not.toHaveBeenCalled();
+      expect(provider.provider.interactionDetails).not.toHaveBeenCalled();
+      expect(provider.interactionResult).not.toHaveBeenCalled();
+    }
+  );
 });

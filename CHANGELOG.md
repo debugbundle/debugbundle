@@ -6,6 +6,12 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.28.1] - 2026-11-18
+
+- Keep API and MCP startup available as the temporary OpenAI reviewer credential
+  approaches or passes expiry. Preserve its exact deadline and deny expired
+  reviewer authorization before provider interaction or grant creation.
+
 ## [1.28.0] - 2026-11-17
 
 - Bound vulnerable repeated-extglob patterns in the core/site build dependency,
@@ -50,7 +56,6 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 ### CLI documentation follow-up
 
 - CLI 1.25.1 corrects the remaining Rust candidate/unpublished wording in its public npm README; runtime behaviour is unchanged. The CLI release gate now verifies stable Rust discovery and package guidance.
-
 
 - Add Rust Cargo package/workspace discovery and native logging, Axum, Actix Web
   and browser-relay setup guidance. Preserve application source and existing project
