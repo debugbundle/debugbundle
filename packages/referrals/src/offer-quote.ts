@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { getBillingCatalogPrice } from "../../shared-types/src/billing-catalog.js";
 import { previewOfferPrice, type OfferPolicy } from "./programme-policy.js";
+import { OfferClaimSourceSchema, type OfferClaimSource } from "./offer-claim-source.js";
 
 export {
   OfferQuoteSelectionSchema,
@@ -14,8 +15,15 @@ import {
   type OfferPurchaseQuote
 } from "./offer-quote-contracts.js";
 const claimsSchema = OfferPurchaseQuoteSchema.omit({ confirmation_token: true })
-  .extend({ organization_id: z.uuid(), actor_user_id: z.uuid() })
+  .extend({
+    organization_id: z.uuid(),
+    actor_user_id: z.uuid(),
+    source_version_id: z.uuid().optional(),
+    code: z.string().min(3).max(24).optional(),
+    new_claim: OfferClaimSourceSchema.optional()
+  })
   .strict();
+export type VerifiedOfferQuote = z.infer<typeof claimsSchema>;
 export interface OfferQuoteCodec {
   issue(
     input: {
@@ -25,6 +33,9 @@ export interface OfferQuoteCodec {
       version_id: string;
       selection: z.input<typeof OfferQuoteSelectionSchema>;
       policy: OfferPolicy;
+      source_version_id?: string;
+      code?: string;
+      new_claim?: OfferClaimSource;
     },
     now?: number
   ): OfferPurchaseQuote;
@@ -47,6 +58,9 @@ export function createOfferQuoteCodec(secret: string): OfferQuoteCodec {
         version_id: string;
         selection: z.input<typeof OfferQuoteSelectionSchema>;
         policy: OfferPolicy;
+        source_version_id?: string;
+        code?: string;
+        new_claim?: OfferClaimSource;
       },
       now = Date.now()
     ): OfferPurchaseQuote {
@@ -71,6 +85,13 @@ export function createOfferQuoteCodec(secret: string): OfferQuoteCodec {
         actor_user_id: input.actor_user_id,
         claim_id: input.claim_id,
         version_id: input.version_id,
+        ...(input.source_version_id || input.new_claim
+          ? {
+              source_version_id: input.source_version_id,
+              code: input.code,
+              new_claim: input.new_claim
+            }
+          : {}),
         currency: "usd",
         base_minor: base,
         discount_minor: prices.discount_minor,

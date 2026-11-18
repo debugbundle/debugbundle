@@ -6,6 +6,7 @@ import { createTokenApiServer } from "../../helpers/api-tokens.js";
 import { mockedObject } from "../../helpers/vitest.js";
 import type { ApiDependencies } from "../../../apps/api/src/api-types.js";
 import { SESSION_COOKIE_NAME, buildCsrfToken } from "../../../packages/auth/src/index.js";
+import { ProgrammeError } from "../../../packages/referrals/src/programme-policy.js";
 
 const user = "22222222-2222-4222-8222-222222222222",
   org = "11111111-1111-4111-8111-111111111111";
@@ -36,6 +37,8 @@ function setup(billing?: NonNullable<ApiDependencies["billingManagement"]>) {
     publicLandingUrl: "https://debugbundle.test/",
     preview,
     pending: vi.fn().mockResolvedValue(null),
+    mayReplacePending: vi.fn().mockResolvedValue(false),
+    context: vi.fn().mockResolvedValue(null),
     visit: vi
       .fn()
       .mockResolvedValue("dbundle_offer=signed; HttpOnly; Secure; SameSite=Lax; Path=/"),
@@ -87,6 +90,52 @@ it("returns minimal no-store public offer context with scoped credentialed CORS"
     headers: { origin: "https://debugbundle.test", "access-control-request-method": "GET" }
   });
   expect(preflight.statusCode).toBe(403);
+});
+it("serves the shared anonymous promotion context without issuing a cookie or admitting a claim", async () => {
+  const f = setup();
+  vi.mocked(f.offers.context).mockResolvedValue({
+    code: "SALE30",
+    version: offerDefinition,
+    available: true
+  });
+  const response = await f.app.inject({
+    url: "/v2/offers/context",
+    headers: { origin: "https://debugbundle.test" }
+  });
+  expect(response.statusCode).toBe(200);
+  expect(response.json()).toMatchObject({ offer: { code: "SALE30", available: true } });
+  expect(response.headers["cache-control"]).toBe("private, no-store");
+  expect(response.headers["set-cookie"]).toBeUndefined();
+  expect(f.offers.context).toHaveBeenCalledWith(undefined);
+  expect(f.apply).not.toHaveBeenCalled();
+});
+it("compares the exact plan and interval without changing the public response shape", async () => {
+  const f = setup();
+  expect(
+    (await f.app.inject({ url: "/v2/offers/context?code=OWEN20&target_plan=solo&interval=month" }))
+      .statusCode
+  ).toBe(200);
+  expect(f.preview).toHaveBeenCalledWith("OWEN20", { target_plan: "solo", interval: "month" });
+  expect((await f.app.inject({ url: "/v2/offers/context?target_plan=solo" })).statusCode).toBe(400);
+  expect(f.apply).not.toHaveBeenCalled();
+});
+it("allows a referral carrier to replace a promotion hint without an attribution-change prompt", async () => {
+  const f = setup();
+  vi.mocked(f.offers.pending).mockResolvedValue({
+    code: "SALE30",
+    version: offerDefinition,
+    available: true
+  });
+  vi.mocked(f.offers.mayReplacePending).mockResolvedValue(true);
+  const response = await f.app.inject({
+    method: "POST",
+    url: "/v2/offers/pending",
+    headers: { origin: "https://debugbundle.test" },
+    payload: { code: "OWEN20" }
+  });
+  expect(response.statusCode).toBe(200);
+  expect(f.offers.visit).toHaveBeenCalledWith("OWEN20", undefined);
+  expect(f.apply).not.toHaveBeenCalled();
 });
 it("requires an exact Origin for anonymous hint writes without granting account authority", async () => {
   const f = setup();
@@ -265,6 +314,65 @@ it("does not expose provider exception details", async () => {
   expect(response.body).not.toContain("private-provider-secret");
 });
 
+it.each([true, false])(
+  "keeps lookup read-only and allows re-review after a rejected confirmation (fresh: %s)",
+  async (fresh) => {
+    const create = vi.fn(),
+      f = setup(
+        mockedObject<NonNullable<ApiDependencies["billingManagement"]>>({
+          getBillingSummaryForOrganization: vi.fn().mockResolvedValue({ plan: "free" }),
+          createCheckoutLink: create
+        })
+      );
+    const codec = createOfferQuoteCodec("api-offer-quote-secret-at-least-thirty-two-characters");
+    const quote = codec.issue({
+      organization_id: org,
+      actor_user_id: user,
+      claim_id: offerClaim.claim_id,
+      version_id: offerDefinition.version_id,
+      selection: { target_plan: "solo", interval: "month" },
+      policy: offerPolicy,
+      code: "SALE30",
+      ...(fresh
+        ? { new_claim: { attribution_id: null, partner_code: null } }
+        : { source_version_id: "33333333-3333-4333-8333-333333333333" })
+    });
+    f.offers.quote = vi.fn().mockResolvedValue(quote);
+    f.offers.verifyQuote = vi.fn(codec.verify);
+    f.offers.prepareCheckout = vi
+      .fn()
+      .mockRejectedValue(new ProgrammeError("offer_context_changed"));
+    const headers = { ...bearer };
+    const preview = await f.app.inject({
+      method: "POST",
+      url: "/v2/offers/quote",
+      headers,
+      payload: { target_plan: "solo", interval: "month", include_public_offers: true }
+    });
+    expect(preview.statusCode).toBe(200);
+    expect(f.offers.quote).toHaveBeenCalledWith(
+      { organization_id: org, actor_user_id: user },
+      {
+        target_plan: "solo",
+        interval: "month",
+        additional_capacity_units: 0,
+        include_public_offers: true
+      }
+    );
+    expect(f.offers.prepareCheckout).not.toHaveBeenCalled();
+    const confirmation = await f.app.inject({
+      method: "POST",
+      url: "/v2/offers/checkout",
+      headers,
+      payload: { confirmation_token: quote.confirmation_token }
+    });
+    expect(confirmation.statusCode).toBe(409);
+    expect(confirmation.json()).toEqual({ error: "offer_confirmation_required" });
+    expect(f.offers.prepareCheckout).toHaveBeenCalledOnce();
+    expect(create).not.toHaveBeenCalled();
+    await f.app.close();
+  }
+);
 it("confirms a signed offer through the Owner billing adapter without trusting a browser amount", async () => {
   const create = vi.fn().mockResolvedValue({ url: "https://checkout.stripe.com/test" }),
     billing = mockedObject<NonNullable<ApiDependencies["billingManagement"]>>({
@@ -372,3 +480,46 @@ it("keeps public visit/removal as hints and applies customer removal only to the
   expect(remove).toHaveBeenCalledExactlyOnceWith({ organization_id: org, actor_user_id: user });
   await f.app.close();
 });
+
+it.each(["preparation transport", "provider admission"])(
+  "does not offer a new price review after an uncertain %s failure",
+  async (boundary) => {
+    const create = vi.fn().mockRejectedValue(new ProgrammeError("programme_unavailable"));
+    const f = setup(
+      mockedObject<NonNullable<ApiDependencies["billingManagement"]>>({
+        getBillingSummaryForOrganization: vi.fn().mockResolvedValue({ plan: "free" }),
+        createCheckoutLink: create
+      })
+    );
+    const codec = createOfferQuoteCodec("api-offer-quote-secret-at-least-thirty-two-characters");
+    const quote = codec.issue({
+      organization_id: org,
+      actor_user_id: user,
+      claim_id: offerClaim.claim_id,
+      version_id: offerDefinition.version_id,
+      selection: { target_plan: "solo", interval: "month" },
+      policy: offerPolicy,
+      code: "SALE30",
+      source_version_id: "33333333-3333-4333-8333-333333333333"
+    });
+    f.offers.verifyQuote = vi.fn(codec.verify);
+    f.offers.prepareCheckout =
+      boundary === "preparation transport"
+        ? vi.fn().mockRejectedValue(new Error("eligibility_transport_unavailable"))
+        : vi.fn().mockResolvedValue({
+            claim_id: offerClaim.claim_id,
+            version_id: offerDefinition.version_id,
+            verified_owner_email: session.email
+          });
+    const response = await f.app.inject({
+      method: "POST",
+      url: "/v2/offers/checkout",
+      headers: bearer,
+      payload: { confirmation_token: quote.confirmation_token }
+    });
+    expect(response.statusCode).toBeGreaterThanOrEqual(400);
+    expect(response.json()).not.toEqual({ error: "offer_confirmation_required" });
+    expect(create).toHaveBeenCalledTimes(boundary === "provider admission" ? 1 : 0);
+    await f.app.close();
+  }
+);

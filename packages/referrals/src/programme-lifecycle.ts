@@ -23,6 +23,10 @@ export const programmeTransitions: Record<ProgrammeState, ProgrammeState[]> = {
   paused: ["active", "ended"],
   ended: []
 };
+/** Stable public fallback; the registry still owns uniqueness and code blocking. */
+export function defaultPromotionCode(versionId: string): string {
+  return `PROMO-${z.uuid().parse(versionId).replaceAll("-", "").slice(0, 18).toUpperCase()}`;
+}
 /** Check before provider preparation and again under the storage lock. */
 export function assertProgrammeStateChange(
   version: ProgrammeVersion,

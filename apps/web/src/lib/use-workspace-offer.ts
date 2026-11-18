@@ -29,7 +29,10 @@ const initial: WorkspaceOfferState = {
   legacy_attribution: null,
   legacy_discount_eligible: false
 };
-export function useWorkspaceOffer(organizationId: string): {
+export function useWorkspaceOffer(
+  organizationId: string,
+  refreshKey = 0
+): {
   data: WorkspaceOfferState;
   reload: () => void;
 } {
@@ -72,7 +75,7 @@ export function useWorkspaceOffer(organizationId: string): {
     return () => {
       generation.current++;
     };
-  }, [organizationId, revision]);
+  }, [organizationId, revision, refreshKey]);
   const reload = useCallback(() => setRevision((value) => value + 1), []);
   return { data, reload };
 }

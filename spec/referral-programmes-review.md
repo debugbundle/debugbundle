@@ -88,16 +88,15 @@ unchanged. SDK capture parity is not applicable; no SDK code changed.
 
 ### Public-page review
 
-The static preview alone uses the hosted API by default. The new offer routes
-have not been deployed there, so rebuilding only the site can show unavailable
-terms. For the public-page review, use:
+The static preview alone uses the hosted API by default. For an isolated public
+review with a synthetic programme, use:
 
 ```sh
 make referral-public-review
 ```
 
 Open `http://localhost:5292/affiliates/`. This rebuilds the static preview with
-`NEXT_PUBLIC_DEBUGBUNDLE_API_URL=http://localhost:3003` and runs the actual public
+`NEXT_PUBLIC_DEBUGBUNDLE_API_URL=http://localhost:3004` and runs the actual public
 offer routes against a dedicated tmpfs database. The clearly labelled **Local
 review referral programme** uses the approved 20% introductory discount and 50%
 commission for 12 months across Solo, Team and Business. Enter `REVIEW20` to
@@ -106,12 +105,27 @@ review the pending-offer notice and pricing; its cookie is only a local hint.
 This fixture supplies no real credentials, mail, account authentication, Checkout
 or provider transport. App/signup links retain their normal destinations; this
 target qualifies the public review surface, not a payment or signup journey.
-Only port 3003 is published, bound to loopback; the database has no host port.
+Only port 3004 is published, bound to loopback; the database has no host port.
 The dedicated bridge permits the host to access the API. Its source mount is
 read-only, it ignores ordinary database environment settings, and startup refuses
 any database except `debugbundle_referral_review`. Label checks prevent replacing
-or deleting foreign containers or networks. Restarting preserves the one sample
-programme while the database container is running.
+or deleting foreign containers or networks. The `referral-review` Compose profile
+owns both services under the ordinary `debugbundle` project, with a separate
+network. The `public-preview` profile owns the nginx preview on 5292. Adoption
+of the older standalone containers dumps/restores their synthetic data first.
+Restarting the API preserves the sample programme while the database container
+is running; stopping a tmpfs database discards its synthetic records.
+
+To start all ordinary local services and both independent previews together:
+
+```sh
+make dev-review
+```
+
+This preserves the app's populated mock mode on 5291, starts its underlying real
+API/worker/infrastructure, waits for readiness and rebuilds the public preview.
+The ordinary API remains on 3003. Public fixtures and private in-memory edits
+remain independent; this command does not qualify real account/payment journeys.
 
 ```sh
 make referral-public-review-stop
@@ -140,7 +154,7 @@ analytics are synthetic empty states. Unsupported support/payment operations
 return an explicit unavailable error; live-mode coupon binding is refused.
 This is UI review, not validation of operator authentication, provider binding
 or financial settlement. Those retain their real-service acceptance gates.
-The public preview on 5292 still uses its separate real-route fixture on 3003;
+The public preview on 5292 still uses its separate real-route fixture on 3004;
 drafts/codes created in the private simulator do not populate that database.
 
 ### Automated qualification

@@ -11,6 +11,7 @@ import {
   OfferGrantInventoryRecordSchema
 } from "../../referrals/src/offer-inventory-contracts.js";
 import { z } from "zod";
+import { PublicOfferContextQuerySchema } from "../../referrals/src/offer-choice.js";
 import { PAYOUT_OPERATIONS } from "./payout-operations.js";
 import {
   CreatorCodeSchema,
@@ -29,7 +30,7 @@ import {
 } from "../../referrals/src/referral-contracts.js";
 import {
   OfferPurchaseQuoteSchema,
-  OfferQuoteSelectionSchema
+  OfferQuoteRequestSchema
 } from "../../referrals/src/offer-quote-contracts.js";
 
 const empty = z.object({}).strict(),
@@ -84,7 +85,7 @@ export const OFFER_OPERATIONS = {
   context: {
     method: "GET",
     path: "/v2/offers/context",
-    input: z.object({ code: PublicOfferCodeSchema.optional() }).strict(),
+    input: PublicOfferContextQuerySchema,
     response: z.object({ offer: PublicOfferPreviewSchema.nullable() }).strict(),
     read: true,
     operator: false
@@ -132,7 +133,7 @@ export const OFFER_OPERATIONS = {
   quote: {
     method: "POST",
     path: "/v2/offers/quote",
-    input: OfferQuoteSelectionSchema,
+    input: OfferQuoteRequestSchema,
     response: z.object({ quote: OfferPurchaseQuoteSchema }).strict(),
     read: true,
     operator: false

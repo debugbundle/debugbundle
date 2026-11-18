@@ -2664,6 +2664,11 @@ Mapped requirements: FR-PJS-01/04. Explicit roots, secret-free manifest/diff, re
 
 ### AC-WEB-10: Local Mock Preview
 
+- `make dev-review` groups the app, public preview and isolated referral services
+  in the `debugbundle` Compose project. API/worker/web/public/referral services
+  have readiness checks; the public fixture on 3004 coexists with the app API on
+  3003. Legacy standalone review data survives adoption, and stopping the public
+  referral fixture leaves the ordinary app services and persistent data intact.
 - Billing controls switch all four tiers, both paid intervals and paid,
   complimentary, locked-trial and mature-trial states in memory. Session/project
   plan projections agree with the selected fixture; paid terms and monthly
@@ -3165,9 +3170,21 @@ wait remains the default, with only the audited grant described below.
 - **AC-REF-01:** Test normalization, malformed/reserved aliases, creator/promotion/legacy collisions and concurrent reservation. Renames/deletion cannot reassign codes. Old clients/links still work.
   Operator code blocking serialises with both legacy and versioned claim admission; existing saved promises survive the block.
 - **AC-REF-02:** Lifecycle/revision/cap races preserve frozen offers, terms and balances. Preview visits consume no claim slots; promised claims cannot lose their slot later.
+  Competing activations leave one current live revision; saving/discarding a draft
+  preserves the live offer. One programme groups drafts/history; ended mistakes
+  start archived. Native local dates convert correctly across timezone/DST boundaries
+  and preserve untouched stored timestamp precision.
 - **AC-REF-03:** Exercise no-cookie manual claim, email/GitHub signup, outage/retry, device/session changes, trial expiry and explicit workspace correction; failed persistence never displays saved success.
   A saved claim/attribution remains purchasable after enrolment pauses even if signup-completion acknowledgement was lost; an unresolved hint alone still blocks unconfirmed full-price checkout.
 - **AC-REF-04:** Verify all six plan/interval totals, original/introductory/renewal amounts and tax/capacity separation across quote/provider/UI. Cache isolation and unavailable validation are fail closed for discounted checkout.
+  Anonymous homepage context compares eligible current promotions through the
+  existing referral banner/pricing/signup path; presented referral identity survives.
+  A confirmed empty context and a failed background lookup without offer context
+  render no banner. A supplied code or previously loaded offer retains recovery
+  controls after failure; stale discounts are never shown as confirmed prices.
+  Future/expired/paused/capped/blocked promotions are excluded, and reads create no
+  cookie, claim or provider write. Installed publication repair requires its ordered
+  migration, preserves existing code/provider ownership and fails closed on collision.
   Activation rejects percentages that round an eligible catalogue invoice to zero. Successful public code selection/removal consumes the URL hint; invalid codes never masquerade as replacement conflicts.
   Automatic setup covers referrals/promotions, server-only mode, product/capacity
   scope, monthly-only scope with shared interval products, exact immutable retries,
@@ -3181,6 +3198,22 @@ wait remains the default, with only the audited grant described below.
   recovery with an in-memory transport; both programme kinds must compose through
   activation, claim, signed quote and an idempotent Checkout retry.
 - **AC-REF-05:** Confirm replacement, preserve partner, prevent a second identity benefit after campaign change/account recreation and enforce visible trial-safe deadlines.
+  Remove or expire the saved claim while provider eligibility verification is in
+  flight: confirmation must preserve that state without replacement history or
+  consuming the new campaign's slot. A withdrawn quote must permit a fresh review
+  and successful confirmation; transport/provider uncertainty must retain the
+  original immutable attempt.
+  Test cheaper/referral/tied discounts, including rounding ties and different
+  plan/interval scopes. Compare all eligible promotions rather than newest only.
+  Both visit orders and cookie-free signup retain the referral carrier; API and
+  worker recovery persist the same discount and creator agreement. Prove actual
+  ledger commission on discounted cash. Existing claim quotes do not write; explicit
+  confirmation rechecks code, capacity, source version, identity and frozen attempts.
+  No-claim public-offer previews write no financial state; confirmation creates
+  exactly the quoted claim once. Test duplicate and competing confirmations,
+  changed attribution, pending signup, prior payment, wait/cap/block/expiry and
+  ordinary admitted checkout. Unsupported/outage lookups stay closed; a definitive
+  no-offer response requires a separate ordinary-price purchase confirmation.
 - **AC-REF-06:** A code never bypasses the wait. A valid exact grant admits its bound attempt; expiration, revocation, wrong subject and concurrent use are denied. Existing issued sessions/confirmed payments remain reconcilable.
 - **AC-REF-07:** Test allowlisted email-authenticated and all denied principals, CSRF, scoped delegation expiry/revocation/session/token binding, action parity and audit; no new restricted OAuth tools.
 - **AC-REF-08:** Test all-plan cash, zero/trial invoices, annual anniversary allocation, partial collection/refunds, credits, disputes, duplicate/out-of-order webhooks and competing manual payouts. Legacy canonical outputs remain equal.

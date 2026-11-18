@@ -58,11 +58,11 @@ const descriptions: Record<OfferOperation, string> = {
   programmes:
     "List public active or scheduled referral and introductory programmes with their exact terms.",
   context:
-    "Preview a public code's offer. A preview does not establish eligibility or save a discount.",
+    "Preview the cheapest eligible public offer, retaining the presented referral code and preferring referrals on price ties. Supply target_plan and interval together for an exact invoice comparison. A preview does not establish eligibility or save a discount.",
   quote:
-    "Quote the current Owner's saved introductory offer, selected plan and interval. Amounts exclude tax, which is calculated at Checkout.",
+    "Read-only quote for the current Owner's selected plan and interval. Set include_public_offers=true to discover eligible promotions without a saved claim, preserving any creator; otherwise quote the saved offer. Creates no claim or provider session. Amounts exclude tax, calculated at Checkout.",
   checkout:
-    "Start or reconcile the exact signed quoted offer only after explicit human purchase confirmation. May create a provider Checkout Session; never call merely to inspect pricing.",
+    "Start or reconcile the exact signed quoted offer only after explicit human purchase confirmation. May create the confirmed introductory claim and a provider Checkout Session; never call merely to inspect pricing.",
   creator: "Read your own creator programme, branded code, legacy code and share link.",
   join: "Join a versioned referral programme only after the human accepts its exact terms version.",
   code: "Reserve your one memorable creator code. Codes are public and cannot be reassigned to another creator.",

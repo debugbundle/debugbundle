@@ -1,3 +1,146 @@
+# 19 November production release train — authorized, qualifying
+
+The owner now authorizes all pending DebugBundle commits and the production
+release flow. Selected versions are core 1.29.0, CLI/MCP/OpenClaw/portable skill
+1.27.0 and site 1.11.1. The optional API inputs warrant a minor core/client
+release; the site correction remains a patch. SDKs, shared JS, editor packages
+and the hosted OpenAI plugin retain their versions. See
+[release execution](spec/release-20261119.md) for eligibility, migration order,
+production preservation and final gates. Earlier withheld-release notes below
+are historical and superseded by this authorization.
+
+Read-only production baseline confirms core 1.28.1 and 94 migration checksums,
+with existing Business, reports, reviews, project merges and referrals enabled.
+Credentials and commercial/financial fingerprints are retained only in ignored
+local evidence. Full CI, isolated affected-path coverage and artifact checks are
+in progress; publication and deployment have not yet occurred.
+
+# 18 November offer release hardening — ready locally, release withheld
+
+The owner requested production-release preparation and explicitly withheld release.
+The review's checkout defects are fixed: replacement repeats canonical claim
+eligibility under the transaction locks after provider verification and code/
+programme lock waits; removed or expired claims stay unchanged, with no replacement
+history or new claim-slot consumption. Definitive preparation rejection permits
+a new price review for both fresh and saved claims. Transport/provider-admission
+uncertainty preserves the exact confirmation and existing payment attempt.
+
+Billing now refreshes its workspace-offer reader after a definitive rejection.
+A removal in another tab cannot leave stale saved terms blocking purchase; the
+regular price still requires a separate explicit confirmation. Pending programme
+drafts remain editable alongside the live revision and collapsed older history.
+
+Final Docker qualification: 636 cases in 77 core/API/CLI/MCP/web/database files
+pass with V8 coverage, including offer/provider adapters, referral ties and cash
+attribution, installed-predecessor upgrade, publication migration, checkout and
+webhook safety. All 48 changed TypeScript files pass lint/format; full core
+typechecking and the app production build pass. Ten Europe/Ljubljana date/form
+checks pass. The changed-file coverage gate passes for 30 source files; a final
+three-case draft/history check also passes with 100% grouped-control function
+coverage. The site independently passes 119 functional and 10 dependency-policy
+cases, its isolated production export and typechecking.
+
+Early concurrent validation hit resource-related timeouts; the completed combined
+rerun passes all affected cases, and the site export passes separately. One new
+test-only lint issue and missing formatting were corrected before the final checks.
+The app retains its existing large-chunk warning. No new dependencies or database
+shape changes were introduced by this hardening.
+
+Evidence: `.tmp/offer-release-final-coverage.log`,
+`.tmp/offer-release-final-coverage/`, `.tmp/offer-release-final-static.log`,
+`.tmp/offer-release-final-types-build.log`, `.tmp/offer-release-group-check.log`,
+`.tmp/offer-release-coverage-gate.log`, and `.tmp/offer-release-final-site.log`.
+The final lint log includes the subsequently corrected format-only failure;
+the succeeding format/type/build log is authoritative for those checks.
+See [release preparation](spec/offer-release-readiness-20261118.md) for distribution
+eligibility, migration order and the remaining authorized-release execution gates.
+No commit, push, publication, deployment, live/provider mutation, consumer-product
+change or browser acceptance is claimed.
+
+# 18 November cheapest eligible offer — referral flow qualified locally
+
+The owner requested lowest eligible introductory invoice cost, with referral
+priority on equal rounded prices. Shared selection now serves the public banner,
+per-plan pricing, code application, signup and durable worker recovery. A cheaper
+promotion retains the original creator/code and frozen commission agreement;
+legacy Business terms remain explicit. Quote previews keep saved promises intact;
+explicit confirmation can select the quoted better discount on the existing claim.
+Same-code revisions retain the original creator agreement, and an early-purchase
+grant cannot be stranded by selecting a campaign that disallows it.
+
+Qualification: 305 affected core/API/CLI/MCP/web tests pass, and the final 20
+focused database cases cover real HTTP, legacy compatibility and ten new selection
+cases. A final eleven-case selection run also passes after adding the stale-quote
+revocation guard: a removed or expired offer cannot be restored by an old quote.
+Other offer suites passed in the broader run; its changed HTTP expectation
+was updated from 20% referral pricing to the active 30% promotion, retaining
+capacity. Four generated-reference checks pass. Site checks pass (116 functional
+and 10 dependency-policy cases), including a full isolated production export and
+typecheck. Core types, scoped lint/format, diff checks and the app build pass.
+The app retains its existing large-chunk warning. Pre-ship review covers exact
+quotes, price ties, caps/blocks, attribution locks, worker/browser parity, retained
+commission, quote races, first-purchase eligibility and source-version fencing.
+
+The owner also explicitly approved checkout discovery without an existing claim.
+Its price review writes no financial state; purchase confirmation creates exactly
+the signed claim ID while preserving the captured creator. Changed attribution,
+pending signup, prior payment, wait/cap/block/expiry and competing/admitted attempts
+are rechecked. Legacy ties retain their original redemption path. The optional
+request flag preserves old-client behaviour and prevents an old server or outage
+from silently selecting full price. Lost responses retain the same proof.
+
+Extension qualification: 36 focused database cases pass, including 15 fresh-claim
+cases; 54 focused quote/API/CLI/MCP/web regressions pass. All 86 Billing UI cases
+pass, including fresh and saved lost-response recovery. Four generated-reference
+checks pass on an isolated rerun after a concurrent-run timeout. Full core types,
+scoped lint/format and the app build pass. Pre-ship review covers the new nonce,
+attribution snapshot, no-write preview, confirmation/replay boundaries, compatibility
+and unchanged schema. See [selection behaviour](spec/referral-offer-selection.md).
+No deployment, publication, production data/provider mutation or consumer-product
+change occurred.
+
+Public no-offer follow-up: the owner approved hiding anonymous discovery failures.
+Empty contexts and failed background lookups now render no banner without a
+supplied code or known offer; explicit/previous offer recovery retains the existing
+warning and retry controls. Discount prices remain unconfirmed after failure.
+All 119 site functional and 10 dependency-policy cases pass; isolated production
+export and site typecheck pass. No hosted deployment or live offer data changes.
+The running localhost:5292 preview initially retained the 17 November static export.
+`make dev-public-refresh` rebuilt it and restarted only `debugbundle-public`.
+Fresh HTTP readback references `8749-07a50b6aa32a7908.js`; served and built bytes
+match and include the offer-context guard. The preview is healthy. This is local
+HTTP/artifact verification, not browser or hosted acceptance.
+
+# 18 November programme publication correction — qualified locally, unreleased
+
+Live public reads confirmed Black Friday at DebugBundle revision 2 was eligible
+at 30% while anonymous `/v2/offers/context` returned null. The homepage already
+mounted the shared referral/promotion provider and banner. The corrected context
+preserves selected code hints and otherwise discovers one eligible promotion.
+Activation reserves a missing public code and atomically ends superseded live
+revisions. The approved UI groups programme history, archives ended mistakes and
+uses native local date/time fields with UTC storage and responsive columns.
+
+Forward data migration `202611180001_reconcile_offer_publication` repairs current
+promotions without codes and stale superseded state labels; existing blocked
+codes, provider bindings, policies and saved customer promises remain preserved.
+Ledger recovery cannot skip this repair by inferring it from table shape.
+
+Qualification: 332 core tests pass (the DST-only case is separately exercised in
+the 10-case Europe/Ljubljana run), 106 offer database cases pass, and the exact
+immutable-predecessor upgrade passes. The final artifact/UI check adds 13 passing
+cases. Site tests pass (115 functional plus 10 dependency-policy cases). Core/site
+typechecks, scoped lint/format, diff checks and the app production build pass.
+The build retains its existing large-chunk warning. Public API/MCP references
+are regenerated. Pre-ship review covers lifecycle/cap races, code blocking and
+ownership collisions, absent-ledger repair, no-write public reads, timezone/DST,
+archived history and frozen customer/provider/financial records.
+
+Details: [publication correction](spec/referral-programme-publication-correction.md).
+No commit, package publication, hosted deployment, live data/provider mutation or
+consumer-product change occurred. The migration and API/app release remain the
+next gate before these fixes appear live.
+
 # 18 November affiliate release — published and verified
 
 Core 1.28.1 and site 1.11.0 are live from the coordinated

@@ -313,6 +313,28 @@ customer discount followed by 80% commission retains 16% of the original base
 before fees/operating costs; no combined-discount-plus-commission percentage cap
 is applied. Existing half-up rounding, windows and refund debt remain unchanged.
 
+Owner-selected price policy, 18 November 2026: choose the cheapest eligible
+introductory base invoice, with referral priority on equal rounded amounts.
+A promotion can supply the discount while the claim retains the original
+`referral_version_id` and code for commission. Never use a promotion's zero
+commission rate as the creator agreement. Legacy referrals retain an explicit
+null version and their original Business-only commission scope. New signup
+recovery and ordinary API/CLI/MCP use the same policy. Quote reads do not rewrite
+saved promises; explicit purchase confirmation may select the quoted replacement
+before reservation. Reserved/provider work remains exact and non-stacking.
+Replacement reuses the canonical checkout eligibility check under the owner and
+identity locks, after provider reads and campaign/code lock waits. A removed or
+expired saved claim cannot be restored by a stale quote. Definitive preparation
+rejections return `offer_confirmation_required` before calling the billing
+provider adapter, for both fresh and replacement claims. Transport failures and
+provider-admission failures retain their existing reconciliation semantics.
+An explicitly opted-in no-claim quote signs a new claim ID and the existing
+attribution/code snapshot without writing financial state. Confirmation may create
+only that claim, under the ordinary owner/identity/programme locks and all current
+purchase checks. Attribution changes or another claim invalidate the preview;
+retries preserve the same nonce. Legacy ties retain ordinary referral redemption.
+See [offer selection](../spec/referral-offer-selection.md).
+
 Unresolved signup intent blocks a full-price first reservation. Durable attribution
 or a claim for that same current Owner takes precedence over a lost acknowledgement
 of intent completion; it remains usable when enrolment pauses. This changes no

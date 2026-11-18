@@ -205,6 +205,36 @@ FR/AC-REF-11 and the [payment setup contract](../contracts/referral-accounting.m
 
 ## Public affiliate presentation
 
+Anonymous public context compares the presented code with current promotions
+within their claim window and capacity, preferring the cheapest eligible rounded
+invoice amount and the referral on ties. Exact comparisons accept plan and interval
+together. Before selection, a better promotion must retain the original eligible
+scope. The presented referral code remains the signup attribution carrier even
+when the displayed terms are a cheaper promotion. Invalid explicit codes never
+masquerade as a valid promotion. Preview reads create no cookie,
+claim or provider object. The existing site-wide banner, details, pricing and
+signup link consume this same context on the homepage and other public layouts.
+Activation/scheduling reserves a stable public promotion code when none exists.
+An intentionally blocked code is never bypassed by generating another code.
+
+Signup and durable recovery save that cheaper discount with the original creator
+agreement. Existing saved offers can receive an exact cheaper quote without a
+write; explicit confirmation rechecks and records its replacement before Checkout
+reservation. Ties prefer an available versioned referral. Legacy attribution
+remains Business-only under its original agreement. See the
+[selection contract](referral-offer-selection.md). Customers without a saved claim
+can review public promotions without a write, then explicitly confirm creation
+of the exact claim with their existing creator attribution preserved.
+
+Activating/scheduling a revision atomically ends its superseded live revisions;
+saving a draft leaves the current offer alone. Saved agreements, claims and
+financial terms stay frozen. Operators see one permanent programme with pending
+drafts and closed revision history. Ended programmes are in closed Archives;
+discarding a draft records its existing ended transition rather than deleting
+immutable history. Native date/time inputs use the device timezone and persist
+UTC; untouched stored seconds remain exact. See the
+[correction and upgrade notes](referral-programme-publication-correction.md).
+
 The public programme page is `/affiliates/`, linked as Affiliates between About
 and Contact in the footer. This is a clean rename of the unpublished marketing
 route, with no legacy redirect. `/docs/referrals/`, creator settings, API names and

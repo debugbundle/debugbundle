@@ -13,6 +13,9 @@ import { runInTransaction } from "./transaction.js";
 import type { Queryable } from "./types.js";
 import { resolveOfferCode } from "./offer-code-resolver.js";
 import { lockOfferCodeForClaim } from "./offer-code-registry.js";
+import { resolveOfferReferrer } from "./offer-referrer.js";
+import { NewOfferClaimSchema } from "../../referrals/src/offer-claim-source.js";
+import { readOfferCheckoutContext, readOfferPurchaseEligibility } from "./offer-benefit-store.js";
 import {
   OfferActorSchema,
   lockOfferIdentity,
@@ -27,6 +30,10 @@ const applySchema = OfferActorSchema.extend({
   code: PublicOfferCodeSchema,
   source: z.enum(["link", "manual"]),
   explicit_correction: z.boolean(),
+  referral_code: PublicOfferCodeSchema.optional(),
+  expected_version_id: z.uuid().optional(),
+  preserve_referral: z.boolean().optional(),
+  new_claim: NewOfferClaimSchema.optional(),
   provider_customer_id_checked: z.string().min(1).max(255).nullable(),
   provider_previously_paid: z.boolean()
 }).strict();
@@ -197,7 +204,22 @@ export function createOfferClaimStore(
         if (owner.customer_id !== input.provider_customer_id_checked)
           throw new ProgrammeError("offer_context_changed");
         const current = await claimRow(tx, input.organization_id);
-        if (current?.code === input.code && current.revoked_at === null)
+        if (
+          input.new_claim &&
+          current &&
+          (current.id !== input.new_claim.claim_id ||
+            current.code !== input.code ||
+            current.revoked_at !== null)
+        )
+          throw new ProgrammeError("offer_context_changed");
+        if (input.expected_version_id && current?.version_id !== input.expected_version_id)
+          throw new ProgrammeError("offer_context_changed");
+        if (
+          current?.code === input.code &&
+          current.revoked_at === null &&
+          !input.expected_version_id &&
+          (!input.referral_code || current.referral_code === input.referral_code)
+        )
           return mapClaim(tx, current);
         if (
           current?.code === input.code &&
@@ -210,11 +232,32 @@ export function createOfferClaimStore(
             id: string;
             partner_id: string;
             reserved_checkout_attempt_id: string | null;
+            partner_code: string;
           }>(
-            "SELECT id,partner_id,reserved_checkout_attempt_id FROM referral_attributions WHERE organization_id=$1 FOR UPDATE",
+            "SELECT id,partner_id,reserved_checkout_attempt_id,(SELECT code FROM referral_partners p WHERE p.id=referral_attributions.partner_id) AS partner_code FROM referral_attributions WHERE organization_id=$1 FOR UPDATE",
             [input.organization_id]
           )
         ).rows[0];
+        if (input.new_claim) {
+          if (
+            (attribution?.id ?? null) !== input.new_claim.attribution_id ||
+            (attribution?.partner_code ?? null) !== input.new_claim.partner_code
+          )
+            throw new ProgrammeError("offer_context_changed");
+          const eligibility = await readOfferPurchaseEligibility(tx, input.organization_id);
+          if (!eligibility.allowed || eligibility.previously_paid)
+            throw new ProgrammeError("offer_ineligible");
+          if (
+            !attribution &&
+            (
+              await tx.query(
+                "SELECT id FROM offer_signup_intents WHERE organization_id=$1 AND user_id=$2 AND status='pending' AND expires_at>clock_timestamp()",
+                [input.organization_id, input.actor_user_id]
+              )
+            ).rows.length
+          )
+            throw new ProgrammeError("programme_unavailable");
+        }
         if (
           current?.checkout_attempt_id ||
           current?.eligible_invoice_id ||
@@ -257,10 +300,22 @@ export function createOfferClaimStore(
           throw new ProgrammeError("offer_ineligible");
         const resolved = await resolveOfferCode(tx, input.code);
         if (!resolved) throw new ProgrammeError("invalid_offer_code");
+        if (input.new_claim && resolved.version.policy.kind !== "promotion")
+          throw new ProgrammeError("offer_context_changed");
         if (resolved.partner_user_id === input.actor_user_id)
           throw new ProgrammeError("offer_ineligible");
+        const referrer = input.referral_code
+          ? await resolveOfferReferrer(tx, input.referral_code)
+          : null;
+        if (input.referral_code && !referrer) throw new ProgrammeError("invalid_offer_code");
+        if (referrer?.partner_user_id === input.actor_user_id)
+          throw new ProgrammeError("offer_ineligible");
         const versionIds = [
-          ...new Set([resolved.version.version_id, ...(current ? [current.version_id] : [])])
+          ...new Set([
+            resolved.version.version_id,
+            ...(referrer?.version ? [referrer.version.version_id] : []),
+            ...(current ? [current.version_id] : [])
+          ])
         ].sort();
         const programmeIds = [
           ...new Set(
@@ -301,19 +356,52 @@ export function createOfferClaimStore(
         const fresh = await resolveOfferCode(tx, input.code);
         if (!fresh || fresh.version.version_id !== version.version_id)
           throw new ProgrammeError("programme_changed");
+        if (input.referral_code) {
+          await lockOfferCodeForClaim(tx, input.referral_code);
+          const checked = await resolveOfferReferrer(tx, input.referral_code);
+          if (
+            !checked ||
+            checked.partner_id !== referrer!.partner_id ||
+            checked.version?.version_id !== referrer!.version?.version_id
+          )
+            throw new ProgrammeError("programme_changed");
+        }
+        if (input.expected_version_id) {
+          // Provider reads and lock waits can outlive removal or the saved
+          // deadline. Recheck eligibility under the owner/identity locks before
+          // replacing any promise, attribution or claim-slot accounting.
+          const context = await readOfferCheckoutContext(tx, {
+            organization_id: input.organization_id,
+            actor_user_id: input.actor_user_id
+          });
+          if (!context?.discount_eligible || context.version_id !== input.expected_version_id)
+            throw new ProgrammeError("offer_context_changed");
+        }
         let attributionId = current?.attribution_id ?? attribution?.id ?? null;
         let referralVersionId = current?.referral_version_id ?? null;
         let referralCodeId = current?.referral_code_id ?? null;
-        if (resolved.partner_id !== null) {
+        const partnerId = referrer?.partner_id ?? resolved.partner_id;
+        if (partnerId !== null) {
           attributionId ??= randomUUID();
           await tx.query(
             `INSERT INTO referral_attributions(id,partner_id,organization_id,organization_external_id,owner_identity_hash,source)
             VALUES($1,$2,$3,$3,$4,$5) ON CONFLICT(organization_external_id) DO UPDATE SET partner_id=EXCLUDED.partner_id,source=EXCLUDED.source,updated_at=now()`,
-            [attributionId, resolved.partner_id, input.organization_id, hash, input.source]
+            [attributionId, partnerId, input.organization_id, hash, input.source]
           );
-          referralVersionId = version.version_id;
-          referralCodeId = resolved.code_id;
-        } else if (attributionId && !referralVersionId) {
+          // A promotion never substitutes its policy for the creator's agreement.
+          // Existing same-partner commission terms stay frozen across discount changes.
+          if (
+            (!input.preserve_referral && resolved.partner_id !== null) ||
+            !attribution ||
+            attribution.partner_id !== partnerId
+          ) {
+            referralVersionId = referrer
+              ? (referrer.version?.version_id ?? null)
+              : version.version_id;
+            referralCodeId = referrer?.code_id ?? resolved.code_id;
+          }
+        }
+        if (attributionId && !referralCodeId) {
           // A promotion replaces only the discount. A null referral version is
           // the explicit preserved legacy Business-only commission agreement.
           await tx.query(
@@ -329,7 +417,7 @@ export function createOfferClaimStore(
           if (!original) throw new ProgrammeError("offer_context_changed");
           referralCodeId = original.id;
         }
-        const id = current?.id ?? randomUUID();
+        const id = current?.id ?? input.new_claim?.claim_id ?? randomUUID();
         const deadline = offerClaimDeadline(
           version.policy,
           Date.now(),

@@ -30,6 +30,7 @@ function fixture(enabled = true) {
       take: vi.fn().mockResolvedValue(null),
       complete: vi.fn()
     };
+  const publicPromotion = vi.fn().mockResolvedValue(null);
   const legacy = mockedObject<LegacyOfferAdapter>({
     enabled: true,
     readHint: (header: string | undefined) => old.readHint(header),
@@ -61,6 +62,7 @@ function fixture(enabled = true) {
       getVersion: async () => ({ ...version }),
       setState,
       bindProvider,
+      publicPromotion,
       preview: async (code: string) =>
         code === "OWEN20" ? { code, version: offerVersion, available: true } : null
     }),
@@ -90,6 +92,7 @@ function fixture(enabled = true) {
     verifyCoupon,
     setState,
     bindProvider,
+    publicPromotion,
     setBinding: (value: typeof binding) => {
       binding = value;
     }
@@ -102,6 +105,26 @@ const change = {
   expected_state: "draft",
   acknowledge_unlimited: false
 } as const;
+it("compares public promotions while retaining the selected referral carrier and avoiding anonymous writes", async () => {
+  const f = fixture();
+  f.publicPromotion.mockResolvedValue({
+    code: "SALE30",
+    version: {
+      ...offerVersion,
+      policy: {
+        ...offerVersion.policy,
+        kind: "promotion",
+        commission_basis_points: 0,
+        discount_basis_points: 3000
+      }
+    },
+    available: true
+  });
+  expect(await f.service.context(undefined)).toMatchObject({ code: "SALE30" });
+  expect(await f.service.context(f.links.issue("OWEN20"))).toMatchObject({ code: "OWEN20" });
+  expect(f.publicPromotion).toHaveBeenCalledTimes(2);
+  expect(await fixture(false).service.context(undefined)).toBeNull();
+});
 it("prepares an automatic binding before activation and reuses it when resuming", async () => {
   const f = fixture();
   await expect(f.service.changeState(change)).resolves.toMatchObject({ state: "active" });

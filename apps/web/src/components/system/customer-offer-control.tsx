@@ -24,12 +24,14 @@ import {
 
 export function CustomerOfferControl({
   organizationId,
+  refreshKey,
   onState
 }: {
   organizationId: string;
+  refreshKey?: number;
   onState?: (state: WorkspaceOfferState) => void;
 }): JSX.Element {
-  const { data, reload } = useWorkspaceOffer(organizationId),
+  const { data, reload } = useWorkspaceOffer(organizationId, refreshKey),
     { pending, run } = usePendingAction();
   const [code, setCode] = useState(""),
     [error, setError] = useState<string | null>(null),

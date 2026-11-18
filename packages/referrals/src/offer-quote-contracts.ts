@@ -7,6 +7,9 @@ export const OfferQuoteSelectionSchema = z
     additional_capacity_units: z.number().int().min(0).max(99).default(0)
   })
   .strict();
+export const OfferQuoteRequestSchema = OfferQuoteSelectionSchema.extend({
+  include_public_offers: z.literal(true).optional()
+});
 export const OfferPurchaseQuoteSchema = OfferQuoteSelectionSchema.extend({
   claim_id: z.uuid(),
   version_id: z.uuid(),

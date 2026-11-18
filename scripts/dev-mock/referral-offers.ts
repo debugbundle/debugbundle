@@ -1,4 +1,10 @@
 import { randomUUID } from "node:crypto";
+import { defaultPromotionCode } from "../../packages/referrals/src/programme-lifecycle.js";
+import {
+  preferOffer,
+  OfferPriceSelectionSchema,
+  type OfferPriceSelection
+} from "../../packages/referrals/src/offer-choice.js";
 import { z } from "zod";
 import {
   OFFER_OPERATIONS,
@@ -87,6 +93,21 @@ export function createReferralOfferMocks(isSignedIn: () => boolean) {
     creator,
     share_url: creator ? `http://localhost:5292/affiliates/?offer=${creator.code}` : null
   });
+  const selectedContext = (
+    code: string | null,
+    selection?: OfferPriceSelection
+  ): ReturnType<typeof context> => {
+    const original = context(code);
+    if (code && (!original || !original.available)) return original;
+    const selected = [...codes.keys()]
+      .map(context)
+      .filter((offer) => offer?.version.policy.kind === "promotion")
+      .reduce<ReturnType<typeof context>>(
+        (current, offer) => preferOffer(current, offer, selection),
+        original
+      );
+    return selected && original ? { ...selected, code: original.code } : selected;
+  };
 
   return {
     handle(
@@ -136,10 +157,18 @@ export function createReferralOfferMocks(isSignedIn: () => boolean) {
         if (!input.success) return error("invalid_offer_request", 400);
         const next = context(input.data.code);
         if (!next?.available) return error("invalid_offer_code");
-        if (pending && pending !== input.data.code && !input.data.explicit_correction)
+        if (
+          pending &&
+          pending !== input.data.code &&
+          !input.data.explicit_correction &&
+          !(
+            context(pending)?.version.policy.kind === "promotion" &&
+            next.version.policy.kind === "referral"
+          )
+        )
           return error("offer_change_requires_confirmation");
         pending = input.data.code;
-        return reply({ offer: next });
+        return reply({ offer: selectedContext(pending) });
       }
       for (const name of Object.keys(OFFER_OPERATIONS) as OfferOperation[]) {
         const operation = OFFER_OPERATIONS[name];
@@ -181,10 +210,18 @@ export function createReferralOfferMocks(isSignedIn: () => boolean) {
                 )
                 .map(publicOfferDefinition)
             });
-          case "context":
-            return respond({
-              offer: context(typeof input["code"] === "string" ? input["code"] : pending)
+          case "context": {
+            const selection = OfferPriceSelectionSchema.safeParse({
+              target_plan: input["target_plan"],
+              interval: input["interval"]
             });
+            return respond({
+              offer: selectedContext(
+                typeof input["code"] === "string" ? input["code"] : pending,
+                selection.success ? selection.data : undefined
+              )
+            });
+          }
           case "creator":
             return respond(creatorResult());
           case "join": {
@@ -297,7 +334,28 @@ export function createReferralOfferMocks(isSignedIn: () => boolean) {
               )
                 return error("programme_discount_invalid");
             }
-            if (["active", "scheduled"].includes(next)) bindings.add(version.version_id);
+            if (["active", "scheduled"].includes(next)) {
+              bindings.add(version.version_id);
+              for (const previous of versions) {
+                if (
+                  previous.programme_id === version.programme_id &&
+                  previous !== version &&
+                  ["active", "scheduled", "paused"].includes(previous.state)
+                )
+                  previous.state = "ended";
+              }
+              if (
+                version.policy.kind === "promotion" &&
+                ![...codes.values()].some((c) => c.version_id === version.version_id)
+              ) {
+                codes.set(defaultPromotionCode(version.version_id), {
+                  code_id: randomUUID(),
+                  version_id: version.version_id,
+                  blocked: false,
+                  created_at: now()
+                });
+              }
+            }
             version.state = input["state"] as ProgrammeVersion["state"];
             return respond({ programme: version });
           }

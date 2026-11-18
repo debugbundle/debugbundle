@@ -6,6 +6,21 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.29.0] - 2026-11-19
+
+- Add optional plan/interval public-offer comparison and explicit no-claim quote
+  discovery across API, CLI and ordinary MCP. Preserve existing request defaults,
+  lowest eligible invoice pricing, referral ties and frozen creator agreements.
+- Recheck removed/expired claims under transaction locks before confirmed checkout;
+  recover definitive pre-admission rejection without replacing uncertain attempts.
+- Repair current promotion publication through an ordered data migration, retaining
+  existing codes, claims, commercial policies, provider bindings and financial data.
+- Group programme revision history and archives, keep pending drafts editable and
+  use native local date/time fields with UTC storage and DST validation.
+- Consolidate local review services in Compose and preserve local data and previews.
+- Publish independently versioned CLI/MCP/OpenClaw 1.27.0; retain unchanged SDKs,
+  shared packages, editor plugins and restricted hosted OpenAI distribution.
+
 ## [1.28.1] - 2026-11-18
 
 - Keep API and MCP startup available as the temporary OpenAI reviewer credential

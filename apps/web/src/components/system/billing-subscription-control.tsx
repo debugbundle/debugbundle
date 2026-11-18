@@ -60,6 +60,7 @@ interface Props {
   offerClaim?: OfferClaim | null;
   earlyPurchaseAllowed?: boolean;
   offerReady?: boolean;
+  discoverIntroOffers?: boolean;
   legacyDiscountEligible?: boolean;
   requestedPlan?: {
     plan: PaidTierName;
@@ -87,6 +88,7 @@ export function BillingSubscriptionControl(props: Props): JSX.Element {
   const [intervalTouched, setIntervalTouched] = useState(false);
   const [quote, setQuote] = useState<BillingOfferQuote | null>(null);
   const [introQuote, setIntroQuote] = useState<OfferPurchaseQuote | null>(null);
+  const [noIntroOffer, setNoIntroOffer] = useState(false);
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attemptConfirmed, setAttemptConfirmed] = useState(false);
@@ -153,6 +155,7 @@ export function BillingSubscriptionControl(props: Props): JSX.Element {
       setAttemptConfirmed(false);
       setQuote(null);
       setIntroQuote(null);
+      setNoIntroOffer(false);
       setPaymentUrl(null);
       setError(null);
     }
@@ -172,6 +175,7 @@ export function BillingSubscriptionControl(props: Props): JSX.Element {
       setIntervalTouched(interval !== undefined);
       setQuote(null);
       setIntroQuote(null);
+      setNoIntroOffer(false);
       setPaymentUrl(null);
       setError(null);
       setAttemptConfirmed(false);
@@ -192,7 +196,13 @@ export function BillingSubscriptionControl(props: Props): JSX.Element {
     props.offerClaim && ["saved", "reserved"].includes(props.offerClaim.status)
       ? props.offerClaim
       : null;
-  const usesIntroOffer = activeIntroOffer !== null || (attemptConfirmed && introQuote !== null);
+  const usesIntroOffer =
+    activeIntroOffer !== null ||
+    (!paid && props.discoverIntroOffers === true && !noIntroOffer) ||
+    (attemptConfirmed && introQuote !== null);
+  useEffect(() => {
+    if (!attemptConfirmed) setNoIntroOffer(false);
+  }, [selection.target_plan, selection.interval, attemptConfirmed]);
   const purchaseAllowed =
     !paid &&
     props.offerReady !== false &&
@@ -284,9 +294,28 @@ export function BillingSubscriptionControl(props: Props): JSX.Element {
         usesIntroOffer &&
         (!introQuote || (!attemptConfirmed && Date.parse(introQuote.expires_at) <= Date.now()))
       ) {
-        const result = await offerApi.execute("quote", selection);
-        if (alive(version)) setIntroQuote(result.quote);
-        return;
+        try {
+          const result = await offerApi.execute("quote", {
+            ...selection,
+            ...(!activeIntroOffer && props.discoverIntroOffers
+              ? { include_public_offers: true }
+              : {})
+          });
+          if (alive(version)) setIntroQuote(result.quote);
+          return;
+        } catch (reason) {
+          if (
+            activeIntroOffer ||
+            !(reason instanceof OfferApiError) ||
+            reason.code !== "offer_ineligible"
+          )
+            throw reason;
+          // Only a definitive absence of an eligible introductory quote may
+          // continue through ordinary/legacy checkout. Outages never imply full price.
+          if (!alive(version)) return;
+          setNoIntroOffer(true);
+          return;
+        }
       }
       props.onBeforeCheckout?.(selection.target_plan);
       attemptSource.current = billingSource;
@@ -310,6 +339,7 @@ export function BillingSubscriptionControl(props: Props): JSX.Element {
         // transport/provider failures retain their immutable confirmation.
         setAttemptConfirmed(false);
         setIntroQuote(null);
+        refreshParent();
       }
       if (alive(version))
         setError(
@@ -629,13 +659,15 @@ export function BillingSubscriptionControl(props: Props): JSX.Element {
               <PendingButton
                 pending={phase === "checkout"}
                 pendingLabel={
-                  activeIntroOffer && !introQuote ? "Preparing offer…" : "Opening checkout…"
+                  usesIntroOffer && !introQuote ? "Checking available offers…" : "Opening checkout…"
                 }
                 disabled={busy || !purchaseAllowed}
                 onClick={() => void checkout()}
               >
-                {activeIntroOffer && !introQuote
-                  ? "Review introductory price"
+                {usesIntroOffer && !introQuote
+                  ? activeIntroOffer
+                    ? "Review introductory price"
+                    : "Review price"
                   : "Continue to Stripe"}
               </PendingButton>
             )}

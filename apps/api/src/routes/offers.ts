@@ -1,4 +1,5 @@
 import { ReferralError } from "../../../../packages/referrals/src/referral-contracts.js";
+import { PublicOfferContextQuerySchema } from "../../../../packages/referrals/src/offer-choice.js";
 import { offerAuditDetails } from "../offer-audit.js";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { z } from "zod";
@@ -13,7 +14,7 @@ import { enforceRequestRateLimit, requireRateLimitedMemberAuth } from "../api-he
 import { requireOwnerBillingPrincipal } from "./billing-principal.js";
 import { recordAuditLog } from "../audit-logging.js";
 import { registerOfferOperatorRoutes } from "./offer-operator.js";
-import { OfferQuoteSelectionSchema } from "../../../../packages/referrals/src/offer-quote.js";
+import { OfferQuoteRequestSchema } from "../../../../packages/referrals/src/offer-quote-contracts.js";
 import { canCheckoutToBillingPlan } from "../../../../packages/billing/src/billing-offer-admission.js";
 
 export type OfferRouteHandler = (request: FastifyRequest, reply: FastifyReply) => Promise<unknown>;
@@ -115,16 +116,21 @@ export function registerOfferRoutes(app: FastifyInstance, dependencies: ApiDepen
         }))
       )
         return;
-      const query = z
-        .object({ code: PublicOfferCodeSchema.optional() })
-        .strict()
-        .parse(request.query);
+      const query = PublicOfferContextQuerySchema.parse(request.query);
+      const selection =
+        query.target_plan && query.interval
+          ? { target_plan: query.target_plan, interval: query.interval }
+          : undefined;
       const service = dependencies.offers;
       return reply.send({
         offer: service
           ? query.code
-            ? await service.preview(query.code)
-            : await service.pending(request.headers.cookie)
+            ? selection
+              ? await service.preview(query.code, selection)
+              : await service.preview(query.code)
+            : selection
+              ? await service.context(request.headers.cookie, selection)
+              : await service.context(request.headers.cookie)
           : null
       });
     })
@@ -175,7 +181,12 @@ export function registerOfferRoutes(app: FastifyInstance, dependencies: ApiDepen
           .strict()
           .parse(request.body);
         const previous = await service.pending(request.headers.cookie);
-        if (previous?.available && previous.code !== input.code && !input.explicit_correction)
+        if (
+          previous?.available &&
+          previous.code !== input.code &&
+          !input.explicit_correction &&
+          !(await service.mayReplacePending(previous.code, input.code))
+        )
           throw new ProgrammeError("offer_change_requires_confirmation");
         const offer = await service.preview(input.code);
         if (!offer?.available) throw new ProgrammeError("invalid_offer_code");
@@ -368,7 +379,7 @@ export function registerOfferRoutes(app: FastifyInstance, dependencies: ApiDepen
       return reply.send({
         quote: await dependencies.offers.quote(
           { organization_id: principal.organization_id, actor_user_id: principal.user_id },
-          OfferQuoteSelectionSchema.parse(request.body)
+          OfferQuoteRequestSchema.parse(request.body)
         )
       });
     })
@@ -410,13 +421,25 @@ export function registerOfferRoutes(app: FastifyInstance, dependencies: ApiDepen
       });
       if (!billing || !canCheckoutToBillingPlan(billing, verified.target_plan))
         throw new ProgrammeError("offer_ineligible");
-      const context = await dependencies.offers.benefits.context(actor);
-      if (
-        !context ||
-        context.claim_id !== verified.claim_id ||
-        context.version_id !== verified.version_id
-      )
-        throw new ProgrammeError("offer_context_changed");
+      let context;
+      try {
+        context = verified.code
+          ? await dependencies.offers.prepareCheckout(actor, verified)
+          : await dependencies.offers.benefits.context(actor);
+        if (
+          !context ||
+          context.claim_id !== verified.claim_id ||
+          context.version_id !== verified.version_id
+        )
+          throw new ProgrammeError("offer_context_changed");
+      } catch (error) {
+        // Definitive preparation rejections precede Checkout admission for both
+        // fresh claims and saved replacements. Transport errors and all failures
+        // from createCheckoutLink stay outside this safe-to-review boundary.
+        if (error instanceof ProgrammeError)
+          return reply.status(409).send({ error: "offer_confirmation_required" });
+        throw error;
+      }
       const auditActor = {
         organization_id: principal.organization_id,
         user_id: principal.user_id,

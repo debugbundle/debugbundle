@@ -95,6 +95,7 @@ help:
 	@echo "  make dev             Start everything (infra + API + worker + web) and open http://localhost:5291"
 	@echo "  make dev-mock        Show synthetic UI data at http://localhost:5291/dashboard"
 	@echo "  make dev-mock-off    Restore the web frontend to the real local API"
+	@echo "  make dev-review      Start the full local stack with app and public referral previews"
 	@echo "  make dev-tier        Inspect local tiers; TIER=free|solo|team|business switches the base tier"
 	@echo "  make dev-openai-plugin-preview Start dev with the local synthetic OpenAI UI review route"
 	@echo "  make dev-public      Start the public-site dev server at http://localhost:5292"
@@ -201,7 +202,7 @@ web-check:
 
 .PHONY: compose-check
 compose-check:
-	$(NODE_RUN) "corepack enable && corepack pnpm vitest run tests/infrastructure/local-compose.test.ts"
+	$(NODE_RUN) "corepack enable && corepack pnpm vitest run tests/infrastructure/local-compose.test.ts tests/infrastructure/referral-review-launcher.test.ts"
 
 .PHONY: perf-check
 perf-check:
@@ -402,6 +403,10 @@ format-check-focused:
 .PHONY: referral-programmes-test referral-programmes-integration
 referral-programmes-test:
 	$(NODE_RUN) "node_modules/.bin/vitest run $(if $(TEST_FILES),$(TEST_FILES),tests/packages/referrals/programme-policy.test.ts) --maxWorkers=4 --reporter=dot"
+
+.PHONY: offer-local-time-test
+offer-local-time-test:
+	$(NODE_RUN) "TZ=Europe/Ljubljana node_modules/.bin/vitest run tests/apps/web/web-local-datetime.test.ts tests/apps/web/web-offer-programme-forms.test.tsx --maxWorkers=2 --reporter=dot"
 
 referral-programmes-integration:
 	sh scripts/test-referral-programmes-integration.sh
@@ -768,9 +773,9 @@ dev-openai-plugin-preview:
 # building so its bind mount cannot keep serving a deleted output directory.
 .PHONY: dev-public-refresh
 dev-public-refresh:
-	@test "$$(docker inspect debugbundle-public --format '{{range .Mounts}}{{if eq .Destination "/usr/share/nginx/html"}}{{.Source}}{{end}}{{end}}')" = "$(CURDIR)/site/out"
+	@if docker container inspect debugbundle-public >/dev/null 2>&1; then test "$$(docker inspect debugbundle-public --format '{{range .Mounts}}{{if eq .Destination "/usr/share/nginx/html"}}{{.Source}}{{end}}{{end}}')" = "$(CURDIR)/site/out"; fi
 	$(MAKE) -C site build-webpack
-	docker restart debugbundle-public
+	$(DOCKER_COMPOSE) --profile public-preview up -d --wait --force-recreate public
 	curl --fail --silent --show-error --retry 3 --retry-connrefused --retry-delay 1 -o /dev/null "http://127.0.0.1:$(PUBLIC_SITE_PORT)/"
 	@echo "Public preview ready: http://localhost:$(PUBLIC_SITE_PORT)"
 
@@ -778,9 +783,16 @@ dev-public-refresh:
 referral-public-review-api:
 	sh scripts/referral-public-review.sh up
 referral-public-review: referral-public-review-api
-	$(MAKE) dev-public-refresh SITE_BUILD_API_BASE_URL=http://localhost:3003
+	$(MAKE) dev-public-refresh SITE_BUILD_API_BASE_URL=http://localhost:3004
 referral-public-review-stop:
 	sh scripts/referral-public-review.sh down
+
+.PHONY: dev-review
+dev-review: referral-public-review-api
+	DEBUGBUNDLE_DEV_MOCK=true WEB_BIND_HOST=127.0.0.1 $(DOCKER_COMPOSE) --profile dev --profile referral-review up -d --wait --wait-timeout 180
+	$(MAKE) dev-public-refresh SITE_BUILD_API_BASE_URL=http://localhost:3004
+	@echo "Local app preview: http://localhost:5291/programmes"
+	@echo "Public affiliate preview: http://localhost:5292/affiliates/ (REVIEW20)"
 
 # Recreate only the frontend. API, worker and database state stay independent.
 .PHONY: dev-mock dev-mock-off
@@ -808,7 +820,7 @@ backend-restart: ensure-probe-trigger-secret install
 
 .PHONY: dev-down
 dev-down:
-	$(DOCKER_COMPOSE) --profile dev down
+	$(DOCKER_COMPOSE) --profile dev --profile public-preview --profile referral-review down
 
 .PHONY: dev-reset
 dev-reset:

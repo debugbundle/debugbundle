@@ -1,3 +1,5 @@
+name: debugbundle
+
 x-node-pnpm-env: &node-pnpm-env
   PNPM_CONFIG_CONFIRM_MODULES_PURGE: "false"
 
@@ -199,6 +201,12 @@ services:
       GITHUB_OAUTH_CALLBACK_URL: ${GITHUB_OAUTH_CALLBACK_URL:-http://localhost:5291/v1/auth/github/callback}
       GITHUB_OAUTH_STATE_SECRET: ${GITHUB_OAUTH_STATE_SECRET:-}
     command: sh -lc "corepack enable && corepack pnpm api:start"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/ready >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 90s
     profiles:
       - dev
 
@@ -261,6 +269,7 @@ services:
       AWS_ACCESS_KEY_ID: test
       AWS_SECRET_ACCESS_KEY: test
       WORKER_POLL_INTERVAL_MS: ${WORKER_POLL_INTERVAL_MS:-1000}
+      WORKER_HEALTH_PORT: "3001"
       ANALYTICS_OPPORTUNITY_EVALUATION_INTERVAL_MS: ${ANALYTICS_OPPORTUNITY_EVALUATION_INTERVAL_MS:-21600000}
       AVAILABILITY_CHECK_LOOP_INTERVAL_MS: ${AVAILABILITY_CHECK_LOOP_INTERVAL_MS:-250}
       AVAILABILITY_CHECK_CLAIM_BATCH_SIZE: ${AVAILABILITY_CHECK_CLAIM_BATCH_SIZE:-20}
@@ -268,6 +277,12 @@ services:
       WORKER_RUN_ONCE: ${WORKER_RUN_ONCE:-0}
       ANALYTICS_HASH_SECRET: ${ANALYTICS_HASH_SECRET:-}
     command: sh -lc "corepack enable && corepack pnpm worker:start"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3001/ready >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 90s
     profiles:
       - dev
 
@@ -298,8 +313,91 @@ services:
       VITE_DEBUGBUNDLE_DOGFOOD_CAPTURE_CONSOLE: ${VITE_DEBUGBUNDLE_DOGFOOD_CAPTURE_CONSOLE:-false}
       VITE_DEBUGBUNDLE_DOGFOOD_ANALYTICS_ENABLED: ${VITE_DEBUGBUNDLE_DOGFOOD_ANALYTICS_ENABLED:-false}
     command: sh -lc "corepack enable && corepack pnpm dev -- --host 0.0.0.0 --port 5291"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5291/ >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
     profiles:
       - dev
+
+  public:
+    image: nginx:1.27-alpine
+    container_name: debugbundle-public
+    entrypoint: ["nginx", "-g", "daemon off;"]
+    read_only: true
+    ports:
+      - "127.0.0.1:${PUBLIC_SITE_PORT:-5292}:80"
+    volumes:
+      - ./site/out:/usr/share/nginx/html:ro
+      - ./scripts/public-site-preview.nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 5s
+    profiles:
+      - public-preview
+
+  # Public offer fixtures stay separate from the ordinary app database and API.
+  referral-review-db:
+    image: postgres:16-alpine
+    container_name: debugbundle-referral-review-db
+    labels:
+      com.debugbundle.review-owner: referral-public-review-v1
+    environment:
+      POSTGRES_DB: debugbundle_referral_review
+      POSTGRES_USER: review
+      POSTGRES_PASSWORD: local-review-only
+    tmpfs:
+      - /var/lib/postgresql/data
+    networks:
+      referral-review:
+        aliases:
+          - postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U review -d debugbundle_referral_review"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    profiles:
+      - referral-review
+
+  referral-review-api:
+    image: node:24-alpine
+    container_name: debugbundle-referral-review-api
+    labels:
+      com.debugbundle.review-owner: referral-public-review-v1
+    depends_on:
+      referral-review-db:
+        condition: service_healthy
+    environment:
+      REFERRAL_PUBLIC_REVIEW: "1"
+      NODE_ENV: development
+    volumes:
+      - .:/workspace:ro
+    working_dir: /workspace
+    ports:
+      - "127.0.0.1:3004:3003"
+    networks:
+      - referral-review
+    command: node --import tsx scripts/referral-public-review.ts
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3003/ready >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+    profiles:
+      - referral-review
+
+networks:
+  referral-review:
 
 volumes:
   postgres-data:

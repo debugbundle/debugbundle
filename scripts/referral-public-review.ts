@@ -91,7 +91,7 @@ export async function createReferralPublicReview(db: Queryable): Promise<Fastify
         config: {
           secret,
           enrollmentEnabled: false,
-          publicApiUrl: "http://localhost:3003",
+          publicApiUrl: "http://localhost:3004",
           publicLandingUrl: "http://localhost:5292/"
         },
         enabled: true,
