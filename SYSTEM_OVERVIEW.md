@@ -1,3 +1,8 @@
+API startup validates the temporary OpenAI reviewer configuration structurally,
+without requiring a fresh remaining lifetime. The original expiry remains enforced
+at authorization; expired access cannot create a grant or block unrelated API/MCP
+startup. This runtime correction is released independently as core 1.28.1.
+
 Creator payout preferences are prepared locally for FR/AC-REF-11. Verified creators
 save per-programme IBAN/Wise/Revolut setup in five currencies. Dedicated encrypted
 storage and immutable manual-payment instructions require forward migration

@@ -1,3 +1,8 @@
+OpenAI reviewer startup validation in `apps/api/src/openai-plugin-runtime.ts`
+checks configuration structure without a moving lifetime threshold. The existing
+`openai-reviewer-access.ts` authorization boundary enforces the unchanged expiry
+before provider interaction or grant creation; API/MCP startup remains independent.
+
 Creator notifications: `referrals/creator-email-contracts.ts` validates private
 mail snapshots and `creator-email-delivery.ts` owns the send fence orchestration.
 `email/creator-referral-emails.ts` reuses the shared HTML/plain-text layout;

@@ -175,13 +175,11 @@ function parseReviewerConfig(
       organizationId: env["OPENAI_REVIEWER_ORGANIZATION_ID"],
       projectId: env["OPENAI_REVIEWER_PROJECT_ID"]
     });
-  if (
-    !parsed.success ||
-    !parsed.data.credentialHash.startsWith("$argon2") ||
-    new Date(parsed.data.expiresAt).getTime() <= Date.now() + 7 * 24 * 60 * 60 * 1_000
-  ) {
+  if (!parsed.success || !parsed.data.credentialHash.startsWith("$argon2")) {
     throw new Error("openai_plugin_runtime_config_invalid:OPENAI_REVIEWER_ACCESS");
   }
+  // Expiry is enforced on reviewer authorization, not on unrelated API startup.
+  // Keep the exact configured deadline so a restart never renews reviewer access.
   return parsed.data;
 }
 

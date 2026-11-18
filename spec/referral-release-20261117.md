@@ -7,17 +7,17 @@ outside this release.
 
 ## Distribution eligibility
 
-| Surface                               | Decision | Version  | Shipped change                                                                             |
-| ------------------------------------- | -------- | -------- | ------------------------------------------------------------------------------------------ |
-| Hosted core                           | Publish  | 1.28.0   | Versioned referral offers, payout preferences, creator emails and browser-session renewal. |
-| Public site                           | Publish  | 1.11.0   | Affiliate programme discovery, pricing/offers and introduction article.                    |
-| CLI                                   | Publish  | 1.26.0   | New referral/offer and payout-preference commands with delegated operator authority.       |
-| Standard MCP                          | Publish  | 1.26.0   | Matching schemas and tools; restricted hosted catalogues remain unchanged.                 |
-| OpenClaw companion                    | Publish  | 1.26.0   | Bundled MCP functionality and optional referral/payout tools.                              |
-| Codex developer plugin                | Publish  | 1.9.0    | Exact MCP pin adopts new tools.                                                            |
-| Gemini extension                      | Publish  | 1.8.0    | Exact MCP pin adopts new tools.                                                            |
-| Claude Code plugin                    | Publish  | 1.25.0   | Exact MCP pin adopts new tools.                                                            |
-| SDKs, shared JS, hosted OpenAI plugin | Retain   | Existing | No changed shipped SDK/schema/redaction or restricted hosted tool behaviour.               |
+| Surface                               | Decision | Version  | Shipped change                                                                       |
+| ------------------------------------- | -------- | -------- | ------------------------------------------------------------------------------------ |
+| Hosted core                           | Publish  | 1.28.1   | The 1.28.0 features plus the diagnosed reviewer-expiry startup correction.           |
+| Public site                           | Publish  | 1.11.0   | Affiliate programme discovery, pricing/offers and introduction article.              |
+| CLI                                   | Publish  | 1.26.0   | New referral/offer and payout-preference commands with delegated operator authority. |
+| Standard MCP                          | Publish  | 1.26.0   | Matching schemas and tools; restricted hosted catalogues remain unchanged.           |
+| OpenClaw companion                    | Publish  | 1.26.0   | Bundled MCP functionality and optional referral/payout tools.                        |
+| Codex developer plugin                | Publish  | 1.9.0    | Exact MCP pin adopts new tools.                                                      |
+| Gemini extension                      | Publish  | 1.8.0    | Exact MCP pin adopts new tools.                                                      |
+| Claude Code plugin                    | Publish  | 1.25.0   | Exact MCP pin adopts new tools.                                                      |
+| SDKs, shared JS, hosted OpenAI plugin | Retain   | Existing | No changed shipped SDK/schema/redaction or restricted hosted tool behaviour.         |
 
 ## Release sequence and safeguards
 
@@ -107,3 +107,24 @@ deduplication, retry, recipient and migration checks pass with the worker/templa
 tests (33 cases). Delivery has 100% statement/line/function coverage; event recording
 has 92.68% statements and 100% lines/functions. No coverage threshold or assertion
 was weakened, and no application logic changed for this correction.
+
+## Initial hosted candidate and startup correction
+
+The first disabled reader bridge, cloud workflow
+[44211127654](https://github.com/debugbundle/debugbundle-cloud/actions/runs/44211127654),
+applied all three forward migrations (`applied=3; already_applied=91`) but did not
+promote its candidate. The old API and worker remained healthy on the original
+active release, without restarts. Public readiness stayed successful. No app/site
+assets or programme capability were enabled.
+
+A bounded unexposed reproduction of the exact immutable candidate traced startup
+failure to `parseReviewerConfig`: the existing owner-approved reviewer expiry is
+23 November, less than seven days away. The moving startup lifetime threshold
+incorrectly rejected the still-valid configuration. Core 1.28.1 removes only that
+threshold; structural checks, the unchanged deadline, authorization expiry denial,
+audits and synthetic isolation remain. New regression cases first failed for five
+days, the exact deadline and past expiry. They pass after the correction; separate
+authorization tests deny at/after the exact deadline before provider interaction
+or grant creation. This changes hosted runtime and qualifies a core patch release;
+all independently published packages and plugins retain their selected versions.
+This maps to NFR-MCP-04, AC-MCP-08 and SEC-11, without a schema or credential change.
