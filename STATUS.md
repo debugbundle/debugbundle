@@ -1,3 +1,42 @@
+# 18 November affiliate release — published and verified
+
+Core 1.28.1 and site 1.11.0 are live from the coordinated
+[release record](spec/referral-release-20261117.md). Core/site/cloud work is merged;
+CLI/MCP/OpenClaw 1.26.0, Codex 1.9.0, Claude Code 1.25.0 and Gemini 1.8.0 are
+published with exact-artifact and public/native installation evidence. The
+portable ClawHub skill is independently 1.26.1. SDKs/shared libraries and the
+hosted OpenAI plugin retain their independent versions.
+
+Full patch CI [44213587983](https://github.com/debugbundle/debugbundle/actions/runs/44213587983)
+passed before the exact-tree merge and normal core release. Site main CI and
+release passed. Hosted publication
+[44223279079](https://github.com/debugbundle/debugbundle-cloud/actions/runs/44223279079)
+passed after two disabled bridges established compatible active/rollback readers.
+All 94 migrations are present with every original checksum preserved. API and
+worker are healthy with zero restarts; existing credentials, flags and saved
+settings match baseline. Payout encryption matches its protected recovery copy
+and is unavailable to workers.
+
+Live checks pass for the app build, affiliate page, introduction article, terms,
+pricing, referral docs, SEO, marketing-footer order, anonymous access boundaries
+and fixed no-store referral routing. Current JS/CSS matches its S3 bytes with
+immutable caching; ten prior asset references remain available. All seven baseline
+alarms are OK. A complete scoped incident read finds the same 22 active records,
+with no new IDs or status changes. No incident lifecycle was mutated.
+
+Programme capability is enabled; no commercial/sample programme was created or
+activated. No real payment, test email, transfer, consumer-product mutation or
+OpenAI portal publication occurred. Provider/catalogue readiness and source/DB
+qualification are distinct from a real customer purchase or email-delivery proof.
+Current encrypted preferences remain retained after account unlinking under the
+documented contract; automatic destructive cleanup still requires separate approval.
+
+ClawHub's exact skill/plugin versions pass final security review and normal
+installation. Strict external search remains 6/7 (incident response rank 17
+against top 10), so that separate discovery gate is still partial. Historical
+dated local-review entries below retain their original scope and are superseded
+by this publication record for current release status.
+
 17 November signed-in programme discovery and generic terms (FR/AC-REF-09):
 creator cards now match the public summary structure using the app's shared
 Card/Dialog primitives. Exact rates, scope, duration and saved agreements stay

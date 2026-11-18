@@ -75,8 +75,9 @@ renewed existing DNS authentication. Both direct and nested wildcard attack
 probes, ordinary glob compatibility and exact installed hashes pass in core/site.
 No other dependency package identity changes.
 
-Further immutable workflow/artifact references are added as each gate completes. Historical local review records retain their original
-scope and do not establish production payment or mail acceptance.
+Historical local review records retain their original scope. The publication
+receipts below establish hosted deployment separately from real payment or mail
+delivery; neither customer canary was run.
 
 The first complete coverage run found a stale Claude marketplace version and
 distribution-ledger rows, an outdated referral consent/link test, and new email
@@ -84,7 +85,9 @@ previews changing the established sign-in preview selection. The marketplace and
 ledger now match the selected independent versions, the referral assertions follow
 the approved card and local-site link contract, and the new previews are appended
 without changing the default. All existing consent, retry, CSRF and code-sharing
-assertions remain enforced. Full CI must qualify the corrected source before merge.
+assertions remain enforced. Full CI 44202555281 qualified the corrected source,
+and 44209119027 passed on its exact-tree merged main. The later runtime correction
+passed full CI 44213587983 before its exact-tree merge to the deployed source.
 
 The public ClawHub companion 1.26.0 installs normally on OpenClaw 2026.11.5 with
 no force override. Both distributions have a final benign security review; the
@@ -128,3 +131,77 @@ authorization tests deny at/after the exact deadline before provider interaction
 or grant creation. This changes hosted runtime and qualifies a core patch release;
 all independently published packages and plugins retain their selected versions.
 This maps to NFR-MCP-04, AC-MCP-08 and SEC-11, without a schema or credential change.
+
+## Published source and hosted verification — 18 November
+
+The owner-authorised release is live at core 1.28.1 and site 1.11.0. Deployed core
+source is `ab1402caa8b639a8e9d0e02ff5b71cfe10cfd3e4`; site source and its annotated
+v1.11.0 tag resolve to `af7fbdb2a9d39a725ef89dac413e272fcbc7b256`. Hosted workflow
+source is cloud `290eba43e2d9611fad03372cb979d09ef5bf4e83`.
+
+| Gate                     | Immutable workflow receipt                                                               | Result                                                                                                  |
+| ------------------------ | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Core patch qualification | [44213587983](https://github.com/debugbundle/debugbundle/actions/runs/44213587983)       | Full CI, native Gemini/Rust and installed CLI matrix pass.                                              |
+| Core 1.28.1 publication  | [44220014285](https://github.com/debugbundle/debugbundle/actions/runs/44220014285)       | Canonical non-draft/non-prerelease v1.28.1 targets the tested merged source.                            |
+| Site main qualification  | [44210571687](https://github.com/debugbundle/site/actions/runs/44210571687)              | Full site main CI passes.                                                                               |
+| Site 1.11.0 publication  | [44210579920](https://github.com/debugbundle/site/actions/runs/44210579920)              | Canonical v1.11.0 and exact annotated tag are published.                                                |
+| First disabled bridge    | [44221021748](https://github.com/debugbundle/debugbundle-cloud/actions/runs/44221021748) | Healthy 1.28.1 API/worker, programme capability off, assets unchanged.                                  |
+| Second disabled bridge   | [44222083295](https://github.com/debugbundle/debugbundle-cloud/actions/runs/44222083295) | Active and retained rollback API/worker both support saved offers and creator emails.                   |
+| Full publication         | [44223279079](https://github.com/debugbundle/debugbundle-cloud/actions/runs/44223279079) | Capability enabled, app/site uploaded, edge rules and CDN invalidations complete, external checks pass. |
+
+The active release is `20261118023146-717716a793a7`. Both API and worker use their
+own GHCR repository reference at immutable digest
+`sha256:a3167f509cfff7ecbc08c8a76fbfd3b18996f264328dfd6da082b36e52fa8d4f`.
+The verified previous release is `20261118022007-0edabf6ff1f1`, with API/worker
+digest `sha256:a94d38e9d7b2cc1117a5de4addf54131872b6699cbbaa84ff366aec15fa02005`.
+Exactly those two release directories and all four immutable role references are
+retained. Both have `referral-offers-v1`, `creator-referral-emails-v1`, Business/
+report compatibility and the durable worker protocol. A disabled claim flag is
+not permission to roll back to a pre-offer reader.
+
+Read-only post-deploy snapshots verify both services at 1.28.1, healthy with zero
+restarts, 94 ledger entries and all 91 original checksums preserved. Existing
+credential, feature-setting and saved-configuration fingerprints match baseline.
+The API's dedicated payout key matches the protected recovery copy; the worker
+has no usable key. Disk is 23% used with 46,650,892 KiB available. All seven scoped
+baseline alarms remain OK. A complete, project-scoped incident comparison uses
+canonical incident IDs and pagination: the same 22 active records remain, without
+new IDs or status changes. No incident lifecycle action was taken.
+
+Nineteen independent public HTTP checks pass: exact app build identity, home,
+affiliates, blog/index/article, generic terms, pricing, referral docs, sitemap,
+robots, capability, public programmes/context, private access boundaries and
+fixed-destination no-store referral routing. Footer order is checked on the three
+marketing routes that share SiteShell; unchanged blog/docs layouts have their own
+shells. Anonymous operator reads deliberately return the documented 404 concealment,
+while creator and payout reads require authentication. Current JS/CSS CDN bytes
+match their S3 objects and use immutable caching. Ten pre-publication hashed asset
+references remain available for existing open tabs. These are HTTP/configuration
+and artifact checks, not a browser or real customer-journey claim.
+
+Codex 1.9.0 and Claude Code 1.25.0 pass fresh public marketplace installation,
+upgrade, local retrieval, auth and removal checks with 232 ordinary tools. Gemini
+1.8.0's public main/tag/release ZIP matches all five package files; native Node
+22/24/26 and public Git checks pass. The runtime patch changes none of those
+published package bytes. SDK/shared versions and OpenAI plugin 1.1.0 are retained;
+the latter's local release packet is refreshed against the verified live API
+digest without a portal publication or restricted-tool change.
+
+## Explicit boundaries and remaining external discovery
+
+No commercial or synthetic programme was created/activated; the live public
+programme list is empty until an operator publishes an agreement. Capability is
+available for that normal workflow. No coupon, customer subscription, real payment,
+test email, transfer, consumer-product update or OpenAI portal action was used as
+a deployment canary. Live Stripe catalogue and SES readiness are separate from
+real provider transaction/delivery acceptance. Current encrypted preferences remain
+retained after account unlinking under the existing contract; rejected destructive
+cleanup remains a separate owner decision, not an added deletion trigger.
+
+Exact ClawHub skill 1.26.1 and companion 1.26.0 pass completed final security review
+and normal installation. The latest bounded discovery read remains 6/7: incident
+response is rank 17 against the top-10 gate. The external search gate is partial,
+and its release-command failure is retained honestly. No rank threshold was
+relaxed, old package silently republished, or scanner finding hidden. Pull-based
+directory follow-up and Gemini gallery indexing are separate from verified public
+Git/registry availability.

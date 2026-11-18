@@ -1,7 +1,10 @@
 # Referral programmes, creator codes and introductory offers
 
 Date: 16 November 2026
-Status: approved design implemented; local qualification complete and ready for internal review. Release/activation gates remain separate.
+Status: approved design implemented and qualified; hosted capability and app/site
+published 18 November 2026. Commercial programme activation remains separate.
+Current receipts and remaining external discovery limits are in
+[the coordinated release record](referral-release-20261117.md).
 Delivery: one implementation phase, executed through the ordered slices below.
 
 17 November presentation amendment: the owner approved compact affiliate cards
@@ -67,21 +70,21 @@ acceptance. Earlier test receipts are background, not results for this change.
 
 ### Initial programme
 
-| Concern                  | Planned policy                                                                                                                                     |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Customer benefit         | 20% off the first eligible positive base-subscription invoice.                                                                                     |
-| Plans                    | Solo, Team and Business; monthly and annual.                                                                                                       |
-| Duration                 | First month on monthly billing, first year on annual billing; normal renewal price afterwards.                                                     |
+| Concern                  | Planned policy                                                                                                                                        |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Customer benefit         | 20% off the first eligible positive base-subscription invoice.                                                                                        |
+| Plans                    | Solo, Team and Business; monthly and annual.                                                                                                          |
+| Duration                 | First month on monthly billing, first year on annual billing; normal renewal price afterwards.                                                        |
 | Partner earnings         | Initially 50%; configurable 0–100% of eligible collected base cash after discounts/refunds. No 50% ceiling; exclude tax, capacity and noncash credit. |
-| Commission window        | Twelve calendar months from the first eligible paid base-service anchor; no reset on plan change, cancellation or resubscription.                  |
-| Trial                    | Existing one-time 30-day no-card trial; no commission and no consumption of the introductory benefit.                                              |
-| New-customer eligibility | No prior verified paid history, including retained history after cancellation/deletion. Existing Free/trial customers can qualify.                 |
-| Anonymous attribution    | Thirty days from the first valid visit; later passive links neither replace nor extend it.                                                         |
-| Saved referral benefit   | Durable after claim/signup without cookie-dependent expiry; valid until first eligible purchase unless explicitly revoked for substantiated abuse. |
-| Stacking                 | One introductory offer per invoice. Catalogue annual pricing is the base price, not a second promotional code.                                     |
-| Plan changes             | Commission follows eligible base service across all three plans inside the original window; no second introductory discount.                       |
-| Payouts                  | Manual reviewed payouts; retain at least the existing 30-day/funds-availability hold and dispute/reconciliation holds.                             |
-| Existing obligations     | Preserve legacy 10% claims, original service anchors, historical rates, earned balances and payout records.                                        |
+| Commission window        | Twelve calendar months from the first eligible paid base-service anchor; no reset on plan change, cancellation or resubscription.                     |
+| Trial                    | Existing one-time 30-day no-card trial; no commission and no consumption of the introductory benefit.                                                 |
+| New-customer eligibility | No prior verified paid history, including retained history after cancellation/deletion. Existing Free/trial customers can qualify.                    |
+| Anonymous attribution    | Thirty days from the first valid visit; later passive links neither replace nor extend it.                                                            |
+| Saved referral benefit   | Durable after claim/signup without cookie-dependent expiry; valid until first eligible purchase unless explicitly revoked for substantiated abuse.    |
+| Stacking                 | One introductory offer per invoice. Catalogue annual pricing is the base price, not a second promotional code.                                        |
+| Plan changes             | Commission follows eligible base service across all three plans inside the original window; no second introductory discount.                          |
+| Payouts                  | Manual reviewed payouts; retain at least the existing 30-day/funds-availability hold and dispute/reconciliation holds.                                |
+| Existing obligations     | Preserve legacy 10% claims, original service anchors, historical rates, earned balances and payout records.                                           |
 
 Introductory percentage offers are the bounded promotion feature in this phase.
 Support referral, first-purchase and holiday campaigns for customers who have not
@@ -490,11 +493,13 @@ When release is authorised:
 8. Observe bounded aggregates and reconciliation failures. The stop action halts
    new claims/enrolment while preserving claims and owed earnings.
 
-All versions remain Retain for this documentation-only task. At implementation,
-assess core/site/CLI/MCP/shared distributions independently for shipped behaviour;
-SDKs remain Retain absent actual changes. A new authorised MCP release requires
-the existing ecosystem pipeline. Hosted rollout/retention automation belongs in
-`.local-repos/debugbundle-cloud`.
+The original planning-only task retained all versions. The implemented release
+assesses core/site/CLI/MCP/shared distributions independently in its eligibility
+matrix; SDKs remain Retain without shipped changes. The authorised MCP release
+ran the ecosystem pipeline, retaining its partial external search result rather
+than treating it as green. Hosted rollout/retention automation belongs in
+`.local-repos/debugbundle-cloud`. Production programme drafting/activation and
+payment or mail canaries were not part of the authorised deployment.
 
 ## Completion and remaining decisions
 

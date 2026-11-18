@@ -1,3 +1,9 @@
+Hosted publication is recorded in `spec/referral-release-20261117.md`: core
+1.28.1/site 1.11.0, additive migrations before consumers, compatible retained
+offer/email readers and API-only payout encryption. The private cloud repository
+owns rollout, `/r/<code>` edge routing, static publication and retention. Public
+pages use the hosted API; disposable local simulators remain separate.
+
 OpenAI reviewer startup validation in `apps/api/src/openai-plugin-runtime.ts`
 checks configuration structure without a moving lifetime threshold. The existing
 `openai-reviewer-access.ts` authorization boundary enforces the unchanged expiry
@@ -35,7 +41,7 @@ The dedicated optional server key never enters browser or worker configuration.
 Current profile deletion on anonymisation is deferred pending explicit approval;
 frozen payment instructions are immutable retained financial records.
 
-Referral/offer implementation (local, qualified for internal review):
+Referral/offer implementation (released in core 1.28.1/site 1.11.0):
 `packages/referrals/src/programme-policy.ts` owns browser-safe commercial schemas
 and integer money projections; `offer-quote-contracts.ts` keeps client validation
 separate from the server-only HMAC codec. The policy module shares the 0–100%
@@ -60,9 +66,9 @@ consumes a generated browser-safe policy projection and runtime public context;
 compact programme summaries and complete terms. `affiliate-programmes.ts` projects
 eligible catalogue examples with the existing integer-money policy; shorter annual
 windows show date-dependent commission instead of a full-year amount.
-Its announcement is in `site/content/blog/debugbundle-affiliate-programme.mdx`
-and approved for the coordinated release. Hosted `/r/<code>` routing source
-belongs to `.local-repos/debugbundle-cloud`. No activation or deployment occurred.
+Its published announcement is in `site/content/blog/debugbundle-affiliate-programme.mdx`.
+Hosted `/r/<code>` routing source belongs to `.local-repos/debugbundle-cloud`.
+Capability is enabled; commercial programme creation/activation remains manual.
 See [the approved plan](spec/referral-programmes-plan.md) and `STATUS.md`.
 `scripts/referral-public-review.ts` seeds only the named disposable review
 database and composes the real public offer routes without private authentication

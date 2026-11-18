@@ -1,16 +1,24 @@
+Hosted core 1.28.1 and site 1.11.0 are live from the coordinated
+[affiliate release](spec/referral-release-20261117.md). Programme capability is
+enabled after two verified compatible backend bridges; no commercial programme
+or sample campaign was activated. The affiliate page and introduction article
+are public. Existing credentials, settings, migration checksums and financial
+obligations remain preserved. SDK/shared-library versions are retained.
+
 API startup validates the temporary OpenAI reviewer configuration structurally,
 without requiring a fresh remaining lifetime. The original expiry remains enforced
 at authorization; expired access cannot create a grant or block unrelated API/MCP
 startup. This runtime correction is released independently as core 1.28.1.
 
-Creator payout preferences are prepared locally for FR/AC-REF-11. Verified creators
+Creator payout preferences are released for FR/AC-REF-11. Verified creators
 save per-programme IBAN/Wise/Revolut setup in five currencies. Dedicated encrypted
 storage and immutable manual-payment instructions require forward migration
 `202611160002_add_referral_payout_preferences` and optional
 `REFERRAL_PAYOUT_ENCRYPTION_KEY`. Personal reads are masked; only the separate
 billing payout allowlist can reveal frozen instructions. Programme preparation
 preserves partner-wide negative offsets, holds and idempotent legacy finance.
-Routine review wording is US$50. No transfers, provider setup or deployment occur.
+Routine review wording is US$50. The dedicated hosted key matches its protected
+recovery copy and is cleared from workers; transfers remain manually controlled.
 Current encrypted preferences remain retained after account unlinking; destructive
 cleanup is pending explicit approval. See `spec/referral-payout-preferences-plan.md`.
 Public offer banners stay visible with a shared blue View details link and arrow;
@@ -30,7 +38,7 @@ Creator Referrals uses the existing internal tab pattern: Programme (code and
 agreement), Earnings, Referred clients and Payments (setup and history). Hidden
 panels preserve drafts and pagination; changing the signed-in person clears them.
 Saved payout preferences follow payment history; incomplete setup remains first.
-Creator programme email updates are implemented locally for FR/AC-REF-12: one
+Creator programme email updates are released for FR/AC-REF-12: one
 confirmation per accepted revision, one first-paid-referral celebration per
 permanent programme, and conditional daily UTC summaries for subsequent new paying
 customers. Renewals/trials/visits do not trigger activity. The additive
@@ -39,11 +47,13 @@ the new API/worker. An atomic private outbox, verified personal recipient checks
 and acknowledged SES send fences avoid automatic duplicates under uncertain
 delivery. Notifications carry pending figures and never authorise a payout.
 
-Referral programmes are implemented and locally qualified on `feature/referral-programmes`
-in core and site, with a matching cloud source branch for `/r/<code>` routing.
+Referral programmes are merged and released in core and site, with hosted
+`/r/<code>` routing in the private cloud repository. Original feature branches
+remain available for review.
 The approved contract is [spec/referral-programmes.md](spec/referral-programmes.md)
 and the full delivery plan is [spec/referral-programmes-plan.md](spec/referral-programmes-plan.md).
-New claims default off (`REFERRAL_PROGRAMMES_ENABLED=false`). Immutable programme
+New installations default off (`REFERRAL_PROGRAMMES_ENABLED=false`); hosted
+capability is enabled with compatible active and rollback readers. Immutable programme
 versions, permanent creator aliases, durable signup intents/claims, signed checkout
 quotes and narrowly delegated operator control extend the existing financial lane.
 Explicit programme activation/scheduling prepares its Stripe discount automatically,
@@ -55,7 +65,9 @@ Existing Business-only agreements and earned obligations remain protected.
 Versioned commissions accept the operator's selected 0–100% share of eligible
 collected cash after discounts/refunds; 50% remains an initial default, not a cap.
 The full-cash boundary prevents a negative retained share before fees/costs.
-Internal-review qualification is complete; this is not production acceptance or activation.
+Source, database, installed-artifact and hosted HTTP/configuration qualification
+are recorded separately. No real payment or test-email canary was run, and
+commercial programme creation/activation remains an operator decision.
 Operator inventories use bounded support projections. `offer-performance.ts` and
 `offer-performance-store.ts` derive cohort reporting from verified receipt cash
 and the existing ledger; coverage and holds are explicit. The receipt worker
@@ -93,7 +105,7 @@ layout and copy/docs actions; offer details retain the compact centred layout.
 Code clearing lives beside public/signup code entry; successful clearing also
 consumes the signup URL hint without changing saved workspace benefits or trial intent.
 
-SDK safety release acceptance is complete across all 13 capture surfaces. Core 1.27.2 and site 1.10.4 are live; Python 3.0.0 deliberately changes optional diagnostic callback timing and ships migration guidance. Other SDK corrections use patch releases. Exact artifacts, full CI, preserved configuration/data, live bytes and rollback acceptance are recorded in `spec/sdk-safety-release-20261115.md`. The deep audit closes console Promise forwarding, Swift credential-shaped diagnostic codes, WordPress nonce privacy and Rust unvalidated optional reduction.
+SDK safety release acceptance is complete across all 13 capture surfaces. Core 1.27.2 and site 1.10.4 were the hosted baseline before the affiliate release; their independent SDK artifacts remain current. Python 3.0.0 deliberately changes optional diagnostic callback timing and ships migration guidance. Other SDK corrections use patch releases. Exact artifacts, full CI, preserved configuration/data, live bytes and rollback acceptance are recorded in `spec/sdk-safety-release-20261115.md`. The deep audit closes console Promise forwarding, Swift credential-shaped diagnostic codes, WordPress nonce privacy and Rust unvalidated optional reduction.
 
 SDK internal diagnostics are optional local output with no hidden reporting channel. Node scopes callback recapture suppression; Browser contains its existing local console warnings; Python dispatches diagnostics on one bounded lane outside SDK locks; Go stores fixed codes, Swift safe ACK codes and WordPress sanitised best-effort status transients. See `spec/sdks/internal-diagnostics-audit.md` for remediation and release qualification.
 

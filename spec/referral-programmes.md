@@ -1,6 +1,8 @@
 # Referral programmes and introductory offers
 
-Status: approved implementation contract, 16 November 2026. Not activated.
+Status: approved implementation contract, 16 November 2026. Hosted capability
+released 18 November in core 1.28.1/site 1.11.0; commercial programme activation
+remains an operator decision. See [the release record](referral-release-20261117.md).
 
 Implements FR-REF-01–10 / AC-REF-01–10. Approved policy, design, compatibility and
 ordered delivery are in [the plan](referral-programmes-plan.md).
@@ -23,9 +25,9 @@ Saved workspace offers survive the trial, cookie expiry and device changes. One
 introductory benefit per protected identity prevents benefit reuse. Customer-
 offer replacement never silently changes the referring partner.
 
-The owner approved the detailed plan/design on 16 November. Implementation and
-isolated local qualification are authorised. Publication, provider writes,
-production deployment/activation, transfers and consumer changes remain separate.
+The owner approved the detailed plan/design on 16 November and subsequently
+authorised the coordinated DebugBundle publication/deployment. Commercial
+programme/provider writes, transfers and consumer-product changes remain separate.
 Higher-rate programmes require the matching API, worker and site readers before
 activation; a reader that still rejects rates above 50% cannot safely reconcile
 or serve such a saved agreement. Existing frozen agreements are never rewritten.
@@ -73,9 +75,10 @@ The local public-site development server uses `SITE_API_BASE_URL` (default
 
 The private hosted source handles `/r/CODE` with a temporary no-store redirect to
 the fixed API visit endpoint, rejecting encoded separators and ignoring query
-destinations. The announcement remains outside the site's blog content tree until
-separate publication authorisation. The current implementation/evidence state is
-tracked in `spec/referral-programmes-qualification.md`; it is not a release receipt.
+destinations. The separately approved announcement is published at
+`/blog/debugbundle-affiliate-programme/`. Historical local evidence remains in
+`spec/referral-programmes-qualification.md`; hosted publication and exact live
+artifacts are recorded separately in `spec/referral-release-20261117.md`.
 
 Operator delegation rechecks the exact active token/session workspace as well as
 the verified email, allowlist, unrestricted scope, active membership and expiry.
@@ -122,8 +125,9 @@ requires compatible candidate and retained rollback API/worker images. Once an
 active runtime advertises this capability, disabling the flag never permits
 falling back to old readers. Retain the additive schema and offer-aware worker;
 rollback only to a verified compatible pair. A pre-offer binary is not a safe
-rollback after any versioned promise. No deployment or provider activation has
-been performed as part of local qualification.
+rollback after any versioned promise. The authorised hosted release established
+this compatible pair before enabling capability; no commercial programme was
+activated as a deployment canary.
 
 Bound provider coupons must have neither `max_redemptions` nor `redeem_by`.
 Programme claim caps and frozen per-customer deadlines are enforced in

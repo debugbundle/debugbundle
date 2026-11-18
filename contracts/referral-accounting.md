@@ -1,7 +1,7 @@
 # Business referral accounting
 
 Implements FR-BUS-04 / AC-BUS-04 in [the Business specification](../spec/business-tier.md).
-Local enrolment, attribution, first-eligible-invoice benefit, provider receipt reconciliation, ledger, manual payout and export adapters are implemented. Local qualification is recorded in [the qualification record](../spec/business-tier-qualification-20261108.md); no production programme has been activated.
+Enrolment, attribution, first-eligible-invoice benefit, provider receipt reconciliation, ledger, manual payout and export adapters are implemented. Historical local qualification is recorded in [the qualification record](../spec/business-tier-qualification-20261108.md); hosted capability is published in [the affiliate release](../spec/referral-release-20261117.md), without activating a commercial programme. Legacy Business rules below remain unchanged; versioned programmes use their separately frozen policy.
 
 ## Calculation boundary
 
@@ -87,7 +87,7 @@ eligibility hash. Existing payment-retention records remain intact.
 
 The partner client projection contains only a referral client ID, attribution date
 and programme status. It does not expose organisation/user IDs, emails, invoice
-identifiers, project lists or debug data. The shared API/CLI/ordinary MCP adapters and optional runtime now use these records. Receipt reconciliation and the approved partner/operator UI are implemented locally. Discount reservation and early/deleted customer reconciliation are implemented; local ledger/payout qualification is recorded in the qualification record above.
+identifiers, project lists or debug data. The shared API/CLI/ordinary MCP adapters and optional runtime now use these records. Receipt reconciliation and the approved partner/operator UI are released. Discount reservation and early/deleted customer reconciliation are implemented; local ledger/payout qualification and hosted release evidence remain separately recorded.
 
 ## Identity and customer attribution interfaces
 
@@ -162,14 +162,14 @@ verification are manual; no transfer or provider onboarding occurs.
 
 Routes, shared client/CLI actions and ordinary MCP tools:
 
-| Route | `debugbundle offers` action | MCP tool |
-| --- | --- | --- |
-| `GET /v2/referrals/payout-policy` | `payout_policy` | `get_referral_payout_policy` |
-| `GET /v2/referrals/payout-preferences` | `payout_preferences` | `get_creator_payout_preferences` |
-| `POST /v2/referrals/payout-preferences` | `save_payout_preferences` | `save_creator_payout_preferences` |
-| `GET /v2/referrals/payout-balances?partner_id=…` | `payout_balances` | `get_referral_programme_payout_balances` |
-| `POST /v2/referrals/payouts/prepare` | `prepare_payout` | `prepare_referral_programme_payout` |
-| `GET /v2/referrals/payouts/:batch_id/instructions` | `payout_instructions` | `get_referral_payout_instructions` |
+| Route                                              | `debugbundle offers` action | MCP tool                                 |
+| -------------------------------------------------- | --------------------------- | ---------------------------------------- |
+| `GET /v2/referrals/payout-policy`                  | `payout_policy`             | `get_referral_payout_policy`             |
+| `GET /v2/referrals/payout-preferences`             | `payout_preferences`        | `get_creator_payout_preferences`         |
+| `POST /v2/referrals/payout-preferences`            | `save_payout_preferences`   | `save_creator_payout_preferences`        |
+| `GET /v2/referrals/payout-balances?partner_id=…`   | `payout_balances`           | `get_referral_programme_payout_balances` |
+| `POST /v2/referrals/payouts/prepare`               | `prepare_payout`            | `prepare_referral_programme_payout`      |
+| `GET /v2/referrals/payouts/:batch_id/instructions` | `payout_instructions`       | `get_referral_payout_instructions`       |
 
 For structured input use `--input <file>`; saves require a private 0600 file.
 Never put bank details in shell arguments, audit metadata or reports. Creator
