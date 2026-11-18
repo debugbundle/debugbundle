@@ -1,3 +1,4 @@
+import { registerOfferRoutes } from "./routes/offers.js";
 import { registerReferralRoutes } from "./routes/referrals.js";
 import { registerNotificationPreferencesRoutes } from "./routes/notification-preferences.js";
 import { registerOrganizationRoutes } from "./routes/organizations.js";
@@ -103,6 +104,8 @@ const API_SEARCH_CRAWLER_POLICY = "noindex, nofollow, noarchive";
 const CONTENT_LENGTH_HEADER = "content-length";
 const apiRequestTimeouts = new WeakMap<object, NodeJS.Timeout>();
 const CSRF_EXEMPT_ROUTE_KEYS = new Set([
+  "POST /v2/offers/pending",
+  "DELETE /v2/offers/pending",
   "POST /v1/auth/request-code",
   "POST /v1/auth/verify-code",
   "POST /v1/auth/github/device/start",
@@ -252,7 +255,8 @@ function registerApiCsrfProtection(app: FastifyInstance): void {
 function registerApiCors(
   app: FastifyInstance,
   allowedOrigins: string[],
-  statusOrigin: string | null
+  statusOrigin: string | null,
+  offerOrigin: string | null
 ): void {
   app.addHook("onRequest", async (request, reply) => {
     const requestOrigin =
@@ -282,6 +286,30 @@ function registerApiCors(
       return;
     }
 
+    const offerPath = getRequestPath(request.url);
+    if (
+      requestOrigin === offerOrigin &&
+      [
+        "/v2/offers/context",
+        "/v2/offers/programmes",
+        "/v2/offers/capabilities",
+        "/v2/offers/pending"
+      ].includes(offerPath)
+    ) {
+      reply.header("Access-Control-Allow-Origin", requestOrigin);
+      reply.header("Access-Control-Allow-Credentials", "true");
+      reply.header("Access-Control-Expose-Headers", "Retry-After");
+      if (isCorsPreflightRequest(request)) {
+        const method = request.headers["access-control-request-method"];
+        const permitted = offerPath === "/v2/offers/pending" ? ["POST", "DELETE"] : ["GET"];
+        if (!permitted.includes(method ?? ""))
+          return reply.status(403).send({ error: "cors_origin_not_allowed" });
+        reply.header("Access-Control-Allow-Methods", permitted.join(", "));
+        reply.header("Access-Control-Allow-Headers", "Content-Type, X-CSRF-Token");
+        return reply.status(204).send();
+      }
+      return;
+    }
     if (!allowedOrigins.includes(requestOrigin)) {
       if (isSdkProjectTokenCorsRequest(request) && normalizeOrigin(requestOrigin) !== null) {
         reply.header("Access-Control-Allow-Origin", requestOrigin);
@@ -431,7 +459,8 @@ export function createApiServer(
     allowedOrigins,
     normalizeOrigin(
       dependencies.publicStatusBaseUrl ?? dogfoodingEnv["PUBLIC_STATUS_PAGE_BASE_URL"]
-    )
+    ),
+    dependencies.offers?.publicOrigin ?? null
   );
   registerApiSearchCrawlerControls(app);
   registerApiContentLengthLimit(app, SMALL_REQUEST_BODY_LIMIT_BYTES);
@@ -491,6 +520,7 @@ export function createApiServer(
   registerTokenRoutes(app, dependencies);
   registerOrganizationRoutes(app, dependencies);
   registerReferralRoutes(app, dependencies);
+  registerOfferRoutes(app, dependencies);
   registerReportDefinitionRoutes(app, dependencies);
   registerImprovementReviewRoutes(app, dependencies);
   registerReportRunRoutes(app, dependencies);

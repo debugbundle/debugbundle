@@ -13,6 +13,7 @@ minimumReleaseAgeExclude:
   - "@debugbundle/*"
 # Apply minimum patched versions to audited vulnerable dependency ranges.
 overrides:
+  "picomatch@>=4.0.0 <=4.0.7": 4.0.7
   "body-parser@>=2.0.0 <2.4.0": 2.4.0
   "zod@>=4.0.0 <4.6.6": 4.6.6
   "@modelcontextprotocol/sdk@>=1.3.0 <1.32.1": 1.32.1
@@ -36,3 +37,6 @@ overrides:
   "flatted@>=3.0.0 <3.4.2": 3.4.2
   "source-map-js@>=1.0.0 <1.2.2": 1.2.2
   "proxy-addr@>=2.0.0 <2.0.8": 2.0.8
+
+patchedDependencies:
+  picomatch@4.0.7: patches/picomatch@4.0.7.patch

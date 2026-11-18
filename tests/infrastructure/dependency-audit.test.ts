@@ -20,7 +20,10 @@ it.skipIf(!existsSync(join(process.cwd(), "site/package.json")))(
       "scripts/dependency-audit.test.mjs",
       "patches/zod@3.25.76.patch",
       "patches/zod-security-backport.json",
-      "patches/ZOD-LICENSE"
+      "patches/ZOD-LICENSE",
+      "patches/picomatch@4.0.7.patch",
+      "patches/picomatch-security-backport.json",
+      "patches/PICOMATCH-LICENSE"
     ]) {
       expect(readFileSync(join(process.cwd(), "site", file))).toEqual(
         readFileSync(join(process.cwd(), file))

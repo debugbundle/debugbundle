@@ -15,12 +15,17 @@ function buildMigratedApiSchemaDb(scopeGuardsAvailable = true): Queryable {
     query: async <Row extends Record<string, unknown>>(sql: string) => {
       await Promise.resolve();
 
+      // Readiness probes return a boolean; the table inventory is a separate query.
+      if (sql.includes("AS ready"))
+        return { rows: [{ ready: scopeGuardsAvailable }] as unknown as Row[] };
+      if (sql.includes("protect_offer_immutable_records"))
+        return { rows: [{ available: scopeGuardsAvailable }] as unknown as Row[] };
+      if (sql.includes("AS available"))
+        return { rows: [{ available: scopeGuardsAvailable }] as unknown as Row[] };
       if (sql.includes("information_schema.tables")) {
         return { rows: API_TABLE_ROWS as unknown as Row[] };
       }
 
-      if (sql.includes("AS available"))
-        return { rows: [{ available: scopeGuardsAvailable }] as unknown as Row[] };
       if (sql.includes("AS project_service_schema_available")) {
         return {
           rows: [{ project_service_schema_available: scopeGuardsAvailable }] as unknown as Row[]

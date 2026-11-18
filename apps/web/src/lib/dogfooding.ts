@@ -1,3 +1,4 @@
+import { REFERRAL_PAYOUT_REDACT_FIELDS } from "../../../../packages/referrals/src/payout-privacy.js";
 import {
   createDebugBundleBrowserSdk,
   type DebugBundleBrowserInitConfig,
@@ -304,6 +305,7 @@ export function initializeWebDogfooding(
         false);
 
     sdk.init({
+      redactFields: [...REFERRAL_PAYOUT_REDACT_FIELDS],
       ...(config.projectToken === null || isRelayEndpoint(config.endpoint)
         ? {}
         : { projectToken: config.projectToken }),

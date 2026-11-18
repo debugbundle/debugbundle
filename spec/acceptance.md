@@ -2205,6 +2205,7 @@ Mapped requirements: FR-PJS-01/04. Explicit roots, secret-free manifest/diff, re
 - **And** the report includes: total bundles generated (by type), new incidents, regressions, top spiking incidents
 - **And** projects with zero activity receive no report (no noise)
 - **And** the report includes resolved incident counts and a plain-language outcome sentence for incidents opened during the week
+- **And** email plain text/HTML and Slack use singular wording for one item and plural wording for zero or multiple items across summaries, count labels, spike headings and occurrence counts, including combined project summaries; a resolved single new incident reads "You resolved the only incident opened this week", and an unresolved one reads "The only incident opened this week is still open"
 - **And** email reports due for the same recipient set and weekly window are combined into one email with per-project sections
 - **And** project owners/admins can enable or disable the project email report from project settings
 - **And** weekly email report channels are limited to 3 recipients
@@ -2707,6 +2708,21 @@ Mapped requirements: FR-PJS-01/04. Explicit roots, secret-free manifest/diff, re
 - Replacing a loading button's text node with a translator-style element does not cause `insertBefore` or `removeChild` failures when pending state changes. The auth form can advance from Send code to Verify code after the same mutation. Labels and accessible names remain correct.
 - Existing permissions, invalid-session handling, trial/purchase gates, Checkout return and background billing refresh tests remain passing.
 
+### AC-WEB-13: Session Expiry and Persistent Update Notice
+
+- Returning focus to a visible signed-in app or revealing its tab checks the server session with cookies and `cache: no-store`. Hidden tabs and signed-out forms do not trigger focus reads. Overlapping focus, visibility and explicit refresh calls share one request and leave the current page mounted.
+- A confirmed absent session (`401` or a successful null session response) redirects protected routes to login and shows one session-expired toast. Protected JSON, artifact, settings and delete adapters normalize both `invalid_session` and `invalid_member_token` 401 responses through the same invalidation path, clear CSRF state, and do not add the generic pagination-refresh error toast.
+- Network failures, 5xx responses, permission denials and incorrect login codes do not establish expiry. Late session reads after invalidation, sign-out or replacement sign-in cannot overwrite the newer identity/CSRF state. Ordinary signed-out bootstrap does not announce expiry.
+- An available-update toast remains after ten minutes and repeated focus/visibility events, offers the keyboard-accessible Reload action, and cannot be dismissed by timeout or swipe. No duplicate notice is created. Unmounted checks do not publish late notices; the existing post-reload changelog notice retains its finite duration.
+
+### AC-WEB-14: Rolling Browser Session Policy
+
+- Email-code and GitHub sign-in create a seven-day server deadline and an HttpOnly, Secure, SameSite=Strict cookie capped at original creation plus thirty days. Logout revokes authority immediately.
+- Foreground pointer, keyboard, wheel or visible/focused tab-return activity renews at most once per five minutes per tab, with one request in flight. A transient failure retains identity and retries only on later activity after at least one minute; no keepalive timer exists. Synthetic events, hidden/unfocused activity, session reads and background API traffic do not renew.
+- A successful renewal uses `min(created_at + 30 days, max(existing expires_at, server now + 7 days))`. Original creation never changes. At either exact deadline authentication and renewal fail closed. Unknown, revoked, future-created or suspended sessions cannot renew; concurrent renewals cannot shorten the deadline and concurrent logout cannot restore authority.
+- The renewal route accepts only cookie authentication, a valid CSRF token, exact app Origin and an empty body; client-supplied lifetimes and bearer authorization are rejected. Auth rate limits apply. Responses are uncached, contain no credential plaintext, and never set cookies. Late responses cannot overwrite sign-out or replacement sign-in state.
+- Existing valid sessions remain usable; legacy cookies retain their originally issued expiry and may require one further sign-in after rollout. No database migration, token rotation, CLI/MCP lifecycle change or SDK change is required.
+
 ### AC-ANL-17: Analytics Settings
 
 - **Given** a project owner or admin opens project analytics settings
@@ -3128,3 +3144,58 @@ AC-SMI-08: API/CLI/ordinary MCP/web parity; offline safety matrix and separately
 approved bounded provider qualification before changed-prompt activation. Require useful
 checks scoring at least seven of eight with every safety gate passing. See
 [the planning contract](../contracts/improvement-review-planning.md).
+
+## Referral programmes and introductory offers
+
+Mapped requirements: FR-REF-01–10, FR-BUS-04, FR-BIL-07/10. The original AC-BUS-04
+fixtures continue to specify legacy claims; new-programme exceptions use explicit
+versions and never silently change those fixtures. AC-BILL-09's first-purchase
+wait remains the default, with only the audited grant described below.
+
+- **AC-REF-01:** Test normalization, malformed/reserved aliases, creator/promotion/legacy collisions and concurrent reservation. Renames/deletion cannot reassign codes. Old clients/links still work.
+  Operator code blocking serialises with both legacy and versioned claim admission; existing saved promises survive the block.
+- **AC-REF-02:** Lifecycle/revision/cap races preserve frozen offers, terms and balances. Preview visits consume no claim slots; promised claims cannot lose their slot later.
+- **AC-REF-03:** Exercise no-cookie manual claim, email/GitHub signup, outage/retry, device/session changes, trial expiry and explicit workspace correction; failed persistence never displays saved success.
+  A saved claim/attribution remains purchasable after enrolment pauses even if signup-completion acknowledgement was lost; an unresolved hint alone still blocks unconfirmed full-price checkout.
+- **AC-REF-04:** Verify all six plan/interval totals, original/introductory/renewal amounts and tax/capacity separation across quote/provider/UI. Cache isolation and unavailable validation are fail closed for discounted checkout.
+  Activation rejects percentages that round an eligible catalogue invoice to zero. Successful public code selection/removal consumes the URL hint; invalid codes never masquerade as replacement conflicts.
+  Automatic setup covers referrals/promotions, server-only mode, product/capacity
+  scope, monthly-only scope with shared interval products, exact immutable retries,
+  lost provider responses, failed binding writes and competing activations. Failed
+  setup remains inactive; stale/invalid/disabled requests create no provider object.
+  Existing bindings and advanced manual-binding API/CLI/MCP remain compatible.
+  Reject duplicate eligible plan/interval prices and mismatched amount, currency,
+  interval/count, usage or tax treatment before coupon creation. Include retained
+  inactive capacity prices in product-scope exclusion without making them
+  purchasable. Verify actual Stripe SDK request encoding and lost-response
+  recovery with an in-memory transport; both programme kinds must compose through
+  activation, claim, signed quote and an idempotent Checkout retry.
+- **AC-REF-05:** Confirm replacement, preserve partner, prevent a second identity benefit after campaign change/account recreation and enforce visible trial-safe deadlines.
+- **AC-REF-06:** A code never bypasses the wait. A valid exact grant admits its bound attempt; expiration, revocation, wrong subject and concurrent use are denied. Existing issued sessions/confirmed payments remain reconcilable.
+- **AC-REF-07:** Test allowlisted email-authenticated and all denied principals, CSRF, scoped delegation expiry/revocation/session/token binding, action parity and audit; no new restricted OAuth tools.
+- **AC-REF-08:** Test all-plan cash, zero/trial invoices, annual anniversary allocation, partial collection/refunds, credits, disputes, duplicate/out-of-order webhooks and competing manual payouts. Legacy canonical outputs remain equal.
+  Accept rates above 50%, including exact two-decimal inputs and 100%. Reject
+  negative rates, rates above 100% and excess precision. Prove non-negative
+  post-discount retained cash with cumulative rounding/refunds, frozen-version
+  settlement and matching API/CLI/MCP/public readers.
+- **AC-REF-09:** Verify public route/footer/sitemap/content, terms, examples and creator/app states agree with programme data; publication is separate from preparation.
+  The public canonical route is `/affiliates/`, with no unpublished `/referrals/`
+  alias. Cards show programme-specific earnings, discount, eligible plans and
+  duration, retaining account-based enrolment. Named closed-by-default terms
+  dialogs use the shared modal and retain conditions, payout rules, deadlines and
+  the complete price table. Short annual commission windows must not advertise
+  a full-year cash amount; show the rate and explain date-based allocation.
+  Signed-in cards show selected rates, eligible scope and duration before consent;
+  accepted versions remain distinct from new choices. Terms dialogs retain exact
+  version, examples, keyboard dismissal and focus return without changing consent.
+  General terms contain no fixed discount/commission or earning period.
+- **AC-REF-10:** Test clean and installed upgrade, missing/corrupt migration readiness, old-checksum/record preservation, mixed-version readers, safe rollback, financial retention and bounded account export.
+- **AC-REF-11:** Verify all five currencies and three methods; IBAN/tag validation, supported countries, personal ownership, CSRF, identity switching and stale edits. Prove encryption/masked reads and audit secrecy, exact atomic instruction snapshots, concurrent/idempotent preparation, cross-programme refund offsets, held earnings, missing/wrong keys, old-writer rejection and preserved legacy payments. The creator can earn before setup; below-US$50 balances carry forward and manual exceptions remain possible. API, CLI and ordinary MCP share policy and finance authority; restricted tools gain no access.
+  Creator sections use Programme, Earnings, Referred clients and Payments tabs;
+  payment preferences and history share Payments. Verify keyboard selection,
+  inactive-panel hiding, draft preservation across tabs, refresh after enrolment,
+  neutral unavailable states and compatibility with legacy creator accounts.
+  Setup stays before payment history until all accepted programmes have saved
+  preferences. Verify saved-on-load and successful-save ordering, failed-save
+  stability, incomplete programmes and retained drafts/history after reordering.
+- **AC-REF-12:** Verify idempotent and concurrent programme joins, accepted revisions, one celebration per permanent programme across revisions, and one event per new paying customer despite duplicate receipts and renewals. Exclude zero/trial, pre-rollout, refunded-before-confirmation, disputed and ineligible activity. Prove UTC window boundaries, writer/scheduler fencing, multi-programme grouping, quiet days, late/expired notifications, bounded retries and lost-provider/database acknowledgements. Delivery rechecks the original verified creator; unlinking or verification loss suppresses it. Email templates escape names, validate all values, retain plain-text/HTML parity and distinguish pending earnings from available payouts. Installed migrations, schema readiness, existing email/payment flows and private account exports remain covered.

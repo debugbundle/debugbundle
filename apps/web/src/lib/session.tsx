@@ -15,6 +15,9 @@ import {
   subscribeToBrowserSessionInvalidation,
   type SessionRecord
 } from "./api.js";
+import { rememberSession } from "./api-client.js";
+import { renewBrowserSession } from "./api-auth.js";
+import { subscribeToSessionActivity } from "./session-activity.js";
 
 interface SessionContextValue {
   session: SessionRecord | null;
@@ -29,17 +32,34 @@ interface SessionContextValue {
 const SessionContext = createContext<SessionContextValue | null>(null);
 
 export function SessionProvider({ children }: { children: ReactNode }): JSX.Element {
-  const [session, setSession] = useState<SessionRecord | null>(null);
+  const [session, updateSession] = useState<SessionRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [sessionInvalidationCount, setSessionInvalidationCount] = useState(0);
   const hasBootstrappedSession = useRef(false);
   const sessionRequestPending = useRef(false);
   const [sessionLoadError, setSessionLoadError] = useState(false);
+  const pendingRefresh = useRef<Promise<SessionRecord | null> | null>(null);
+  const sessionRevision = useRef(0);
 
-  const refreshSession = useCallback(async (): Promise<SessionRecord | null> => {
-    const nextSession = await getSession();
-    setSession(nextSession);
-    return nextSession;
+  const setSession = useCallback((nextSession: SessionRecord | null): void => {
+    sessionRevision.current += 1;
+    rememberSession(nextSession);
+    updateSession(nextSession);
+  }, []);
+
+  const refreshSession = useCallback((): Promise<SessionRecord | null> => {
+    if (pendingRefresh.current !== null) return pendingRefresh.current;
+    const revision = sessionRevision.current;
+    const request = getSession()
+      .then((nextSession) => {
+        if (sessionRevision.current === revision) updateSession(nextSession);
+        return nextSession;
+      })
+      .finally(() => {
+        pendingRefresh.current = null;
+      });
+    pendingRefresh.current = request;
+    return request;
   }, []);
 
   const retrySession = useCallback(async (): Promise<void> => {
@@ -69,12 +89,44 @@ export function SessionProvider({ children }: { children: ReactNode }): JSX.Elem
 
   useEffect(() => {
     return subscribeToBrowserSessionInvalidation(() => {
-      setSession(null);
+      sessionRevision.current += 1;
+      updateSession(null);
       setSessionLoadError(false);
       setIsLoading(false);
       setSessionInvalidationCount((current) => current + 1);
     });
   }, []);
+
+  useEffect(() => {
+    if (session === null) return;
+    const checkSession = (): void => {
+      if (document.visibilityState !== "visible") return;
+      // This is a background read: keep the current page mounted and retain
+      // the established session if the network/server is temporarily unavailable.
+      void refreshSession().catch(() => undefined);
+    };
+    window.addEventListener("focus", checkSession);
+    document.addEventListener("visibilitychange", checkSession);
+    return () => {
+      window.removeEventListener("focus", checkSession);
+      document.removeEventListener("visibilitychange", checkSession);
+    };
+  }, [session, refreshSession]);
+
+  const sessionId = session?.session_id;
+  useEffect(() => {
+    if (sessionId === undefined) return;
+    let stopped = false;
+    const unsubscribe = subscribeToSessionActivity(async () => {
+      const revision = sessionRevision.current;
+      const renewed = await renewBrowserSession();
+      if (!stopped && sessionRevision.current === revision) updateSession(renewed);
+    });
+    return () => {
+      stopped = true;
+      unsubscribe();
+    };
+  }, [sessionId]);
 
   useEffect(() => {
     function handleUnhandledRejection(event: PromiseRejectionEvent): void {
@@ -100,7 +152,15 @@ export function SessionProvider({ children }: { children: ReactNode }): JSX.Elem
       refreshSession,
       setSession
     }),
-    [session, isLoading, sessionInvalidationCount, sessionLoadError, retrySession, refreshSession]
+    [
+      session,
+      isLoading,
+      sessionInvalidationCount,
+      sessionLoadError,
+      retrySession,
+      refreshSession,
+      setSession
+    ]
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

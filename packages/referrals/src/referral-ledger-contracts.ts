@@ -1,3 +1,4 @@
+import { OfferBenefitInvoiceSchema } from "./stripe-offer-invoice.js";
 import { z } from "zod";
 import { ReferralCommissionInputSchema } from "./commission-policy.js";
 import { ReferralCodeSchema, ReferralAuthSchema } from "./referral-contracts.js";
@@ -20,6 +21,7 @@ export const ReferralInvoiceFactsSchema = z
     payments: z.array(ReferralCashPaymentSchema).max(100),
     refunds: ReferralCommissionInputSchema.shape.refunds,
     disputed: z.boolean(),
+    base_discount_minor: money.optional(),
     reconciliation_hold: z
       .enum(["credit_allocation_unverified", "refund_allocation_unverified"])
       .optional()
@@ -33,7 +35,8 @@ export const ReferralReceiptSnapshotSchema = z
     provider_customer_id: z.string().min(1).max(255),
     observed_at: z.string().datetime(),
     invoices: z.array(ReferralInvoiceFactsSchema).max(1000),
-    benefit_invoices: z.array(ReferralBenefitInvoiceSchema).max(1000).optional()
+    benefit_invoices: z.array(ReferralBenefitInvoiceSchema).max(1000).optional(),
+    offer_benefit_invoices: z.array(OfferBenefitInvoiceSchema).max(1000).optional()
   })
   .strict();
 export type ReferralReceiptSnapshot = z.infer<typeof ReferralReceiptSnapshotSchema>;

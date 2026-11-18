@@ -1,3 +1,4 @@
+import { registerSessionRenewalRoute } from "./auth-session-renewal.js";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -538,6 +539,7 @@ async function enforceAuthRateLimit(
 
 export function registerAuthRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
   assertDevGithubMockNotEnabledInProduction();
+  registerSessionRenewalRoute(app, dependencies, { enforceAuthRateLimit });
 
   const handleReviewAccess = async (
     request: FastifyRequest,
@@ -875,6 +877,7 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: ApiDepend
   );
 
   app.get("/v1/auth/session", async (request, reply) => {
+    reply.header("Cache-Control", "no-store");
     if (dependencies.webAuth === undefined) {
       return reply.status(503).send({
         error: "auth_not_configured"

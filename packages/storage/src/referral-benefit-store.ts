@@ -128,6 +128,12 @@ export function createReferralBenefitStore(db: Queryable): ReferralBenefitStore 
           )
         ).rows[0];
         const own = benefit?.["attribution_id"] === a.id;
+        const hasVersionedClaim =
+          (
+            await tx.query("SELECT id FROM offer_claims WHERE owner_identity_hash=$1", [
+              a.owner_identity_hash
+            ])
+          ).rows.length > 0;
         const paid = await priorPaid(tx, a.owner_identity_hash);
         return ContextSchema.parse({
           ...owner,
@@ -137,6 +143,7 @@ export function createReferralBenefitStore(db: Queryable): ReferralBenefitStore 
           coupon_id: own ? benefit["coupon_id"] : null,
           checkout_attempt_id: own ? benefit["checkout_attempt_id"] : null,
           discount_eligible:
+            !hasVersionedClaim &&
             a.partner_status === "active" &&
             a.partner_user_id !== input.actor_user_id &&
             a.period_status !== "ineligible" &&
@@ -154,6 +161,14 @@ export function createReferralBenefitStore(db: Queryable): ReferralBenefitStore 
         if (!a || a.id !== input.attribution_id)
           throw new Error("referral_benefit_context_changed");
         await identityLock(tx, a.owner_identity_hash);
+        if (
+          (
+            await tx.query("SELECT id FROM offer_claims WHERE owner_identity_hash=$1", [
+              a.owner_identity_hash
+            ])
+          ).rows.length
+        )
+          return null;
         const old = (
           await tx.query<Record<string, unknown>>(
             "SELECT * FROM referral_invoice_benefits WHERE owner_identity_hash=$1 FOR UPDATE",

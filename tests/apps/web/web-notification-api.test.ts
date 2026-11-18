@@ -1,7 +1,8 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { requestNotificationPreferences } from "../../../apps/web/src/lib/api-notification-preferences.js";
 import { notificationResponse } from "../../helpers/notification-fixtures.js";
-vi.mock("../../../apps/web/src/lib/api-client.js", () => ({
+vi.mock("../../../apps/web/src/lib/api-client.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../apps/web/src/lib/api-client.js")>()),
   API_BASE: "https://api.example.com",
   buildBrowserSessionHeaders: (json: boolean) =>
     json ? { "Content-Type": "application/json", "X-CSRF-Token": "csrf" } : {}

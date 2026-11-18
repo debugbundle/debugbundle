@@ -9,9 +9,11 @@ interface ToastAction {
 }
 
 interface ToastOptions {
+  id?: string;
   action?: ToastAction;
   description?: string;
   duration?: number;
+  dismissible?: boolean;
 }
 
 export function showSuccessToast(message: string, options: ToastOptions = {}): void {

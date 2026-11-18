@@ -32,7 +32,8 @@ describe("retention cleanup service", () => {
   it.each([
     "pruneExpiredReportLifecycleFacts",
     "pruneExpiredReportSourceText",
-    "pruneExpiredReportAvailability"
+    "pruneExpiredReportAvailability",
+    "pruneOfferTransientState"
   ] as const)(
     "prunes %s in bounded batches even without object deletion support",
     async (method) => {
@@ -57,7 +58,8 @@ describe("retention cleanup service", () => {
   it.each([
     "pruneExpiredReportLifecycleFacts",
     "pruneExpiredReportSourceText",
-    "pruneExpiredReportAvailability"
+    "pruneExpiredReportAvailability",
+    "pruneOfferTransientState"
   ] as const)(
     "requests another cleanup pass when the bounded %s backlog remains",
     async (method) => {

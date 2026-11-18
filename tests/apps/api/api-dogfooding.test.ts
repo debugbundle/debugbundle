@@ -1,3 +1,4 @@
+import { REFERRAL_PAYOUT_REDACT_FIELDS } from "../../../packages/referrals/src/payout-privacy.js";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -140,6 +141,7 @@ describe("api dogfooding", () => {
         environment: "development",
         service: "debugbundle-api",
         framework: "fastify",
+        redactFields: [...REFERRAL_PAYOUT_REDACT_FIELDS],
         captureConsole: false,
         projectMode: "connected",
         beforeSend: sanitizeApiDogfoodingEvent,

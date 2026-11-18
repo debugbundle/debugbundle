@@ -1,3 +1,6 @@
+import { OFFER_PROGRAMME_MIGRATION } from "../../../packages/storage/src/offer-programme-schema.js";
+import { PAYOUT_PREFERENCE_MIGRATION } from "../../../packages/storage/src/payout-preference-schema.js";
+import { CREATOR_EMAIL_MIGRATION } from "../../../packages/storage/src/creator-email-schema.js";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -335,7 +338,7 @@ describe("storage schema migrations", () => {
     ).rejects.toThrow("storage_migration_checksum_mismatch");
   });
 
-  it("should seed the migration ledger instead of replaying history for a current bootstrap schema", async (): Promise<void> => {
+  it("seeds installed bootstrap history and applies the additive offer migration", async (): Promise<void> => {
     const currentSchemaColumns = [
       { table_name: "projects", column_name: "capture_rules_require_server" },
       { table_name: "capture_rules", column_name: "scope_origin_ids" },
@@ -453,10 +456,30 @@ describe("storage schema migrations", () => {
       .mockResolvedValue({ rows: [] });
 
     const result = await migrateStorageSchema({ query } as Queryable);
-
-    expect(result.applied).toEqual([]);
+    // Bootstrap remains the installed baseline. These additions must run as
+    // ordered forward migrations even when older history is seeded.
+    expect(result.applied).toEqual([
+      OFFER_PROGRAMME_MIGRATION.id,
+      PAYOUT_PREFERENCE_MIGRATION.id,
+      CREATOR_EMAIL_MIGRATION.id
+    ]);
     expect(result.already_applied).toEqual(
-      STORAGE_SCHEMA_MIGRATIONS.map((migration) => migration.id)
+      STORAGE_SCHEMA_MIGRATIONS.filter(
+        (migration) =>
+          ![
+            OFFER_PROGRAMME_MIGRATION.id,
+            PAYOUT_PREFERENCE_MIGRATION.id,
+            CREATOR_EMAIL_MIGRATION.id
+          ].includes(migration.id)
+      ).map((migration) => migration.id)
+    );
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("CREATE TABLE offer_programmes"),
+      []
+    );
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("CREATE TABLE referral_payout_preferences"),
+      []
     );
     expect(query).not.toHaveBeenCalledWith(
       expect.stringContaining(

@@ -61,3 +61,11 @@ export function resolvePricingUrl(
 ): string {
   return new URL("/pricing/", resolveDocumentationUrl(env, currentLocation)).href;
 }
+
+/** Keep referral review on the same public site as the configured docs/pricing. */
+export function resolveReferralTermsUrl(
+  env: WebExternalLinksEnv = import.meta.env,
+  currentLocation: URL | Location = window.location
+): string {
+  return new URL("/terms/#referrals", resolveDocumentationUrl(env, currentLocation)).href;
+}

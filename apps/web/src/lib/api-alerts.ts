@@ -116,7 +116,6 @@ export async function deleteAlert(alertId: string, projectId: string): Promise<v
   );
 
   if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { error?: string } | null;
-    throw new Error(body?.error ?? `request_failed_${response.status}`);
+    await readJson(response);
   }
 }

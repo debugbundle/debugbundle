@@ -2,7 +2,7 @@
   "id": "debugbundle",
   "name": "DebugBundle",
   "description": "Use DebugBundle for runtime error reporting, incident response, live app monitoring, health checks, debug bundles, and product analytics.",
-  "version": "1.25.0",
+  "version": "1.26.0",
   "configSchema": {
     "type": "object",
     "properties": {
@@ -53,6 +53,38 @@
       "debugbundle_claim_referral_payout",
       "debugbundle_mark_referral_payout_uncertain",
       "debugbundle_record_referral_payout",
+      "debugbundle_get_referral_payout_policy",
+      "debugbundle_get_creator_payout_preferences",
+      "debugbundle_save_creator_payout_preferences",
+      "debugbundle_get_referral_programme_payout_balances",
+      "debugbundle_prepare_referral_programme_payout",
+      "debugbundle_get_referral_payout_instructions",
+      "debugbundle_get_offer_capabilities",
+      "debugbundle_list_offer_programmes",
+      "debugbundle_preview_offer",
+      "debugbundle_get_creator_programme",
+      "debugbundle_join_creator_programme",
+      "debugbundle_claim_creator_code",
+      "debugbundle_get_customer_offer",
+      "debugbundle_apply_customer_offer",
+      "debugbundle_remove_customer_offer",
+      "debugbundle_preview_offer_purchase",
+      "debugbundle_checkout_offer_purchase",
+      "debugbundle_retry_signup_offer",
+      "debugbundle_get_offer_programme_performance",
+      "debugbundle_list_offer_operator_programmes",
+      "debugbundle_list_offer_operator_codes",
+      "debugbundle_list_offer_operator_claims",
+      "debugbundle_list_offer_operator_grants",
+      "debugbundle_create_offer_programme_draft",
+      "debugbundle_configure_offer_provider",
+      "debugbundle_set_offer_programme_state",
+      "debugbundle_create_offer_promotion_code",
+      "debugbundle_correct_creator_code",
+      "debugbundle_block_offer_code",
+      "debugbundle_grant_early_offer_purchase",
+      "debugbundle_revoke_early_offer_purchase",
+      "debugbundle_revoke_offer_claim",
       "debugbundle_list_organizations",
       "debugbundle_list_organization_people",
       "debugbundle_list_organization_invites",
@@ -324,6 +356,102 @@
       "optional": true
     },
     "debugbundle_record_referral_payout": {
+      "optional": true
+    },
+    "debugbundle_get_referral_payout_policy": {
+      "optional": true
+    },
+    "debugbundle_get_creator_payout_preferences": {
+      "optional": true
+    },
+    "debugbundle_save_creator_payout_preferences": {
+      "optional": true
+    },
+    "debugbundle_get_referral_programme_payout_balances": {
+      "optional": true
+    },
+    "debugbundle_prepare_referral_programme_payout": {
+      "optional": true
+    },
+    "debugbundle_get_referral_payout_instructions": {
+      "optional": true
+    },
+    "debugbundle_get_offer_capabilities": {
+      "optional": true
+    },
+    "debugbundle_list_offer_programmes": {
+      "optional": true
+    },
+    "debugbundle_preview_offer": {
+      "optional": true
+    },
+    "debugbundle_get_creator_programme": {
+      "optional": true
+    },
+    "debugbundle_join_creator_programme": {
+      "optional": true
+    },
+    "debugbundle_claim_creator_code": {
+      "optional": true
+    },
+    "debugbundle_get_customer_offer": {
+      "optional": true
+    },
+    "debugbundle_apply_customer_offer": {
+      "optional": true
+    },
+    "debugbundle_remove_customer_offer": {
+      "optional": true
+    },
+    "debugbundle_preview_offer_purchase": {
+      "optional": true
+    },
+    "debugbundle_checkout_offer_purchase": {
+      "optional": true
+    },
+    "debugbundle_retry_signup_offer": {
+      "optional": true
+    },
+    "debugbundle_get_offer_programme_performance": {
+      "optional": true
+    },
+    "debugbundle_list_offer_operator_programmes": {
+      "optional": true
+    },
+    "debugbundle_list_offer_operator_codes": {
+      "optional": true
+    },
+    "debugbundle_list_offer_operator_claims": {
+      "optional": true
+    },
+    "debugbundle_list_offer_operator_grants": {
+      "optional": true
+    },
+    "debugbundle_create_offer_programme_draft": {
+      "optional": true
+    },
+    "debugbundle_configure_offer_provider": {
+      "optional": true
+    },
+    "debugbundle_set_offer_programme_state": {
+      "optional": true
+    },
+    "debugbundle_create_offer_promotion_code": {
+      "optional": true
+    },
+    "debugbundle_correct_creator_code": {
+      "optional": true
+    },
+    "debugbundle_block_offer_code": {
+      "optional": true
+    },
+    "debugbundle_grant_early_offer_purchase": {
+      "optional": true
+    },
+    "debugbundle_revoke_early_offer_purchase": {
+      "optional": true
+    },
+    "debugbundle_revoke_offer_claim": {
       "optional": true
     },
     "debugbundle_list_organizations": {

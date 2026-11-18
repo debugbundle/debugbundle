@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CommissionBasisPointsSchema } from "./programme-policy.js";
 
 const money = z.number().int().safe().min(0).max(1_000_000_000_000);
 const timestamp = z.string().datetime();
@@ -49,6 +50,22 @@ export const ReferralCommissionInputSchema = z
   })
   .strict();
 export type ReferralCommissionInput = z.infer<typeof ReferralCommissionInputSchema>;
+export const ReferralCommissionPolicySchema = z
+  .object({
+    eligible_plans: z
+      .array(z.enum(["solo", "team", "business"]))
+      .min(1)
+      .max(3),
+    commission_basis_points: CommissionBasisPointsSchema,
+    commission_months: z.number().int().min(1).max(12)
+  })
+  .strict();
+export type ReferralCommissionPolicy = z.infer<typeof ReferralCommissionPolicySchema>;
+const legacyPolicy: ReferralCommissionPolicy = {
+  eligible_plans: ["business"],
+  commission_basis_points: 5000,
+  commission_months: 12
+};
 
 interface Fraction {
   n: bigint;
@@ -67,13 +84,14 @@ function add(a: Fraction, b: Fraction): Fraction {
 function scale(a: Fraction, n: bigint, d = 1n): Fraction {
   return fraction(a.n * n, a.d * d);
 }
-export function referralCommissionEndsAt(startsAt: string): string {
+export function referralCommissionEndsAt(startsAt: string, months = 12): string {
   timestamp.parse(startsAt);
+  z.number().int().min(1).max(12).parse(months);
   const start = new Date(startsAt),
     result = new Date(start);
   const day = start.getUTCDate();
   result.setUTCDate(1);
-  result.setUTCFullYear(start.getUTCFullYear() + 1);
+  result.setUTCMonth(start.getUTCMonth() + months);
   result.setUTCDate(
     Math.min(
       day,
@@ -82,8 +100,18 @@ export function referralCommissionEndsAt(startsAt: string): string {
   );
   return result.toISOString();
 }
-function eligibleLine(line: z.infer<typeof LineSchema>, start: number, end: number): Fraction {
-  if (line.plan !== "business" || line.kind !== "plan" || line.net_amount_minor <= 0)
+function eligibleLine(
+  line: z.infer<typeof LineSchema>,
+  start: number,
+  end: number,
+  policy: ReferralCommissionPolicy
+): Fraction {
+  if (
+    line.plan === "free" ||
+    !policy.eligible_plans.includes(line.plan) ||
+    line.kind !== "plan" ||
+    line.net_amount_minor <= 0
+  )
     return fraction(0n);
   const from = Date.parse(line.service_starts_at),
     to = Date.parse(line.service_ends_at);
@@ -93,12 +121,40 @@ function eligibleLine(line: z.infer<typeof LineSchema>, start: number, end: numb
 /** Cumulative target, never a per-webhook earning. The ledger posts only its
  * delta from the previous target. Discounts are already netted into each line;
  * credits/negative prorations reduce collected cash across positive charges.
- * Exact service/cash fractions are rounded half up once, after the frozen 50%
- * rate. No tax, add-on, uncollected credit or year-two service earns commission. */
-export function calculateReferralCommission(raw: ReferralCommissionInput): number {
+ * Exact service/cash fractions are rounded half up once, after the frozen rate.
+ * Absent an explicit version policy, the original Business-only 50% applies.
+ * No tax, add-on, uncollected credit or year-two service earns commission. */
+export function calculateReferralCommission(
+  raw: ReferralCommissionInput,
+  rawPolicy: ReferralCommissionPolicy = legacyPolicy
+): number {
+  return calculateCashTarget(raw, rawPolicy, false, rawPolicy.commission_basis_points);
+}
+/** Reporting projection from the same exact refund/cash allocation as commission.
+ * It covers all eligible base service and rounds once, without a commission rate. */
+export function calculateCollectedBaseCash(
+  raw: Omit<ReferralCommissionInput, "first_paid_service_starts_at">,
+  eligiblePlans: ReferralCommissionPolicy["eligible_plans"]
+): number {
+  return calculateCashTarget(
+    { ...raw, first_paid_service_starts_at: "1970-01-01T00:00:00.000Z" },
+    { ...legacyPolicy, eligible_plans: eligiblePlans },
+    true,
+    10000
+  );
+}
+function calculateCashTarget(
+  raw: ReferralCommissionInput,
+  rawPolicy: ReferralCommissionPolicy,
+  allService: boolean,
+  rate: number
+): number {
   const input = ReferralCommissionInputSchema.parse(raw);
+  const policy = ReferralCommissionPolicySchema.parse(rawPolicy);
   const start = Date.parse(input.first_paid_service_starts_at),
-    end = Date.parse(referralCommissionEndsAt(input.first_paid_service_starts_at));
+    end = Date.parse(
+      referralCommissionEndsAt(input.first_paid_service_starts_at, policy.commission_months)
+    );
   const lines = new Map(input.lines.map((line) => [line.id, line]));
   if (
     lines.size !== input.lines.length ||
@@ -167,7 +223,15 @@ export function calculateReferralCommission(raw: ReferralCommissionInput): numbe
     return add(
       total,
       scale(
-        eligibleLine(line, start, end),
+        allService
+          ? fraction(
+              line.kind === "plan" &&
+                line.plan !== "free" &&
+                policy.eligible_plans.includes(line.plan)
+                ? BigInt(line.net_amount_minor)
+                : 0n
+            )
+          : eligibleLine(line, start, end, policy),
         netRemaining.n,
         netRemaining.d * BigInt(line.net_amount_minor)
       )
@@ -175,9 +239,8 @@ export function calculateReferralCommission(raw: ReferralCommissionInput): numbe
   }, fraction(0n));
   const remaining = scale(remainingEligible, collected - refunded, remainingGross);
   if (remaining.n <= 0n) return 0;
-  // Divide by two for the 50% rate, then half-up the cumulative minor units.
-  const denominator = remaining.d * 2n;
-  return Number((remaining.n * 2n + denominator) / (denominator * 2n));
+  const target = scale(remaining, BigInt(rate), 10000n);
+  return Number((target.n * 2n + target.d) / (target.d * 2n));
 }
 export function referralFundsAvailableAt(collectedAt: string, providerAvailableAt: string): string {
   timestamp.parse(collectedAt);

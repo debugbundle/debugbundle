@@ -529,7 +529,7 @@ The upstream registry still reports the legacy version as affected.
 
 Run `make audit` in each repository. The shared, identically vendored
 `scripts/dependency-audit.mjs` invokes native pnpm audit without an ignore list.
-It accounts for only that exact advisory/module/version after verifying the
+The legacy Zod lane accounts for only that exact advisory/module/version after verifying the
 patch hash, all four installed compiled-file hashes in every active legacy
 instance, and bounded-collection semantic probes. Missing dependencies, drift,
 malformed audit data and command failures fail closed. All other advisories use
@@ -538,6 +538,23 @@ Make audit retains low. The matching policy and original MIT license live in
 `patches/`. Auditor regression tests run in both repositories. The owner approved
 this precise core/site exception on 24 October 2026; it does not authorise
 exceptions or changes in consumer products or independently published SDKs.
+
+### Verified picomatch repeated-extglob security patch
+
+The owner approved the targeted core/site patch for GHSA-fc5q-39xc-vjpf on
+17 November 2026. Both workspaces resolve their affected picomatch 4.x instances
+to 4.0.7 with the same pnpm-managed patch. Existing safe nested rewrites run first;
+other wildcard-bearing repeated branches use the parser's conservative literal
+fallback. Escaped, quoted and character-class literals remain distinct.
+
+The shared auditor accounts for this exact advisory/module/version only after
+checking the patch hash, every active installed parser hash and bounded child
+probes for direct/nested attacks and ordinary glob compatibility. The registry
+still reports the upstream version as affected; this is a verified local patch,
+not a claimed upstream fixed release. Missing, modified and mixed-version
+installations fail closed. Other advisories keep their original thresholds.
+The patch, hash policy and upstream MIT licence are retained in `patches/` in
+both repos. No consumer repository or independent SDK adoption is authorised.
 
 Local-processing releases must exercise project/environment isolation through the
 compiled CLI and OpenClaw artifact gates, including a reused trace ID across

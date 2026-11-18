@@ -113,11 +113,76 @@ Reconciliation sorts successful collection timestamps and provider payment ident
 
 A partner/currency lock serialises adjustments and payout claims. Each ledger entry can belong to only one payout batch, and only one claimed/uncertain batch may remain active for a partner/currency. Operators retry the same claim UUID; uncertain outcomes stay claimed until an external payment reference is reconciled. Recording the same paid reference is idempotent, while a conflicting reference is rejected. These stores never initiate a bank/provider transfer.
 
-Partner identity uses a separate `referral-partner:v1:` HMAC purpose. Deleting a user clears its live partner FK while retaining the protected identity hash and obligations. Recreating an email does not automatically restore another identity's private financial history. Bank/payout details are agreed and verified with the operator outside the product; they are not collected in ordinary workspace forms.
+Partner identity uses a separate `referral-partner:v1:` HMAC purpose. Deleting a user clears its live partner FK while retaining the protected identity hash and obligations. Recreating an email does not automatically restore another identity's private financial history. Legacy payments retain their externally agreed recipient workflow. Versioned programmes use the encrypted personal setup described below; workspace roles confer no access to it.
 
 Stripe's [coupon duration rules](https://docs.stripe.com/billing/subscriptions/coupons#coupon-duration) consume a once coupon at invoice finalisation. The approved customer benefit is therefore the first eligible Business base invoice. Trial/zero invoices do not consume it; retrying an eligible failed invoice keeps its existing discount without granting a discount on another eligible invoice. Commission remains based on verified collected cash. No provider coupon or pricing configuration has been changed.
 
 ## Partner finance and manual operator interfaces
+
+### Per-programme payment preferences
+
+FR/AC-REF-11 adds personal payment setup to `/settings/referrals`. Accepted terms
+are required to save preferences; setup is not required to join or earn. The
+permanent programme ID survives revisions. Product-wide policy permits IBAN,
+Wisetag or Revtag, a bounded supported-country list, and USD (default), EUR, GBP,
+CAD and AUD. IBAN format/checksum and tag shape are validated, not account
+ownership or payment-route availability. Routine monthly payout review starts
+at US$50 available; smaller balances carry forward and may be settled manually.
+
+The additive `202611160002_add_referral_payout_preferences` migration adds
+encrypted current preferences and immutable batch instruction snapshots.
+Migrations precede consumers; readiness checks tables, typed required columns,
+keys, constraints and enabled guard timing/function identities. Bootstrap is not
+an upgrade path. Old writers cannot claim versioned positive entries without a
+matching snapshot. Historical batches and all earlier migration checksums remain
+unchanged. Retain this migration when rolling code back.
+
+`REFERRAL_PAYOUT_ENCRYPTION_KEY` is a dedicated 32-byte base64url AES-256-GCM key.
+It must be preserved with backups while ciphertext exists. No fallback to the
+identity secret is allowed. Missing configuration disables setup/preparation;
+existing ledger reads and legacy payouts continue. Wrong keys or corrupted
+instructions fail preparation atomically. Rotation requires a separate encrypted
+data migration. Envelopes bind partner, programme, revision and masked metadata.
+
+Ordinary reads/exports expose masked destination, method, country and currency;
+they exclude recipient names and ciphertext. Saves require the exact last-read
+revision and expected personal user ID. A separately verified billing payout
+operator can explicitly reveal a prepared batch's frozen instructions, with a
+no-store response and metadata-only audit. Programme delegations and workspace
+roles grant no finance access. Restricted MCP catalogues are unchanged.
+
+Preparing a payment reserves positive entries from exactly one programme plus
+all partner-wide negative offsets, under existing financial and partner locks.
+One partner/USD claimed or uncertain batch remains active at a time. The exact
+preference revision and ciphertext are frozen in the same transaction as entry
+claims. Later preference edits cannot alter prepared payments. Retry the same
+claim UUID and original programme/revision; uncertain/paid handling is unchanged.
+Balances and claimed amounts remain USD. Settlement currency/FX and recipient
+verification are manual; no transfer or provider onboarding occurs.
+
+Routes, shared client/CLI actions and ordinary MCP tools:
+
+| Route | `debugbundle offers` action | MCP tool |
+| --- | --- | --- |
+| `GET /v2/referrals/payout-policy` | `payout_policy` | `get_referral_payout_policy` |
+| `GET /v2/referrals/payout-preferences` | `payout_preferences` | `get_creator_payout_preferences` |
+| `POST /v2/referrals/payout-preferences` | `save_payout_preferences` | `save_creator_payout_preferences` |
+| `GET /v2/referrals/payout-balances?partner_id=…` | `payout_balances` | `get_referral_programme_payout_balances` |
+| `POST /v2/referrals/payouts/prepare` | `prepare_payout` | `prepare_referral_programme_payout` |
+| `GET /v2/referrals/payouts/:batch_id/instructions` | `payout_instructions` | `get_referral_payout_instructions` |
+
+For structured input use `--input <file>`; saves require a private 0600 file.
+Never put bank details in shell arguments, audit metadata or reports. Creator
+reads return `{user_id,programmes}`. Saves send `expected_user_id`, `programme_id`,
+`expected_revision` (null initially) and `details` with `method`, `holder`,
+`country`, `currency` and `destination`. Prepare sends `partner_id`, `programme_id`,
+`preference_revision` and stable `claim_id`. Instruction reads are explicit
+sensitive disclosure, not an ordinary balance read.
+
+Current encrypted preferences are preserved when the account is unlinked;
+automatic destructive cleanup was rejected by approval review and is pending
+explicit owner approval. They cannot be read by a recreated account. Frozen
+instructions follow protected financial retention. No deletion trigger was added.
 
 `GET /v1/referrals/earnings` reads the verified human's own pending/available/claimed/paid USD balance, or null before joining, and indicates separately configured operator access. `GET /v1/referrals/payouts` lists only that partner's bounded payout records. Workspace ownership/administration never supplies operator authority.
 
@@ -209,10 +274,91 @@ coupon scope and the exact draft before applying its coupon. This uses Stripe's
 and its stable idempotency identity. It never creates/finalises/charges an invoice,
 changes a subscription, or chooses a later bill on replay. A lost acknowledgement
 reads back the same draft. An unresolved intent cannot be replaced by another
-invoice. A finalised first eligible invoice lacking the expected discount remains
+invoice unless complete verified facts prove that its original invoice finalised
+at zero eligible base/due and collected no eligible base cash. The worker records
+an immutable `referral_benefit_recovery_retirements` receipt before clearing only
+that draft-repair pointer. It retains the Checkout reservation and pending benefit.
+The same rule covers legacy and versioned offers; a refund cannot reset an already
+collected/consumed benefit. A finalised first eligible invoice lacking the expected discount remains
 held for explicit reconciliation; no refund, credit or new benefit is invented.
 
 Provider reads/writes run outside database locks. Short transactions check the
 worker lease before preparation and before committing receipt/ledger/source/job
-completion. Provider price/coupon configuration and programme activation remain
-separate operator actions; these source changes perform no provider call.
+completion. Programme activation/scheduling prepares or verifies its once-only,
+product-scoped coupon from immutable terms before the locked transition. Mode
+comes from the server's verified catalogue. Deterministic coupon IDs and idempotency
+keys preserve retries; canonical read-back resolves lost acknowledgements. Existing
+bindings remain immutable and are verified at Checkout/recovery. Failed setup cannot
+activate the version or charge a customer. Price configuration remains independent.
+The manual-binding interface stays compatible; local tests use synthetic providers.
+The eligible catalogue must select exactly one current price per plan/interval
+and match the published USD amount, recurring interval/count, licensed usage and
+exclusive tax treatment. Product exclusions include retained capacity prices even
+when inactive. Retention never makes a historical price newly purchasable, and
+the same catalogue verification applies at Checkout and draft recovery.
+
+## Approved versioned programme extension
+
+The [referral programmes contract](../spec/referral-programmes.md), FR-REF-01–10,
+adds explicitly versioned all-paid-plan offers and creator-code aliases. The
+Business-only ten-percent policy above remains the legacy policy. New claims
+freeze their own policy; old strict v1 schemas remain unchanged. Financial
+settlement chooses policy by the retained attribution/claim, never current
+marketing settings or a caller-supplied percentage. No activation is implied.
+Versioned commission is a configurable 0–100% share of eligible collected base
+cash after discounts and refund allocation, at whole basis-point precision. The
+initial 50% is a default, not a ceiling; legacy strict 50% DTOs stay unchanged.
+The shared schema rejects paying more than the available eligible cash. A 20%
+customer discount followed by 80% commission retains 16% of the original base
+before fees/operating costs; no combined-discount-plus-commission percentage cap
+is applied. Existing half-up rounding, windows and refund debt remain unchanged.
+
+Unresolved signup intent blocks a full-price first reservation. Durable attribution
+or a claim for that same current Owner takes precedence over a lost acknowledgement
+of intent completion; it remains usable when enrolment pauses. This changes no
+coupon/quote/identity eligibility or admission checks and grants no benefit from a
+hint alone. Existing exact Checkout reservations retain their normal replay fence.
+
+## Creator email notifications
+
+FR/AC-REF-12 adds personal transactional notifications for versioned programme
+memberships. The owner selected new customers' first paid purchases only;
+renewals/repeat payments, visits, signup claims and trials do not create activity.
+Accepted revisions queue one confirmation per creator/version. A first-purchase
+celebration is unique to the creator and permanent programme, including across
+revisions. Later newly paying customers enter one daily digest per creator, with
+separate programme sections. The celebration's purchase is not repeated in a digest.
+
+New migration `202611170001_add_creator_referral_emails` adds an activation epoch,
+minimal conversion receipts and a private delivery outbox. Enrolment and the receipt
+worker's final fenced transaction queue notifications atomically, outside provider
+I/O. Event writers take a shared epoch lock before user/financial locks; the daily
+scheduler seals each UTC [00:00,00:00) window under the exclusive lock, with bounded
+batches. Old purchases before activation are not backfilled or celebrated. A
+committed source event enters only one celebration/digest. Quiet windows create no
+message. Summaries show at most 25 named programme sections and explicitly identify
+any additional programmes included in exact overall totals.
+
+The existing SES acknowledged transport disables SDK retries. A committed send
+fence and exact attempt token precede dispatch. Explicit rejection may retry up
+to five attempts; timeout, lost provider acknowledgement or a crash after send
+becomes uncertain and never automatically resends. Preparation can be reclaimed
+before a send starts. Recipient resolution checks the original creator's current
+verified account and partner binding. No customer identities, invoice/provider
+references, payout details or full email addresses are stored in the notification
+payload. Delivery attention logs contain only an opaque delivery ID and fixed state.
+
+Daily mail expires 24 hours after its window closes; a second check immediately
+before sending also requires a covered referral confirmed inside the last 24 hours.
+All queued mail expires after seven days. Expiry skips obsolete notifications, not financial records or earned
+balances. The first-purchase marker remains permanent. Amounts are pending at
+confirmation, in USD, and subject to refunds, holds and adjustment; notifications
+never authorise payout. Personal account export exposes only bounded delivery
+kind/status/attempt/timestamps, without message payload or provider metadata.
+
+Deploy the additive migration before the new API/worker. Enable new-programme
+claims only after both compatible candidates are ready, as in the existing rollout
+contract. No reverse migration or financial deletion is required on rollback; old
+readers can leave the outbox idle. The existing SES sender, region, timeout and app
+origin configure delivery. Missing mail configuration leaves delivery disabled.
+See `spec/creator-referral-emails-review.md` for local qualification and receipts.

@@ -200,6 +200,7 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
       interval: BillingInterval;
     }): Promise<StripeOfferUpgradePreviewResult>;
     createCheckoutLink(input: {
+      expected_offer?: { claim_id: string; version_id: string; expires_at: string };
       organization_id: string;
       billing_email: string;
       current_plan: "free" | "solo" | "team" | "business";

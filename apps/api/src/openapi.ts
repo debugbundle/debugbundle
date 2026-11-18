@@ -1,3 +1,4 @@
+import { offerOperations } from "./openapi-offers.js";
 import { notificationPreferencesOperations } from "./openapi-notification-preferences.js";
 import { organizationOperations } from "./openapi-organizations.js";
 import { referralOperations } from "./openapi-referrals.js";
@@ -86,7 +87,8 @@ export function buildPublicOpenApiSpec(): Record<string, unknown> {
     ...notificationsOperations(),
     ...captureOperations(),
     ...publicStatusOperations(),
-    ...notificationPreferencesOperations()
+    ...notificationPreferencesOperations(),
+    ...offerOperations()
   ];
   const paths: Record<string, Record<string, unknown>> = {};
 
@@ -167,6 +169,13 @@ export function buildPublicOpenApiSpec(): Record<string, unknown> {
           in: "cookie",
           name: SESSION_COOKIE_NAME,
           description: "Browser session cookie for interactive authenticated routes."
+        },
+        offerOperatorAuthorization: {
+          type: "apiKey",
+          in: "header",
+          name: "X-DebugBundle-Operator-Authorization",
+          description:
+            "Bearer <temporary proof> issued only by an allowlisted verified email-code browser session. Must accompany the exact unrestricted member token. Expires after 15 minutes; no automatic refresh, Analytics or payout authority."
         },
         memberBearerToken: {
           type: "http",

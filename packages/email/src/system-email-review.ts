@@ -7,6 +7,7 @@ import {
   renderProjectInviteEmail,
   renderWeeklyReportEmail
 } from "./index.js";
+import { CREATOR_EMAIL_REVIEW_ENTRIES } from "./creator-email-review.js";
 import {
   renderAllowanceLimitReachedEmail,
   renderAllowanceWarning80Email,
@@ -568,7 +569,8 @@ export const SYSTEM_EMAIL_REVIEW_ENTRIES: readonly SystemEmailReviewEntry[] = [
         ]
       });
     }
-  }
+  },
+  ...CREATOR_EMAIL_REVIEW_ENTRIES
 ] as const;
 
 export function getSystemEmailReviewEntry(id: string): SystemEmailReviewEntry | null {

@@ -193,6 +193,13 @@ or project-reference columns block eligibility. Classification is not proof that
 every reader/writer is implemented: complete the module/data-path audit and
 acceptance matrix before enabling apply.
 
+Referral programme versions, code ownership, customer claims and accepted terms,
+signup intents, grants, delegation records, provider bindings and zero-invoice
+recovery-retirement evidence are `unchanged_account` data. Project consolidation
+must leave every such record and claim counter intact; it grants no offer,
+financial or operator authority. The installed-schema inventory must classify
+all twelve programme tables before consolidation can proceed.
+
 ## Retained automation
 
 Capture rules, alerts, agent webhooks and GitHub dispatch rules snapshot origin

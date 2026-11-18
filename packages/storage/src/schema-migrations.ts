@@ -1,4 +1,13 @@
 import {
+  OFFER_PROGRAMME_MIGRATION,
+  offerProgrammeSchemaAvailable
+} from "./offer-programme-schema.js";
+import { CREATOR_EMAIL_MIGRATION, creatorEmailSchemaAvailable } from "./creator-email-schema.js";
+import {
+  PAYOUT_PREFERENCE_MIGRATION,
+  payoutPreferenceSchemaAvailable
+} from "./payout-preference-schema.js";
+import {
   SELFHOST_ORGANIZATION_ACCESS_MIGRATION,
   selfhostOrganizationAccessSchemaAvailable
 } from "./selfhost-organization-access-schema.js";
@@ -160,7 +169,10 @@ export const STORAGE_SCHEMA_MIGRATIONS: readonly StorageSchemaMigration[] = [
   REPORT_IDENTITY_MIGRATION,
   REPORT_PRODUCT_MIGRATION,
   IMPROVEMENT_REVIEW_MIGRATION,
-  IMPROVEMENT_REVIEW_PLANNING_MIGRATION
+  IMPROVEMENT_REVIEW_PLANNING_MIGRATION,
+  OFFER_PROGRAMME_MIGRATION,
+  PAYOUT_PREFERENCE_MIGRATION,
+  CREATOR_EMAIL_MIGRATION
 ].sort((left, right) => left.id.localeCompare(right.id));
 
 function validateStorageSchemaMigrations(migrations: readonly StorageSchemaMigration[]): void {
@@ -247,8 +259,14 @@ async function reconcileMigrationLedgerInTransaction(
   const reportProductReady = await reportProductSchemaAvailable(db);
   const improvementReviewReady = await improvementReviewSchemaAvailable(db);
   const reviewPlanningReady = await improvementReviewPlanningSchemaAvailable(db);
+  const offerProgrammeReady = await offerProgrammeSchemaAvailable(db);
+  const payoutPreferenceReady = await payoutPreferenceSchemaAvailable(db);
+  const creatorEmailReady = await creatorEmailSchemaAvailable(db);
   const verifiedBaseline = STORAGE_SCHEMA_MIGRATIONS.filter(
     (migration) =>
+      (migration.id !== CREATOR_EMAIL_MIGRATION.id || creatorEmailReady) &&
+      (migration.id !== PAYOUT_PREFERENCE_MIGRATION.id || payoutPreferenceReady) &&
+      (migration.id !== OFFER_PROGRAMME_MIGRATION.id || offerProgrammeReady) &&
       (migration.id !== REPORT_IDENTITY_MIGRATION.id || reportIdentityReady) &&
       (migration.id !== REPORT_PRODUCT_MIGRATION.id || reportProductReady) &&
       (migration.id !== IMPROVEMENT_REVIEW_MIGRATION.id || improvementReviewReady) &&
@@ -450,6 +468,11 @@ export async function assertStorageSchemaMigrationsApplied(db: Queryable): Promi
   }
   if (!(await projectServiceSchemaAvailable(db)))
     throw new Error("project_service_schema_incomplete");
+  if (!(await offerProgrammeSchemaAvailable(db)))
+    throw new Error("offer_programme_schema_incomplete");
+  if (!(await payoutPreferenceSchemaAvailable(db)))
+    throw new Error("payout_preference_schema_incomplete");
+  if (!(await creatorEmailSchemaAvailable(db))) throw new Error("creator_email_schema_incomplete");
   if (!(await referralSchemaAvailable(db))) throw new Error("referral_schema_incomplete");
   if (!(await referralLedgerSchemaAvailable(db)))
     throw new Error("referral_ledger_schema_incomplete");

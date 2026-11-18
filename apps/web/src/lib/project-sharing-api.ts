@@ -1,4 +1,8 @@
-import { buildApiUrl, buildBrowserSessionHeaders } from "./api.js";
+import {
+  buildApiUrl,
+  buildBrowserSessionHeaders,
+  readJson as readProjectSharingJson
+} from "./api-client.js";
 
 export interface ProjectMemberRecord {
   user_id: string;
@@ -26,20 +30,6 @@ export interface AcceptedProjectInviteRecord {
   user_id: string;
   role: "owner" | "admin" | "member" | "viewer";
   membership_type?: "owner" | "collaborator";
-}
-
-async function readProjectSharingJson<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { error?: string } | null;
-
-    if (response.status === 401 && body?.error === "invalid_session") {
-      throw new Error("invalid_session");
-    }
-
-    throw new Error(body?.error ?? `request_failed_${response.status}`);
-  }
-
-  return (await response.json()) as T;
 }
 
 export async function listProjectMembers(projectId: string): Promise<ProjectMemberRecord[]> {

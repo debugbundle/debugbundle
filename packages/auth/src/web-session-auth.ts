@@ -1,7 +1,15 @@
+import type { SignupOfferHint } from "./primitives.js";
 import { createHmac, randomBytes } from "node:crypto";
 
 import { DEFAULT_GITHUB_AUTHORIZE_URL, type GitHubOAuthConfig } from "./github-auth-client.js";
 import { resolveGitHubAccountForIdentity } from "./github-account-linking.js";
+import {
+  BROWSER_SESSION_IDLE_MS,
+  BROWSER_SESSION_ABSOLUTE_MS,
+  isBrowserSessionInactive,
+  type RenewBrowserSessionInput,
+  type RenewedBrowserSession
+} from "./browser-session-policy.js";
 import {
   PROJECT_INVITE_TOKEN_PREFIX,
   type AcceptProjectInviteStoreResult,
@@ -22,12 +30,10 @@ import {
   generateSessionToken,
   hashToken,
   isTimingSafeEqualUtf8,
-  isRecordInactive,
   isTokenExpired,
   normalizeEmail
 } from "./primitives.js";
 
-const DEFAULT_SESSION_LIFETIME_MS = 1000 * 60 * 60 * 24 * 7;
 const DEFAULT_EMAIL_AUTH_CODE_LIFETIME_MS = 1000 * 60 * 10;
 const DEFAULT_GITHUB_OAUTH_STATE_LIFETIME_MS = 1000 * 60 * 10;
 
@@ -37,10 +43,12 @@ export interface WebSessionAuthStore {
   createUserAccount(input: CreateUserAccountInput): Promise<WebUserAccount | null>;
   createSession(input: CreateSessionInput): Promise<WebSessionRecord | null>;
   resolveSessionByTokenHash(tokenHash: string): Promise<WebSessionRecord | null>;
+  renewSessionByTokenHash?(input: RenewBrowserSessionInput): Promise<RenewedBrowserSession | null>;
   revokeSessionByTokenHash(input: RevokeSessionInput): Promise<boolean>;
   revokeOtherSessionsForUser(input: RevokeOtherSessionsInput): Promise<number>;
   markUserEmailVerified(input: { user_id: string; verified_at: string }): Promise<boolean>;
   upsertGitHubUserAccount(input: {
+    signup_offer?: SignupOfferHint;
     github_user_id: string;
     email: string;
     verified_at: string;
@@ -155,6 +163,7 @@ export interface WebSessionAuthService {
     now?: Date;
   }): Promise<RequestEmailCodeResult>;
   verifyEmailCode(input: {
+    signup_offer?: SignupOfferHint;
     email: string;
     code: string;
     now?: Date;
@@ -164,6 +173,7 @@ export interface WebSessionAuthService {
     accepted_terms_at?: string;
   }): Promise<BeginGitHubAuthResult>;
   completeGithubAuth(input: {
+    signup_offer?: SignupOfferHint;
     code: string;
     state: string;
     stateCookieValue: string | null;
@@ -178,6 +188,10 @@ export interface WebSessionAuthService {
     options?: { now?: Date }
   ): Promise<WebSessionRecord | null>;
   revokeSessionByToken(sessionToken: string, options?: { now?: Date }): Promise<boolean>;
+  renewSessionByToken(
+    sessionToken: string,
+    options?: { now?: Date }
+  ): Promise<RenewedBrowserSession | null>;
 }
 
 export function generateGithubOauthState(input: {
@@ -290,7 +304,10 @@ export function createWebSessionAuthService(
   store: WebSessionAuthStore & EmailAuthChallengeStore & ProjectInviteAcceptanceStore,
   options: WebSessionAuthServiceOptions = {}
 ): WebSessionAuthService {
-  const sessionLifetimeMs = options.sessionLifetimeMs ?? DEFAULT_SESSION_LIFETIME_MS;
+  const sessionLifetimeMs = Math.min(
+    options.sessionLifetimeMs ?? BROWSER_SESSION_IDLE_MS,
+    BROWSER_SESSION_IDLE_MS
+  );
   const emailAuthCodeLifetimeMs =
     options.emailAuthCodeLifetimeMs ?? DEFAULT_EMAIL_AUTH_CODE_LIFETIME_MS;
 
@@ -345,7 +362,8 @@ export function createWebSessionAuthService(
           email: normalizedEmail,
           ...deriveOrganizationIdentity(normalizedEmail),
           accepted_terms_at: consumed.accepted_terms_at,
-          created_at: now.toISOString()
+          created_at: now.toISOString(),
+          ...(input.signup_offer ? { signup_offer: input.signup_offer } : {})
         });
         createdUser = createdAccount !== null;
         account = createdAccount ?? (await store.findUserAccountByEmail(normalizedEmail));
@@ -474,6 +492,7 @@ export function createWebSessionAuthService(
         store,
         identity,
         verified_at: now.toISOString(),
+        ...(input.signup_offer ? { signup_offer: input.signup_offer } : {}),
         ...(statePayload.accepted_terms_at === undefined
           ? {}
           : { accepted_terms_at: statePayload.accepted_terms_at })
@@ -511,7 +530,7 @@ export function createWebSessionAuthService(
     async acceptInviteForSession(sessionToken: string, input): Promise<AcceptInviteResult> {
       const now = input.now ?? new Date();
       const session = await store.resolveSessionByTokenHash(hashToken(sessionToken));
-      if (session === null || isRecordInactive(session, now)) {
+      if (session === null || isBrowserSessionInactive(session, now)) {
         return {
           ok: false,
           error: "invalid_session"
@@ -573,11 +592,23 @@ export function createWebSessionAuthService(
         return null;
       }
 
-      if (isRecordInactive(session, options.now ?? new Date())) {
+      if (isBrowserSessionInactive(session, options.now ?? new Date())) {
         return null;
       }
 
       return session;
+    },
+
+    async renewSessionByToken(sessionToken, options = {}) {
+      // Renewal is an explicit activity operation; ordinary authentication stays read-only.
+      return (
+        store.renewSessionByTokenHash?.({
+          session_token_hash: hashToken(sessionToken),
+          now: (options.now ?? new Date()).toISOString(),
+          idle_lifetime_ms: sessionLifetimeMs,
+          absolute_lifetime_ms: BROWSER_SESSION_ABSOLUTE_MS
+        }) ?? null
+      );
     },
 
     async revokeSessionByToken(sessionToken: string, options = {}): Promise<boolean> {

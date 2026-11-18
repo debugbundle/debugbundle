@@ -1,3 +1,4 @@
+import { OFFER_MCP_TOOL_NAMES, OFFER_MCP_TOOL_CATALOG } from "./offer-tools.js";
 import {
   NOTIFICATION_MCP_TOOL_NAMES,
   NOTIFICATION_MCP_TOOL_CATALOG
@@ -55,6 +56,7 @@ import { WEBHOOK_MCP_TOOL_NAMES } from "./webhook-tools.js";
 import { WEEKLY_REPORT_MCP_TOOL_NAMES } from "./weekly-report-tools.js";
 
 type McpToolName =
+  | (typeof OFFER_MCP_TOOL_NAMES)[number]
   | (typeof IMPROVEMENT_REVIEW_MCP_TOOL_NAMES)[number]
   | (typeof REPORT_DELIVERY_MCP_TOOL_NAMES)[number]
   | (typeof REPORT_PDF_MCP_TOOL_NAMES)[number]
@@ -142,6 +144,7 @@ export const MCP_TOOL_CATALOG = [
   ...REPORT_MCP_TOOL_CATALOG,
   ...REPORT_RUN_MCP_TOOL_CATALOG,
   ...REFERRAL_MCP_TOOL_CATALOG,
+  ...OFFER_MCP_TOOL_CATALOG,
   ...ORGANIZATION_MCP_TOOL_CATALOG,
   ...PROJECT_MERGE_MCP_TOOL_CATALOG,
   ...SERVICE_DEFINITION_MCP_TOOL_CATALOG,

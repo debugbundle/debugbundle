@@ -2,12 +2,11 @@
 name: debugbundle
 license: MIT-0
 description: >-
-  Use DebugBundle for runtime error reporting, crash reporting, incident reporting,
-  incident response, live app monitoring, and production monitoring focused on runtime
-  failures, customer-facing incidents, and endpoint health—not generic infrastructure
-  metrics. Investigate exceptions, alerts, logs, observability signals, health checks,
-  and debug bundles; review product analytics; and guide evidence-based fixes through
-  CLI primarily, with MCP where needed.
+  Runtime error reporting and incident response for live apps with DebugBundle.
+  Use it for crash reporting, incident monitoring, production monitoring, endpoint
+  health checks, debug bundles and product analytics. Investigate runtime failures,
+  exceptions, logs and observability signals through the CLI primarily, with MCP
+  where needed. Covers application incidents, not generic infrastructure metrics.
 metadata:
   openclaw:
     requires:
@@ -23,11 +22,11 @@ metadata:
         description: Optional DebugBundle API base URL for self-hosted or non-production environments.
     install:
       - kind: node
-        package: "@debugbundle/mcp@1.25.0"
+        package: "@debugbundle/mcp@1.26.0"
         bins:
           - debugbundle-mcp
       - kind: node
-        package: "@debugbundle/cli@1.25.1"
+        package: "@debugbundle/cli@1.26.0"
         bins:
           - debugbundle
     skillKey: debugbundle

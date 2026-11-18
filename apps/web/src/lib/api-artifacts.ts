@@ -1,4 +1,9 @@
-import { API_BASE, buildBrowserSessionHeaders, readJson } from "./api-client.js";
+import {
+  API_BASE,
+  assertBrowserSessionResponse,
+  buildBrowserSessionHeaders,
+  readJson
+} from "./api-client.js";
 import { normalizeImprovementRecord, normalizeIncidentRecord } from "./api-record-normalizers.js";
 import { observeWebActivationStep } from "./dogfooding-flows.js";
 import type { IncidentRecord, IncidentStatusFilter, ImprovementRecord } from "./api-types.js";
@@ -145,7 +150,10 @@ export async function getIncidentReproduction(
 
 async function readArtifact(path: string): Promise<unknown> {
   const response = await fetch(`${API_BASE}${path}`, { credentials: "include" });
-  if (!response.ok) throw new Error(`request_failed_${response.status}`);
+  if (!response.ok) {
+    assertBrowserSessionResponse(response.status, await response.json().catch(() => null));
+    throw new Error(`request_failed_${response.status}`);
+  }
   return (await response.json()) as unknown;
 }
 

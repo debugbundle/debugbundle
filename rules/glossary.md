@@ -413,8 +413,8 @@ rebuild from preserved event files.
 - **Organisation grant:** A fixed Owner/Admin/Member relationship. A Business grant may explicitly include current and future projects; suspension denies access from every grant.
 - **Project Viewer:** A read-only project role. Credential permissions can narrow the holder's current authority, never expand it.
 - **Monthly allowance window:** The shared usage period, including a monthly sub-window inside an annual paid term. Capacity purchases and upgrades do not reset consumed usage.
-- **First eligible referral invoice:** The first finalised, positive Business base invoice carrying the verified referral benefit. A retry of that invoice keeps its discount; trial/zero invoices do not consume it and a later invoice does not receive another benefit.
-- **Collected base cash:** Verified, allocated payment for eligible Business base service, excluding tax, capacity and non-cash credit. Referral commission follows this cash and the paid-service period, with refund/dispute reversals and availability holds.
+- **First eligible referral invoice:** The first finalised, positive base invoice on a plan eligible under the saved agreement (Business only for the legacy agreement) carrying the verified referral benefit. A retry of that invoice keeps its discount; trial/zero invoices do not consume it and a later invoice does not receive another benefit.
+- **Collected base cash:** Verified, allocated payment for base service eligible under the saved agreement, excluding tax, capacity and non-cash credit. Referral commission follows this cash and the paid-service period, with refund/dispute reversals and availability holds.
 - **Canonical report:** One immutable, private structured report. HTML, PDF and email overview use its same facts and any available analysis; formatting retries do not generate more AI analysis.
 - **Whole report scope:** Every frozen project and original origin selected for that report. Reading or delivering the report requires current authority for the entire scope; AI prose is never made shareable by filtering out projects afterward.
 - **Factual-only report:** A canonical report containing authoritative observations and explicit analysis unavailability when optional AI cannot safely complete.
@@ -425,3 +425,16 @@ rebuild from preserved event files.
 
 - **Weekly improvement review**: a separate consented, versioned project/week artifact of bounded retained evidence, deterministic priorities and optional AI investigation guidance. It does not replace an ordinary opportunity or BundleV1.
 - **Intentional factual report**: a Solo/Team report whose saved product mode excludes AI entirely, completing successfully with `analysis.status=not_requested`; distinct from a degraded Business AI result.
+
+- **Programme version:** An immutable commercial agreement with a lifecycle and bounded eligibility policy. Revisions change future acceptance; they do not rewrite saved claims.
+- **Creator code:** A public, case-insensitive permanent alias of a partner identity. It is not authentication or proof of purchase eligibility, and is never reassigned.
+- **Offer claim:** An identity-protected workspace promise freezing the selected discount and its version independently of the referring partner.
+- **Signup offer intent:** A bounded account-bound receipt of the public code presented during new-account creation, retained for safe automatic retry after verification.
+- **Operator delegation:** A hashed, revocable 15-minute proof supplementing an unrestricted member token, tied to the issuing email-code session, exact workspace and explicit programme actions.
+- **Offer performance cohort:** Current claims made within an explicit UTC window, with current lifetime verified financial totals and observation coverage. A reporting projection cannot authorise a payout.
+- **Payout preference:** A creator's encrypted recipient setup for one permanent programme; ordinary reads show a masked destination. It does not change USD accounting or initiate a transfer.
+- **Frozen payout instructions:** Immutable recipient instructions captured with the exact preference revision when earnings are reserved for manual settlement. Later preference edits cannot change that prepared payment.
+- **Affiliate programme:** Public presentation of a creator referral agreement on `/affiliates/`. The underlying referral policy, codes, account settings and financial contracts retain their existing names.
+
+- **Creator purchase milestone:** The first verified qualifying paying customer for a creator and permanent programme. Its celebration does not reset on programme revisions.
+- **Creator activity digest:** A daily UTC summary of subsequent new paying referrals, grouped by programme. It excludes renewals/trials and requires recent activity at dispatch.

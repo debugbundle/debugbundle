@@ -15,7 +15,7 @@ const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
 export function evaluateAudit(
   report,
-  { verifiedLegacyBackport = false, auditLevel = "high" } = {}
+  { verifiedLegacyBackport = false, verifiedPicomatchBackport = false, auditLevel = "high" } = {}
 ) {
   if (
     !severities.includes(auditLevel) ||
@@ -51,10 +51,14 @@ export function evaluateAudit(
         throw new Error("invalid_audit_finding");
       }
       const accounted =
-        verifiedLegacyBackport &&
-        advisory.github_advisory_id === advisoryId &&
-        advisory.module_name === "zod" &&
-        finding.version === legacyVersion;
+        (verifiedLegacyBackport &&
+          advisory.github_advisory_id === advisoryId &&
+          advisory.module_name === "zod" &&
+          finding.version === legacyVersion) ||
+        (verifiedPicomatchBackport &&
+          advisory.github_advisory_id === "GHSA-fc5q-39xc-vjpf" &&
+          advisory.module_name === "picomatch" &&
+          finding.version === "4.0.7");
       if (accounted) accountedFindings += 1;
       return !accounted;
     });
@@ -70,11 +74,19 @@ export function evaluateAudit(
 }
 
 export function collectLegacyRoots(graph) {
+  return collectPackageRoots(graph, "zod", legacyVersion);
+}
+
+export function collectPicomatchRoots(graph) {
+  return collectPackageRoots(graph, "picomatch", "4.0.7");
+}
+
+function collectPackageRoots(graph, packageName, version) {
   if (!Array.isArray(graph)) throw new Error("invalid_dependency_graph");
   const roots = new Set();
   function visit(value, key) {
     if (value === null || typeof value !== "object") return;
-    if (key === "zod" && value.version === legacyVersion) {
+    if (key === packageName && value.version === version) {
       if (typeof value.path !== "string") throw new Error("missing_dependency_path");
       roots.add(value.path);
     }
@@ -82,6 +94,58 @@ export function collectLegacyRoots(graph) {
   }
   visit(graph);
   return [...roots];
+}
+
+export function verifyPicomatchBackport(root, packageRoots) {
+  const policy = JSON.parse(
+    readFileSync(join(root, "patches/picomatch-security-backport.json"), "utf8")
+  );
+  const patch = readFileSync(join(root, "patches/picomatch@4.0.7.patch"));
+  if (
+    policy.advisory !== "GHSA-fc5q-39xc-vjpf" ||
+    policy.version !== "4.0.7" ||
+    policy.patch_sha256 !== sha256(patch) ||
+    Object.keys(policy.files ?? {}).join() !== "lib/parse.js" ||
+    !/^[a-f0-9]{64}$/u.test(policy.files["lib/parse.js"]) ||
+    packageRoots.length === 0
+  ) {
+    throw new Error("invalid_picomatch_backport_policy");
+  }
+  const moduleRoot = realpathSync(join(root, "node_modules")) + sep;
+  for (const directory of packageRoots) {
+    const packageRoot = realpathSync(directory);
+    if (!packageRoot.startsWith(moduleRoot)) throw new Error("dependency_outside_installation");
+    const manifest = JSON.parse(readFileSync(join(packageRoot, "package.json"), "utf8"));
+    if (
+      manifest.name !== "picomatch" ||
+      manifest.version !== policy.version ||
+      sha256(readFileSync(join(packageRoot, "lib/parse.js"))) !== policy.files["lib/parse.js"]
+    ) {
+      throw new Error("picomatch_backport_file_mismatch");
+    }
+    // A child timeout bounds a regressed matcher instead of hanging the audit.
+    const probe = spawnSync(
+      process.execPath,
+      [
+        "-e",
+        `
+      const assert = require('node:assert/strict');
+      const pm = require(${JSON.stringify(packageRoot)});
+      for (const pattern of ['+(*)b', '+(*a)b', '*(a*)b', '+(?*a)b', '+(@(*a))b', '+(@(*(a)))b']) {
+        assert.equal(pm.isMatch('a'.repeat(80) + '!', pattern), false);
+      }
+      assert.equal(pm.isMatch('abab', '+(a|b)'), true);
+      assert.equal(pm.isMatch('b', '+(*(a)|*(b))'), true);
+      assert.equal(pm.isMatch('src/file.ts', '**/*.{ts,tsx}'), true);
+      assert.equal(pm.isMatch('file.js', '*.+(js|ts)'), true);
+    `
+      ],
+      { encoding: "utf8", timeout: 2000 }
+    );
+    if (probe.error || probe.status !== 0)
+      throw new Error("picomatch_backport_semantic_check_failed");
+  }
+  return packageRoots.length;
 }
 
 export function verifyLegacyBackport(root, packageRoots) {
@@ -163,8 +227,32 @@ export function runAudit(root = process.cwd(), auditLevel = "high") {
         )
       )
     : 0;
+  const needsPicomatchBackport = Object.values(report.advisories).some(
+    (advisory) =>
+      advisory.github_advisory_id === "GHSA-fc5q-39xc-vjpf" && advisory.module_name === "picomatch"
+  );
+  const verifiedPicomatchInstances = needsPicomatchBackport
+    ? verifyPicomatchBackport(
+        root,
+        collectPicomatchRoots(
+          runPnpm(root, ["list", "picomatch", "--depth", "Infinity", "--recursive", "--json"])
+        )
+      )
+    : 0;
   return {
-    ...evaluateAudit(report, { auditLevel, verifiedLegacyBackport: verifiedInstances > 0 }),
+    ...evaluateAudit(report, {
+      auditLevel,
+      verifiedLegacyBackport: verifiedInstances > 0,
+      verifiedPicomatchBackport: verifiedPicomatchInstances > 0
+    }),
+    verifiedPicomatchBackport:
+      verifiedPicomatchInstances > 0
+        ? {
+            advisory: "GHSA-fc5q-39xc-vjpf",
+            version: "4.0.7",
+            instances: verifiedPicomatchInstances
+          }
+        : null,
     verifiedBackport:
       verifiedInstances > 0
         ? { advisory: advisoryId, version: legacyVersion, instances: verifiedInstances }

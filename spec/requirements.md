@@ -552,6 +552,10 @@ tax, payment authentication, invoice or portal behaviour.
 
 **FR-WEB-12:** Failed initial browser-session and billing reads must show an explicit, accessible error and bounded user retry using existing components. An unavailable session read is not proof of sign-out. Retry must not overlap session/bootstrap requests, discard established session or billing state, clear an unverified Checkout return, or create a new purchase. Loading labels beside conditional icons retain stable element boundaries when browser tools replace text nodes; translation stays enabled and unrelated errors are not suppressed.
 
+**FR-WEB-13:** Revalidate an established browser session on visible window focus and tab visibility return through an uncached, cookie-backed session read. Coalesce overlapping reads without unmounting the current page. Confirmed session loss, including shared management routes' `401 invalid_member_token`, clears local identity/CSRF state and returns protected routes to login with one session-expired toast. Network/server failures preserve the session; late session reads cannot restore an invalidated identity or overwrite a newer sign-in/sign-out. An available app update uses the existing shared toast and Reload action, with no timeout or manual dismissal until reload; the post-reload changelog notice remains temporary.
+
+**FR-WEB-14:** Browser sessions renew automatically during foreground activity, with a seven-day inactivity deadline and a non-renewable thirty-day maximum from original sign-in. Server-side authentication enforces both deadlines. An explicit cookie/CSRF/app-Origin renewal endpoint atomically extends only active, unrevoked sessions with unsuspended membership/organization; it cannot revive an expired session or reset its creation time. Trusted foreground input and visible focused tab return trigger bounded renewal; passive API reads, polling, hidden tabs and timers do not. Sign-in sets the HttpOnly cookie's fixed absolute deadline; renewal never rewrites cookies. CLI/MCP access tokens and SDK project tokens retain their existing policies.
+
 The preview includes all primary dashboard and project pages, including webhooks/deliveries, tokens, members/invitations, billing/capacity, probes, weekly reports, analytics flows/funnels/journeys/artifacts, and public status settings/options/preview/publication. Public status links stay on the current loopback preview origin; selections are explicit and new checks stay private. Project/check fixtures and newly created records use valid UUIDs, preserving strict production form schemas. Mock credentials cannot authenticate with a real installation; mock checkout and provider setup links stay local. Webhook read failures leave a retryable error state, retain independently available endpoint/history data, and ignore results from an unmounted or previous project view.
 
 ### 1.12 Auth & Identity
@@ -713,7 +717,7 @@ When a collaborator is removed from a project or leaves a shared project, DebugB
 
 ### 1.17 Weekly Project Digests
 
-**FR-RPT-01:** Weekly email/Slack digest of bundles generated (by type), new incidents, resolved incidents, regressions, and top spiking incidents. The customer-facing feature is named **Weekly project digest**, distinct from the broader saved Reports feature. Email/Slack settings, actions, notices and digest email subjects use digest wording; public `weekly-report` API, CLI and MCP identifiers and saved schedules remain compatible.
+**FR-RPT-01:** Weekly email/Slack digest of bundles generated (by type), new incidents, resolved incidents, regressions, and top spiking incidents. The customer-facing feature is named **Weekly project digest**, distinct from the broader saved Reports feature. Email/Slack settings, actions, notices and digest email subjects use digest wording; public `weekly-report` API, CLI and MCP identifiers and saved schedules remain compatible. Digest summaries, count labels, spike headings and occurrence counts use singular wording for one item and plural wording for zero or multiple items in plain text and HTML, including combined project summaries. A single incident opened during the week is described as "the only incident", never "all 1".
 
 **FR-RPT-02:** Weekly report enablement is project-scoped. Project owner/admin settings must be able to enable or disable email weekly reporting for a project, configure up to 3 recipients, and choose day/hour/timezone.
 
@@ -1156,3 +1160,30 @@ safe typed next steps, an additive plan read and separate prompt qualification.
 Noise/configuration advice is required across the controls inventoried in
 [the guidance plan](smart-improvements-guidance-plan.md); behaviour and caps are in
 [the planning contract](../contracts/improvement-review-planning.md).
+
+## Referral programmes and introductory offers
+
+The approved [referral programme contract](referral-programmes.md) extends FR-BUS-04
+for new versioned programmes while preserving legacy Business-only claims.
+
+- **FR-REF-01:** Verified creators can reserve a unique normalised branded code; aliases and old generated codes remain bound to the permanent partner, including after deletion.
+- **FR-REF-02:** Programmes have immutable commercial versions and explicit lifecycle; claimed benefits and earnings survive revision, pause and end.
+- **FR-REF-03:** Validated manual entry works without cookies. Verified signup and explicit Owner claim persist exact attribution/offer across trial, session and device changes, with durable bounded signup recovery.
+- **FR-REF-04:** Public notices, signup, pricing, Billing, quote and provider discount must agree on eligible plans, first-invoice amount, tax/capacity exclusions and normal renewal.
+  Explicit activation/scheduling automatically prepares or verifies the provider
+  discount from immutable programme terms and server-selected mode. Preserve
+  existing bindings; normal operator UI requires no Stripe coupon ID.
+- **FR-REF-05:** Introductory referral/first-purchase/holiday percentage offers share one identity-level benefit. Explicit offer replacement preserves partner attribution and cannot stack benefits.
+- **FR-REF-06:** FR-BIL-10 retains its default seven-day rule. Only an audited, scoped, unexpired operator grant permits early admission; public code possession is insufficient. Preserve provider/payment reconciliation and existing hosted URL limitations.
+- **FR-REF-07:** Programme management uses the internal Analytics allowlist and email-authenticated operator gate; API/CLI/ordinary MCP share domain services and short-lived scoped delegation without gaining Analytics/payout authority.
+- **FR-REF-08:** New-programme all-paid-plan commission uses frozen rates/windows and verified cash, cumulative rounding, refund/dispute holds and immutable deltas; legacy outputs remain compatible.
+  Creator rates are configurable from 0% through 100% of eligible collected cash
+  after discounts/refunds. There is no 50% ceiling. Reject rates that would pay more
+  than that cash, preserving a non-negative retained share before fees and costs.
+- **FR-REF-09:** Public affiliate page (`/affiliates/`), footer, documentation, creator earnings examples, terms and prepared blog announcement describe the actual selected programme. Compact cards show eligible plans, rates and duration; the shared accessible terms modal retains full conditions and examples. Earnings highlights respect the eligible catalogue and commission window.
+  Signed-in discovery and accepted-agreement cards show the same policy-specific
+  summary, with exact terms in the existing app dialog. General terms and guides
+  describe programme-defined rates and scope rather than one fixed offer.
+- **FR-REF-10:** Additive migrations precede consumers; readiness verifies invariants; backfill preserves old checksums/data; rollback must understand new obligations and retained financial identity.
+- **FR-REF-11:** Verified creators can save encrypted payment preferences per permanent programme (IBAN, Wise or Revolut; USD, EUR, GBP, CAD or AUD; fixed supported countries). Joining and earning do not require setup. Ordinary reads are masked. Only separately authorised payout operators can prepare a programme payment against an exact preference revision and explicitly reveal its immutable instructions. USD accounting, partner-wide negative offsets, existing payout retries/holds and legacy payments remain compatible. Routine review starts at US$50; smaller balances remain owed and may be settled manually.
+- **FR-REF-12:** Confirm each accepted programme revision by email. Celebrate the creator's first verified qualifying paid customer once per permanent programme. Subsequent new customers' first paid purchases enter one conditional daily UTC digest per creator, sectioned by programme; quiet days, trials, visits, renewals and repeat payments create no digest activity. Keep amounts explicitly pending, recipient data private, and queue admission atomic with the corresponding enrolment/verified settlement. Replays, revisions and ambiguous mail acknowledgements cannot cause automatic duplicate sends.

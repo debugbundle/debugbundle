@@ -1,0 +1,8 @@
+{
+  "advisory": "GHSA-fc5q-39xc-vjpf",
+  "version": "4.0.7",
+  "patch_sha256": "31bf78ff07d2cba7aa1d3e8d0b746213c86f2147ca6a04394563ef7a519b15d6",
+  "files": {
+    "lib/parse.js": "f8e01fef9fcce08500d83a119ea0b3ca59b58b1de0ffd34058d4081a590431bf"
+  }
+}

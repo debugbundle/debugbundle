@@ -11,6 +11,7 @@ import { enforceRequestRateLimit, requireRateLimitedMemberAuth } from "../api-he
 import { requireOwnerBillingPrincipal } from "./billing-principal.js";
 import { recordAuditLog, resolveAuditActorType } from "../audit-logging.js";
 import { registerReferralFinanceRoutes } from "./referral-finance.js";
+import { registerPayoutPreferenceRoutes } from "./payout-preferences.js";
 
 const JoinSchema = z.object({ terms_version: z.string().min(1).max(100) }).strict();
 const AttributionSchema = z
@@ -55,6 +56,7 @@ function guarded(handler: Handler): Handler {
 /** All personal finance reads use the human identity; customer attribution uses
  * current Owner authority. Restricted project credentials remain fail closed. */
 export function registerReferralRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
+  registerPayoutPreferenceRoutes(app, dependencies);
   const audits = new WeakMap<
     FastifyRequest,
     { user_id: string; organization_id: string; action: string }
@@ -205,6 +207,16 @@ export function registerReferralRoutes(app: FastifyInstance, dependencies: ApiDe
       return;
     const manager = dependencies.referrals;
     const params = z.object({ code: ReferralCodeSchema }).safeParse(request.params);
+    if (params.success && dependencies.offers?.enabled) {
+      const preview = await dependencies.offers.preview(params.data.code).catch(() => null);
+      if (preview?.available) {
+        const cookie = await dependencies.offers
+          .visit(params.data.code, request.headers.cookie)
+          .catch(() => null);
+        if (cookie) reply.header("Set-Cookie", [...dependencies.offers.clearCookies(), cookie]);
+        return reply.redirect(dependencies.offers.publicLandingUrl);
+      }
+    }
     if (manager && params.success) {
       try {
         const result = await manager.visit(params.data.code, request.headers.cookie);

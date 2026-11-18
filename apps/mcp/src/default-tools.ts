@@ -1,3 +1,5 @@
+import { createOfferApi } from "../../../packages/referral-client/src/offer-api.js";
+import { createOfferMcpTools } from "./offer-tools.js";
 import { createNotificationApi } from "../../../packages/alert-client/src/notification-preferences.js";
 import { createNotificationMcpTools } from "./notification-tools.js";
 import { createOrganizationMcpTools } from "./organization-tools.js";
@@ -195,6 +197,7 @@ export async function createDefaultMcpTools(
       ...createTokenMcpTools(createTokenManagementApi(httpClient)),
       ...createOrganizationMcpTools(createOrganizationApi(httpClient)),
       ...createReferralMcpTools(createReferralApi(httpClient)),
+      ...createOfferMcpTools(createOfferApi(httpClient)),
       ...createReportMcpTools(createReportApi(httpClient)),
       ...createReportRunMcpTools(createReportRunApi(httpClient), { source_base_url: baseUrl }),
       ...createReportPdfMcpTools(createReportPdfApi(httpClient), { apiBaseUrl: baseUrl }),

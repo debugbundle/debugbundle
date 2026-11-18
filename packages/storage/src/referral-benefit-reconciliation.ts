@@ -1,3 +1,4 @@
+import { retireZeroBenefitRecovery } from "./referral-benefit-recovery-retirement.js";
 import type { ReferralReceiptSnapshot } from "../../referrals/src/referral-ledger-contracts.js";
 import type { ReferralBenefitRecoverySchema } from "../../referrals/src/stripe-benefit-recovery.js";
 import type { z } from "zod";
@@ -15,6 +16,7 @@ export async function reconcileReferralInvoiceBenefits(
   snapshot: ReferralReceiptSnapshot,
   livemode: boolean
 ): Promise<z.infer<typeof ReferralBenefitRecoverySchema> | null> {
+  await retireZeroBenefitRecovery(db, snapshot, "legacy");
   const context = await readReferralBenefitContext(db, snapshot.organization_external_id);
   if (!context) return null;
   if (!snapshot.benefit_invoices) throw new Error("referral_invoice_benefits_missing");

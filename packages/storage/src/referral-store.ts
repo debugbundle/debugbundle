@@ -1,3 +1,4 @@
+import { lockOfferCodeForClaim, registerLegacyOfferCode } from "./offer-code-registry.js";
 import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import {
@@ -132,7 +133,16 @@ export function createReferralStore(
             [input.user_id]
           )
         ).rows[0];
-        if (existing) return mapPartner(existing);
+        if (existing) {
+          if (
+            !(await registerLegacyOfferCode(tx, {
+              partner_id: existing.partner_id,
+              code: existing.code
+            }))
+          )
+            throw new ReferralError("program_unavailable");
+          return mapPartner(existing);
+        }
         for (let attempt = 0; attempt < 3; attempt++) {
           const row = (
             await tx.query<PartnerRow>(
@@ -151,7 +161,13 @@ export function createReferralStore(
               ]
             )
           ).rows[0];
-          if (row) return mapPartner(row);
+          if (row) {
+            if (
+              !(await registerLegacyOfferCode(tx, { partner_id: row.partner_id, code: row.code }))
+            )
+              throw new ReferralError("program_unavailable");
+            return mapPartner(row);
+          }
         }
         throw new ReferralError("program_unavailable");
       });
@@ -175,7 +191,8 @@ export function createReferralStore(
         (
           await db.query(
             `SELECT p.id FROM referral_partners p JOIN users u ON u.id=p.user_id
-        WHERE p.code=$1 AND p.status='active' AND u.email_verified_at IS NOT NULL`,
+        WHERE p.code=$1 AND p.status='active' AND u.email_verified_at IS NOT NULL
+ AND NOT EXISTS(SELECT 1 FROM offer_codes code WHERE code.code=p.code AND code.blocked)`,
             [code.data]
           )
         ).rows.length === 1
@@ -201,10 +218,12 @@ export function createReferralStore(
         const owner = await lockCustomerOwner(tx, input, true);
         if (owner.customer_id !== input.provider_customer_id_checked)
           throw new ReferralError("billing_state_changed");
+        await lockOfferCodeForClaim(tx, input.code);
         const partner = (
           await tx.query<{ id: string; user_id: string }>(
             `SELECT p.id,p.user_id FROM referral_partners p JOIN users u ON u.id=p.user_id
-          WHERE p.code=$1 AND p.status='active' AND u.email_verified_at IS NOT NULL`,
+          WHERE p.code=$1 AND p.status='active' AND u.email_verified_at IS NOT NULL
+ AND NOT EXISTS(SELECT 1 FROM offer_codes code WHERE code.code=p.code AND code.blocked)`,
             [input.code]
           )
         ).rows[0];
@@ -218,6 +237,16 @@ export function createReferralStore(
           )
         ).rows[0];
         if (current?.partner_id === partner.id) return mapAttribution(current);
+        // The versioned claim owns its attribution/discount replacement as one
+        // transaction. Legacy correction must not change just the partner row.
+        if (
+          (
+            await tx.query("SELECT id FROM offer_claims WHERE organization_external_id=$1::uuid", [
+              input.organization_id
+            ])
+          ).rows.length
+        )
+          throw new ReferralError("attribution_frozen");
         const reserved =
           current?.reserved_checkout_attempt_id != null ||
           (
@@ -277,10 +306,12 @@ export function createReferralStore(
         `SELECT a.id AS client_id,a.created_at::text,CASE
           WHEN period.attribution_id IS NULL THEN 'awaiting_purchase'
           WHEN period.status='ineligible' THEN 'ineligible'
-          WHEN (((period.first_paid_service_starts_at AT TIME ZONE 'UTC')+interval '12 months') AT TIME ZONE 'UTC')<=now() THEN 'commission_period_ended'
+          WHEN (((period.first_paid_service_starts_at AT TIME ZONE 'UTC')+make_interval(months=>COALESCE((referral_version.policy->>'commission_months')::integer,12))) AT TIME ZONE 'UTC')<=now() THEN 'commission_period_ended'
           ELSE 'commission_period_active' END AS status
         FROM referral_attributions a JOIN referral_partners p ON p.id=a.partner_id JOIN users u ON u.id=p.user_id
         LEFT JOIN referral_commission_periods period ON period.attribution_id=a.id
+        LEFT JOIN offer_claims offer_claim ON offer_claim.attribution_id=a.id
+        LEFT JOIN offer_programme_versions referral_version ON referral_version.id=offer_claim.referral_version_id
         WHERE p.user_id=$1::uuid AND u.email_verified_at IS NOT NULL AND ($3::uuid IS NULL OR (a.created_at,a.id)<(
           SELECT cursor.created_at,cursor.id FROM referral_attributions cursor WHERE cursor.id=$3::uuid AND cursor.partner_id=p.id))
         ORDER BY a.created_at DESC,a.id DESC LIMIT $2`,

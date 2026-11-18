@@ -17,6 +17,9 @@ import {
 } from "../../referrals/src/referral-ledger-contracts.js";
 import type { Queryable } from "./types.js";
 import { runInTransaction } from "./transaction.js";
+import { OfferPolicySchema } from "../../referrals/src/programme-policy.js";
+import { capturePayoutInstructions, lockPayoutPartner } from "./payout-preference-store.js";
+import { REFERRAL_FINANCIAL_HOLD_SQL, PAYOUT_PROGRAMME_JOIN_SQL } from "./referral-payout-scope.js";
 
 export interface ReferralLedgerStore {
   reconcile(input: ReferralReceiptSnapshot): Promise<{
@@ -34,6 +37,8 @@ export interface ReferralLedgerStore {
     claim_id: string;
     operator_user_id: string;
     now: string;
+    programme_id?: string;
+    preference_revision?: string;
   }): Promise<ReferralPayout>;
   markUncertain(input: {
     batch_id: string;
@@ -54,8 +59,7 @@ export interface ReferralLedgerStore {
 }
 // A newer unreconciled financial event holds positive cash. Unknown customer
 // scope conservatively holds payouts until the bounded provider lookup binds it.
-const financialHold = `NOT EXISTS(SELECT 1 FROM referral_reconciliation_events r
-  WHERE r.status='pending' AND (r.organization_external_id IS NULL OR r.organization_external_id=(SELECT a.organization_external_id FROM referral_attributions a WHERE a.id=i.attribution_id)))`;
+const financialHold = REFERRAL_FINANCIAL_HOLD_SQL;
 const payoutColumns = `id AS batch_id,partner_id,currency,amount_minor::text,status,external_reference,claimed_at::text,paid_at::text`;
 type PayoutRow = Record<string, unknown> & {
   amount_minor: string;
@@ -74,9 +78,7 @@ const PayoutActorSchema = z
   .object({ batch_id: z.uuid(), operator_user_id: z.uuid(), now: z.string().datetime() })
   .strict();
 async function lockPartner(db: Queryable, partnerId: string): Promise<void> {
-  await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
-    `referral-payout:usd:${partnerId}`
-  ]);
+  await lockPayoutPartner(db, partnerId);
 }
 function canonicalSnapshot(raw: ReferralReceiptSnapshot): ReferralReceiptSnapshot {
   const input = ReferralReceiptSnapshotSchema.parse(raw);
@@ -104,7 +106,10 @@ function canonicalSnapshot(raw: ReferralReceiptSnapshot): ReferralReceiptSnapsho
 /** Only trusted provider reconciliation writes this store. Receipts and target
  * deltas are append-only. Partner/currency locking also fences payout claims
  * against refund/dispute commits; no network work occurs under these locks. */
-export function createReferralLedgerStore(db: Queryable): ReferralLedgerStore {
+export function createReferralLedgerStore(
+  db: Queryable,
+  options: { payoutEncryptionKey?: string } = {}
+): ReferralLedgerStore {
   return {
     async reconcile(raw) {
       const input = canonicalSnapshot(raw);
@@ -162,6 +167,23 @@ export function createReferralLedgerStore(db: Queryable): ReferralLedgerStore {
         if (!attribution) return { status: "no_referral", adjustment_minor: 0 };
         if (attribution.owner_identity_hash !== input.owner_identity_hash)
           throw new Error("referral_receipt_identity_mismatch");
+        const programme = (
+          await tx.query<{ policy: unknown }>(
+            `SELECT v.policy FROM offer_claims c
+          JOIN offer_programme_versions v ON v.id=c.referral_version_id WHERE c.attribution_id=$1`,
+            [attribution.id]
+          )
+        ).rows[0];
+        const offerPolicy = programme ? OfferPolicySchema.parse(programme.policy) : null;
+        if (offerPolicy && offerPolicy.kind !== "referral")
+          throw new Error("referral_policy_unverified");
+        const commissionPolicy = offerPolicy
+          ? {
+              eligible_plans: offerPolicy.eligible_plans,
+              commission_basis_points: offerPolicy.commission_basis_points,
+              commission_months: offerPolicy.commission_months
+            }
+          : undefined;
         await tx.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
           `referral-benefit:${input.owner_identity_hash}`
         ]);
@@ -198,15 +220,14 @@ export function createReferralLedgerStore(db: Queryable): ReferralLedgerStore {
           ]
         );
         if (!inserted.rows.length) return { status: "duplicate", adjustment_minor: 0 };
-        // Capacity-only Business cash is retained in customer payment history,
-        // but cannot start or consume the first paid base-service benefit.
-        // Any earlier paid Solo/Team service remains ineligible, including a
-        // positive add-on during a zero-base bill on those paid tiers.
+        // Legacy Business-only chronology retains its original exclusions.
+        // Versioned programmes start on base service, never capacity-only cash.
         const firstService = collections.find(({ invoice }) =>
           invoice.lines.some(
             (line) =>
               line.net_amount_minor > 0 &&
-              (line.kind === "plan" || line.plan === "solo" || line.plan === "team")
+              (line.kind === "plan" ||
+                (!offerPolicy && (line.plan === "solo" || line.plan === "team")))
           )
         );
         if (!firstService) return { status: "recorded", adjustment_minor: 0 };
@@ -224,7 +245,12 @@ export function createReferralLedgerStore(db: Queryable): ReferralLedgerStore {
               [input.owner_identity_hash, attribution.id, input.organization_external_id]
             )
           ).rows[0]?.blocked === true;
-        const status = firstBase?.plan === "business" && !priorIdentity ? "eligible" : "ineligible";
+        const eligiblePlan =
+          firstBase &&
+          (offerPolicy
+            ? firstBase.plan !== "free" && offerPolicy.eligible_plans.includes(firstBase.plan)
+            : firstBase.plan === "business");
+        const status = eligiblePlan && !priorIdentity ? "eligible" : "ineligible";
         await tx.query(
           `INSERT INTO referral_commission_periods(attribution_id,first_paid_service_starts_at,first_payment_id,status)
           VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
@@ -264,14 +290,17 @@ export function createReferralLedgerStore(db: Queryable): ReferralLedgerStore {
         let adjustment = 0;
         for (const invoice of input.invoices) {
           const cash = invoice.payments.reduce((total, payment) => total + payment.cash_minor, 0);
-          const target = calculateReferralCommission({
-            first_paid_service_starts_at: new Date(
-              period.first_paid_service_starts_at
-            ).toISOString(),
-            lines: invoice.lines,
-            cash_collected_minor: cash,
-            refunds: invoice.refunds
-          });
+          const target = calculateReferralCommission(
+            {
+              first_paid_service_starts_at: new Date(
+                period.first_paid_service_starts_at
+              ).toISOString(),
+              lines: invoice.lines,
+              cash_collected_minor: cash,
+              refunds: invoice.refunds
+            },
+            commissionPolicy
+          );
           const eligibleTarget = period.status === "eligible" ? target : 0;
           const previous = old.get(invoice.invoice_id) ?? 0;
           const changed = await tx.query(
@@ -387,9 +416,15 @@ export function createReferralLedgerStore(db: Queryable): ReferralLedgerStore {
           partner_id: z.uuid(),
           claim_id: z.uuid(),
           operator_user_id: z.uuid(),
-          now: z.string().datetime()
+          now: z.string().datetime(),
+          programme_id: z.uuid().optional(),
+          preference_revision: z.uuid().optional()
         })
         .strict()
+        .refine(
+          (value) =>
+            (value.programme_id === undefined) === (value.preference_revision === undefined)
+        )
         .parse(raw);
       return runInTransaction(db, async (tx) => {
         await tx.query(
@@ -406,6 +441,19 @@ export function createReferralLedgerStore(db: Queryable): ReferralLedgerStore {
         if (previous) {
           const batch = payout(previous);
           if (batch.partner_id !== input.partner_id) throw new Error("payout_claim_conflict");
+          if (input.programme_id) {
+            const scope = (
+              await tx.query<{ programme_id: string; preference_revision: string }>(
+                "SELECT programme_id,preference_revision FROM referral_payout_instructions WHERE batch_id=$1",
+                [batch.batch_id]
+              )
+            ).rows[0];
+            if (
+              scope?.programme_id !== input.programme_id ||
+              scope.preference_revision !== input.preference_revision
+            )
+              throw new Error("payout_claim_conflict");
+          }
           return batch;
         }
         if (
@@ -420,9 +468,11 @@ export function createReferralLedgerStore(db: Queryable): ReferralLedgerStore {
         const entries = (
           await tx.query<{ id: string; amount_minor: string }>(
             `SELECT l.id,l.amount_minor::text FROM referral_commission_ledger l JOIN referral_invoice_balances i ON i.invoice_id=l.invoice_id
+          ${PAYOUT_PROGRAMME_JOIN_SQL}
           WHERE l.partner_id=$1 AND NOT EXISTS(SELECT 1 FROM referral_payout_entries e WHERE e.ledger_entry_id=l.id)
+          AND (payout_version.programme_id IS NOT DISTINCT FROM $3::uuid OR l.amount_minor<0)
           AND (l.amount_minor<0 OR (NOT i.payout_held AND ${financialHold} AND l.available_at<=$2::timestamptz)) ORDER BY l.available_at,l.id LIMIT 10001`,
-            [input.partner_id, input.now]
+            [input.partner_id, input.now, input.programme_id ?? null]
           )
         ).rows;
         if (entries.length > 10000) throw new Error("payout_claim_too_large");
@@ -436,6 +486,18 @@ export function createReferralLedgerStore(db: Queryable): ReferralLedgerStore {
             [input.claim_id, input.partner_id, amount.toString(), input.operator_user_id, input.now]
           )
         ).rows[0]!;
+        if (input.programme_id && input.preference_revision)
+          await capturePayoutInstructions(
+            tx,
+            {
+              partner_id: input.partner_id,
+              programme_id: input.programme_id,
+              preference_revision: input.preference_revision,
+              batch_id: input.claim_id,
+              now: input.now
+            },
+            options.payoutEncryptionKey
+          );
         await tx.query(
           "INSERT INTO referral_payout_entries(batch_id,ledger_entry_id) SELECT $1,unnest($2::uuid[])",
           [input.claim_id, entries.map((row) => row.id)]

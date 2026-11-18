@@ -1,3 +1,4 @@
+import { REFERRAL_PAYOUT_REDACT_FIELDS } from "../../../packages/referrals/src/payout-privacy.js";
 // @vitest-environment jsdom
 
 import { describe, expect, it, vi } from "vitest";
@@ -196,6 +197,7 @@ describe("web dogfooding", () => {
       environment: "development",
       service: "debugbundle-web",
       captureConsole: false,
+      redactFields: [...REFERRAL_PAYOUT_REDACT_FIELDS],
       breadcrumbsOnErrorOnly: false,
       tracePropagationTargets: ["http://localhost:3001/"]
     });
@@ -281,6 +283,7 @@ describe("web dogfooding", () => {
       environment: "development",
       service: "debugbundle-web",
       captureConsole: false,
+      redactFields: [...REFERRAL_PAYOUT_REDACT_FIELDS],
       breadcrumbsOnErrorOnly: false
     });
   });
@@ -387,6 +390,7 @@ describe("web dogfooding", () => {
       environment: "production",
       service: "debugbundle-web",
       captureConsole: false,
+      redactFields: [...REFERRAL_PAYOUT_REDACT_FIELDS],
       breadcrumbsOnErrorOnly: false,
       tracePropagationTargets: ["https://api.debugbundle.com/"]
     });

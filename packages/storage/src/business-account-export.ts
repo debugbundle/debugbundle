@@ -1,3 +1,8 @@
+import {
+  OFFER_ACCOUNT_EXPORT_SECTIONS,
+  isOfferExportSection,
+  readOfferAccountExport
+} from "./offer-account-export.js";
 import { createImprovementReviewStore } from "./improvement-review-store.js";
 import { createImprovementReviewSettingsStore } from "./improvement-review-settings.js";
 import { ReviewListQuerySchema } from "../../smart-improvements/src/review-contract.js";
@@ -14,6 +19,7 @@ import { SmartReportError } from "../../smart-reports/src/report-errors.js";
 import { ReportRunCursorSchema } from "../../smart-reports/src/report-run-api-contract.js";
 import type { Queryable } from "./types.js";
 export const BusinessAccountExportSectionSchema = z.enum([
+  ...OFFER_ACCOUNT_EXPORT_SECTIONS,
   "improvement_review_settings",
   "improvement_reviews",
   "report_definitions",
@@ -185,7 +191,18 @@ export function createBusinessAccountExportStore(db: Queryable): {
       const egressChecks: Array<() => Promise<boolean>> = [];
       let items: Record<string, unknown>[] = [],
         next: string | null = null;
-      if (query.section === "improvement_review_settings") {
+      if (isOfferExportSection(query.section)) {
+        const page = await readOfferAccountExport(db, {
+          section: query.section,
+          user_id: input.user_id,
+          organization_id: input.organization_id,
+          as_of: asOf,
+          after: cursor?.after ?? null,
+          limit: query.limit
+        });
+        items = page.items;
+        next = page.next;
+      } else if (query.section === "improvement_review_settings") {
         const settings = await createImprovementReviewSettingsStore(db).get(scope);
         items = [{ ...settings }];
         egressChecks.push(async () => {

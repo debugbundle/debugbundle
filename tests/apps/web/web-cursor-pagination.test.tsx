@@ -56,6 +56,18 @@ afterEach(() => {
 });
 
 describe("useCursorPagination", () => {
+  it("leaves session-expiry feedback to the session owner", async () => {
+    const showErrorToast = vi.spyOn(notify, "showErrorToast").mockImplementation(() => undefined);
+    const loadPage = vi
+      .fn()
+      .mockResolvedValueOnce({ items: ["First page item"], nextCursor: null })
+      .mockRejectedValueOnce(new Error("invalid_session"));
+    render(<PaginationHarness loadPage={loadPage} />);
+    await screen.findByText("First page item");
+    await userEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    expect(showErrorToast).not.toHaveBeenCalled();
+  });
+
   it("retains exact first-page totals across navigation and refresh instead of counting visible rows", async () => {
     const user = userEvent.setup();
     let count = 42;

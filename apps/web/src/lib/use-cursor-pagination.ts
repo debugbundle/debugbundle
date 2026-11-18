@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { showErrorToast } from "./notify.js";
+import { isInvalidSessionError } from "./api-client.js";
 
 export interface CursorPageResult<TItem> {
   items: TItem[];
@@ -178,10 +179,10 @@ export function useCursorPagination<TItem>(
         });
       }
       setHasError(false);
-    } catch {
+    } catch (error) {
       if (generation.current !== requestGeneration) return;
       setHasError(true);
-      showErrorToast("Could not refresh the current page.");
+      if (!isInvalidSessionError(error)) showErrorToast("Could not refresh the current page.");
     } finally {
       if (generation.current === requestGeneration) {
         pending.current = false;

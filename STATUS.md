@@ -1,3 +1,320 @@
+17 November signed-in programme discovery and generic terms (FR/AC-REF-09):
+creator cards now match the public summary structure using the app's shared
+Card/Dialog primitives. Exact rates, scope, duration and saved agreements stay
+dynamic; general terms/guides/draft contain no fixed commercial offer. Public
+heading breaks before “Get rewarded.”. Public/app catalogue examples share one
+canonical projection; shorter annual windows do not quote full-year earnings.
+
+42 core cases and 122 site checks pass, with genuine coverage, repository/site
+types, focused lint/format, both local builds and refreshed preview HTTP checks.
+See [the card review](spec/referral-affiliate-cards-review.md). Review locally at
+`http://localhost:5291/settings/referrals` and `http://localhost:5292/affiliates/`.
+No commit, publication, deployment, campaign or provider action occurred.
+
+17 November creator email notifications (FR/AC-REF-12), qualified locally:
+creators receive one confirmation per accepted revision and one first-paid-referral
+celebration per permanent programme. Subsequent new customers' first paid purchases
+enter a conditional daily UTC digest, grouped by programme. The owner selected
+first purchases only; renewals/repeat payments and quiet days do not trigger it.
+A final pre-send activity check also suppresses delayed digests on quiet days.
+
+The additive `202611170001_add_creator_referral_emails` migration, readiness guards,
+atomic private outbox and SES attempt fences protect enrolment/settlement and
+prevent automatic duplicate sends after uncertain acceptance. Mail rechecks the
+verified creator and carries pending figures, never payout authority. Templates
+reuse the shared layout and local email review catalogue; account export exposes
+only bounded delivery metadata. Existing payment/notification authority remains.
+
+Local evidence: 191 broad integration tests, 418 broad unit/runtime regressions,
+25 final focused email cases and 96 final runtime/projection cases pass (overlapping
+suites). All eight new runtime modules meet the 80% statements/lines/functions
+coverage floor. Types, focused lint/format, 53 rollout fixtures, final core build,
+121 site checks/export/types and the source-matched unpublished API/worker image
+pass. See [the notification review](spec/creator-referral-emails-review.md). Preview:
+`http://localhost:5291/__dev/system-emails`. No actual email, provider mutation,
+commit, publication, deployment or consumer change occurred.
+
+17 November public affiliate presentation (FR/AC-REF-09), qualified locally:
+the public marketing page is `/affiliates/`, renamed cleanly from the unpublished
+route at the owner's request. Compact responsive cards show selected earnings,
+commission/discount, eligible plans and earning duration. Full terms, payout rules,
+deadlines and price examples use the existing shared modal; joining still goes
+through account consent. Short annual commission windows display the rate rather
+than a full-year cash amount. Footer, SEO/sitemap, docs/draft and local creator
+share links agree. Account/API domain names remain Referrals.
+
+All 121 site checks and nine core mock/projection checks pass. Core/site types,
+focused mock lint/format, static export and refreshed local HTTP checks pass.
+The final generated-contract rerun passes after one parallel-run timeout; no
+contract or timeout was changed. Pre-ship review covered commercial example scope,
+modal accessibility, retained conditions, failure states and the clean route move.
+See [the presentation review](spec/referral-affiliate-cards-review.md). Local review:
+`http://localhost:5292/affiliates/`. No publication, deployment, actual payment,
+provider or other-product mutation occurred.
+
+17 November payment compatibility audit (FR/AC-REF-04), qualified locally:
+reproduced and fixed activation accepting duplicate/mismatched base prices and
+scope verification skipping retained capacity products. One shared catalogue
+module now enforces canonical prices and includes inactive historical capacity
+in scope checks while keeping it unavailable for new purchases.
+
+Final billing/referral regression: 864 tests in 101 files pass. The isolated
+offer/billing suite passes 457 tests in 55 files; actual-SDK in-memory transport
+and activation-to-checkout composition pass, including both programme kinds.
+Repository types, focused lint/format, 71 local rollout/site checks,
+CLI/MCP/dashboard rebuild and a fresh unpublished API/worker image pass. The changed
+runtime module has 100% statements/lines/functions coverage. See the
+[audit and image receipts](spec/referral-payment-audit-20261117.md).
+No payment blocker remains in this local audit. Stripe sandbox acceptance and
+controlled production rollout remain separate release gates; no provider, campaign,
+payment, production, publication or other-product mutation occurred.
+
+17 November automatic programme payment setup (FR/AC-REF-04), qualified locally:
+Activate/Schedule now prepares or verifies the once-only, base-product-scoped
+Stripe discount from immutable programme terms. Normal programme cards no longer
+ask for coupon IDs or a live-mode flag. Existing bindings and the compatible manual
+API/CLI/MCP operation remain; server catalogue mode, positive invoice checks,
+stable provider identities, bounded requests and locked revalidation fail closed.
+Trials, renewals, capacity, saved promises and ledger accounting retain their paths.
+Both referral programmes and promotions are covered, including scheduling,
+interrupted persistence, ambiguous writes and competing activations.
+
+The broad referral regression passes 397 tests in 48 files; the final response-scope
+and scheduling batch passes 24 tests in three files. All 14 changed application
+modules meet the 80% statements/lines/functions coverage floor. Repository-wide
+types, focused lint/format, final CLI/MCP/dashboard build, 116 independent site
+checks, public export and subsequent site types pass. The combined tree typecheck
+resolves the earlier in-progress programme-module errors recorded below.
+Current local review links are `http://localhost:5291/programmes` and
+`http://localhost:5292/docs/referrals/`. See the
+[review and evidence](spec/referral-automatic-payment-setup-review.md).
+No live provider call, campaign activation, payment, schema change, commit, push,
+publication, deployment or consumer-product mutation occurred. Real Stripe sandbox
+acceptance and the existing rollout gates remain separate.
+
+17 November rolling browser sessions (FR/AC-WEB-14), implemented locally on
+`feature/referral-programmes`: explicit foreground activity renews the seven-day
+idle deadline, capped at thirty days from original sign-in. Session reads and
+background polling remain read-only. Renewal requires cookie/CSRF/app Origin,
+uses the existing auth rate limit, and atomically rejects expired, revoked or
+suspended authority. Concurrent renewal cannot shorten a later deadline or undo
+logout. Email/GitHub sign-in issue the fixed absolute cookie; renewal never
+writes cookies. Legacy cookies retain their existing expiry and may need one
+more sign-in after release. Browser lifecycle responses are revision-fenced,
+including delayed error-body parsing after replacement sign-in.
+
+The policy uses existing `sessions.created_at`/`expires_at`, with no schema
+migration or backfill. Deploy API before SPA; older clients keep existing expiry
+behavior. SEC-08 records the owner-approved rationale and security tradeoff.
+Requirements, acceptance, auth architecture, interface contract, system/module
+maps, public authentication docs, OpenAPI and reference artifacts are synchronized.
+
+Local evidence: the web/auth/API/public-reference batch passed 1,292 tests in
+178 files; the final session/toast/API race batch passed 80 tests in 7 files;
+isolated PostgreSQL passed all 9 idle/absolute/revocation/concurrency tests.
+Focused lint and formatting, the final temporary dashboard build, and the
+isolated public-site tests/build/typecheck passed. Red tests demonstrated missing
+renewal, cookie ordering and delayed error-body defects before their fixes.
+Pre-ship review covered trust boundaries, listener cleanup, failure/retry behavior,
+legacy-cookie rollout and existing-schema compatibility. This is automated local
+evidence, not browser or production acceptance.
+
+The repository-wide typecheck passed before concurrent programme test additions.
+Its final rerun reports only those in-progress programme files:
+`tests/packages/referrals/offer-management.test.ts` expects the pending
+`changeState` API and `stripe-offer-provisioning.test.ts` imports the not-yet-present
+`stripe-offer-provisioning.js`. Those unrelated edits are preserved; the combined
+branch type gate must be rerun after that work lands. No commit, push, publication,
+deployment, package bump, production mutation or consumer change occurred.
+
+17 November session/update reliability follow-up (FR/AC-WEB-13), local on
+`feature/referral-programmes`: established sessions revalidate without cached
+responses on visible focus/visibility return, sharing overlapping reads. Both
+browser `invalid_session` and shared-management `invalid_member_token` 401s clear
+identity/CSRF and redirect protected routes to login with one expiry toast.
+Pagination does not duplicate that with its generic refresh error. Protected
+settings, artifact and delete adapters use the same boundary. Failed network/
+server reads retain the current session; stale session reads cannot undo logout,
+invalidation or replacement sign-in. The existing app-update toast has a stable
+identity, no timeout and no manual dismissal until Reload.
+
+Red tests reproduced the focus, auth-code mapping, duplicate refresh feedback,
+late-response and disappearing-update defects. Final Docker qualification:
+`make test-focused TEST_FILES='tests/apps/web --maxWorkers=2 --reporter=dot'`
+passed 1,119 tests across 159 files; repository typecheck, focused lint/format and
+the temporary frontend build passed. The pre-ship review checked session/CSRF
+boundaries, request races, listener cleanup and non-auth failure preservation.
+This is source/automated local evidence, not browser or production acceptance.
+Changes remain uncommitted with the programme work; no publication, deployment,
+dependency version or consumer-product change was made.
+
+17 November UI follow-up: banner/homepage links now explicitly underline only on
+hover. Creator and administrator programme cards reuse one closed-by-default
+Programme details disclosure for policies/examples and admin metadata; names,
+state and consent/action controls remain visible. No commercial, API or storage
+behaviour changed. Source/component checks and local builds are recorded in
+`spec/referral-ui-review-20261116.md`.
+Commission correction: 50% is a default, not a ceiling. Versioned programmes now
+accept 0–100% of eligible cash after discounts/refunds; paying more than that cash
+is rejected. Exact two-decimal input, shared accounting validation, public schema
+and generated references agree. Database/automation/UI/site checks, types, focused
+lint/format and local builds pass; see the UI review evidence. No activation or
+production change occurred.
+Enabled public-site buttons also share a pointer cursor, including offer details
+and theme controls, while disabled and specialised cursor states are preserved.
+Programme-details and enrolment actions now fit their content on the left; the
+Analytics programme link sits in the right-hand header action group.
+Creator Referrals now reuses the internal Tabs pattern: Programme, Earnings,
+Referred clients and Payments. Setup and payment history share Payments; hidden
+panels preserve drafts and pagination, and a changed personal identity clears
+them. Confirmed enrolment refreshes setup and balances. All 39 focused checks,
+core types, focused lint/format, candidate build and changed-file coverage passed.
+See the UI review record for local evidence and review boundaries.
+Earnings now uses the same card/centred empty-state pattern as clients and
+payments. All 25 referral checks, types, focused lint/format, candidate build and
+changed-file coverage pass for this follow-up.
+Saved payout preferences now follow Payments history; incomplete setup remains
+first. Confirmed reads drive the order, failed saves retain drafts/order, and
+keyed cards retain state. All 32 referral/payment checks, core types, focused
+lint/format and the local build pass; fresh coverage qualifies both changed files.
+
+# Creator payment preferences and persistent offer banner — local review
+
+The approved payout setup is implemented for FR/AC-REF-11: per-programme encrypted
+IBAN/Wise/Revolut details, USD/EUR/GBP/CAD/AUD, fixed countries, masked personal
+reads and frozen operator-only instructions. Routine review wording is US$50.
+Programme payout preparation preserves holds, global refund offsets and legacy
+finance. API/CLI/ordinary MCP and optional OpenClaw contracts agree; app/API
+telemetry redact payment fields. Migration `202611160002_add_referral_payout_preferences`
+precedes consumers and readiness checks its guards. The public banner remains
+visible, reuses the shared blue View details link/arrow on phones and desktop,
+and retains the existing modal close control.
+
+Qualification: 425 regression tests, 22 final-source tests, 19 signup/Billing client
+tests, 26 automation tests, 114 site tests and 53 hosted configuration tests passed.
+Core/site types, focused lint/format, builds and the changed-file coverage gate
+(124 files) passed. Local preview/source checks are not browser/device, deployment,
+provider or payment acceptance. Review [the detailed record](spec/referral-payout-preferences-review.md).
+
+One retention policy step is pending explicit owner approval: automatic review
+rejected destructive deletion of current preferences on account anonymisation.
+No deletion trigger/cascade was added. Current encrypted preferences are retained
+and lose their live user link; frozen financial instructions remain immutable.
+All code stays uncommitted on `feature/referral-programmes`; no publication,
+deployment, real key, live campaign, transfer or consumer-product change occurred.
+
+# 16 November referral programmes — ready for internal review
+
+The approved [single-phase plan](spec/referral-programmes-plan.md) is implemented
+and locally qualified on `feature/referral-programmes` in core, site and the private
+cloud source companion. Review [the guide](spec/referral-programmes-review.md) and
+[final qualification](spec/referral-programmes-qualification.md). No commit, push,
+publication, deployment, provider write, live activation or consumer change occurred.
+
+Includes immutable programmes, permanent creator/promotion/legacy codes, durable
+signup and workspace promises, signed exact-price Checkout, all-paid-plan benefit
+and commission settlement, scoped early-purchase grants, the existing Analytics
+email gate and temporary operator delegation, inventories and verified reporting.
+Customer/creator/operator UI, public notices/pricing/page/footer and the unpublished
+announcement are complete. Legacy agreements, balances and saved obligations remain.
+
+All 143 full test/coverage groups pass: 6,977 passed executions, plus a 92-case
+receipt-group refresh containing two new adapter cases. The unchanged coverage
+checker passes all 108 changed source files. Lint/types/format, core/OpenClaw builds,
+site 103 tests/152-route export/types, hosted 71 source checks and the exact-source
+local image pass. Final pre-ship and documentation reconciliation are complete.
+
+The full rehearsal found and fixed the account-table consolidation classification;
+111 project cases and actual saved-offer preservation now pass. Forward-migrated
+report export/deletion fixtures pass. A lost signup-completion acknowledgement no
+longer blocks a durable same-Owner promise when enrolment pauses; unresolved hints
+still block unconfirmed full-price purchases. The 47-case financial regression passes.
+
+New claims remain off and no programme is seeded active. Real provider sandbox,
+owner review, publication and compatible rollout/activation remain separate release
+gates; this record establishes readiness for internal review, not production launch.
+Exact source/artifact inventories are retained under `.tmp/referral-review-*`.
+
+Local public-review follow-up: `make referral-public-review` now starts a dedicated
+synthetic API/database and rebuilds the existing static preview against localhost.
+The earlier screenshot showed the expected API-failure fallback because the
+preview still called undeployed hosted offer routes. `/referrals/` now serves the
+rebuilt HTML and client chunk with the explicit local API address. The labelled
+local programme and `REVIEW20` exercise the approved 20% / 50% terms without
+activating a live programme. Four focused integration tests, types/lint/format,
+the site export and real local HTTP/CORS/cookie/authority checks pass. No browser
+rendering or provider/signup/payment acceptance is claimed. See the review guide
+and `.tmp/referral-public-review-{api,served}.json` for this later runtime receipt.
+
+Follow-up audit complete: four reproduced defects are corrected—stale URL hints,
+untyped conflict prompts, concurrent code blocking/claim admission, and discounts
+that round an eligible base invoice to zero. Final measured coverage runs pass
+317 referral tests and 73 legacy tests; source-aware reconciliation again passes
+all 108 changed files. Full types/lint, focused final style, core/automation builds,
+106 site tests/export, 71 hosted checks and the refreshed exact-source image pass.
+Actual local HTTP checks verify the rebuilt preview and synthetic offer context.
+The [audit](spec/referral-programmes-audit-20261116.md) records current identities,
+all ten acceptance areas and remaining provider/owner/rollout release gates.
+This remains ready for internal review, not production-verified or deployed.
+
+First UI follow-up: the offer notice used a compact summary, pricing link, accessible
+details disclosure and separate hide/remove controls. Eligibility and deadlines
+stay visible; failed validation shows standard-price guidance. Code-field errors
+are associated with their inputs, mobile code entry is consistent, public terms
+have readable line lengths and financial amounts align. All 109 site tests and 35
+app component tests pass, with types, focused lint/format, refreshed coverage and
+local builds. See [UI review](spec/referral-ui-review-20261116.md). Browser/owner
+acceptance and production gates remain separate; no publication occurred.
+
+Subsequent banner refinement: a blue creator-code tag and short message kept
+the strip compact, with conditions/deadlines in a shared Radix modal. Price cards
+place the original strike and inverse percentage badge below the introductory
+amount. All 111 site tests, types and export checks pass; both badge variants pass
+token-based contrast checks in both themes. SayCheese was a read-only reference.
+Latest local receipts use `.tmp/referral-modal-*`; no core behaviour or release changed.
+
+The compact/code-clearing refinement temporarily removed the desktop max-width, used
+REFERRAL/SALE tags, shows a short mobile summary and reduces the close control to
+32px with no inherited text-button padding. Copy says “your first invoice”. The
+modal keeps full codes and conditions; its removal action and technical explanation
+are gone. Clear code lives beside public/signup entry and requires confirmed server
+clearing before removing URL hints. Existing trial/return navigation is preserved.
+All 112 site tests and 71 app/auth/offer tests pass, together with core/site types,
+focused lint/format and the unchanged 108-file coverage gate. Current receipts use
+`.tmp/referral-compact-*`; both local builds pass and served preview assets match
+the rebuilt export. Source/component and local build qualification remain
+separate from browser/owner and production acceptance.
+
+The subsequent owner correction restores the home/marketing container and aligns
+the banner with the docs/blog navigation widths and gutters. The root notice stays
+mounted across navigation. Public code entry is now a plain native
+disclosure, closed by default, instead of a persistent card. All 113 site tests
+and the site typecheck pass; current site-only receipts use `.tmp/referral-alignment-*`.
+The local export/rebuild passes and served assets match on all five page families.
+Offer details and the existing agent-prompt modal now share `SiteDialog` instead
+of separate Radix shells. Header/footer spacing and the circular end-aligned close
+control follow the prompt reference; each retains its content, actions and sizing.
+All 114 site tests, types, formatting and export checks pass; the rebuilt preview
+serves the shared shell on offer and prompt routes (`.tmp/referral-shared-dialog-*`).
+Pricing code entry now sits beside the “Compare every plan” heading, closed by
+default and anchored right. The billing selector is restored to its original
+centred position above the plan cards. Expanding code entry affects only the
+comparison section; code-action labels remain on one line while the input flexes.
+Current receipt prefix: `.tmp/referral-comparison-code-*`. Earlier pricing-control
+placement receipts remain historical.
+
+The private UI preview is running on loopback port 5291. Missing simulator
+handlers for v2 offers, internal analytics and legacy referral reads caused the
+reported loading failures; development-only in-memory handlers now cover campaign
+draft/revision/lifecycle forms, codes and empty analytics/history views. Production
+services, allowlists and provider validation are unchanged. Internal Analytics and
+Programmes titles live in the top header, the pages link in both directions and
+Create programme sits opposite the tabs. All 146 local preview/offer/UI tests,
+core types, focused lint/format and candidate build pass. Local HTTP checks verify
+15 JSON endpoints, four app routes and foreign-origin denial. Receipts use
+`.tmp/referral-app-preview-*`; this is simulator UI qualification, separate from
+the real-route public fixture, authentication/provider acceptance and deployment.
+
 # 15 November SDK safety release — published and production verified
 
 All 13 maintained SDK/plugin capture surfaces are released and verified. Core
@@ -2251,3 +2568,38 @@ the actual registry crate. Public docs now identify stable Rust after PHP. Share
 types 3.7.0 publication passes (`43583438840`); independent clients/core/site
 promotion and production acceptance remain pending. Go/.NET hook follow-up and
 external discovery limitations remain open; no consumer product is changed.
+# 17 November coordinated affiliate release — in progress
+
+The owner authorises committing all pending DebugBundle work across core/site/cloud,
+including browser-session fixes and the reviewed affiliate article, merging main
+branches and executing normal releases. Planned versions and rollout gates are in
+[the release record](spec/referral-release-20261117.md). Fresh source, package,
+database and hosted-source qualification is running before publication. This
+heading supersedes earlier local-only status for this authorised release; those
+historical test records retain their original evidence scope.
+
+Checkpoint: core commit `b34e7ec8` and site `79e2a11` are pushed for PRs #18 and
+#7. Cloud PR #5 is merged at `3f34113`. CLI and MCP 1.26.0 publication workflows
+44181480908 / 44181485357 pass, including actual registry installs and native
+Codex; CLI compatibility 44181412639 also passes. No hosted deployment occurred.
+
+Fresh full lint, core types/format/build, site tests and 71 cloud source checks
+pass. The broader DB run passed 158 cases; its two reproduced fixture issues
+were corrected and both owning files pass all 24 cases. The 491-case focused
+unit run had only stale generated release metadata; regeneration and all four
+projection tests pass. Both minimum and current OpenClaw 2026.11.5 installed
+plugin checks pass.
+
+The owner explicitly approved the targeted picomatch patch/lockfiles and payout
+key setup after automatic review requested separate consent. Both dependency
+installations are complete, the strict root audit and regression pass, and only
+picomatch package identities change in the locks. The dedicated payout-encryption
+GitHub secret is configured with a protected recovery copy; the existing referral
+secret is preserved. Core/site CI will rerun on the qualified security commit.
+
+MCP ecosystem follow-through reached the official Registry but its saved JWT is
+expired (401); no ecosystem publisher succeeded. Restore the existing DNS
+publisher authentication before retrying supported targets. Smithery remains
+excluded as retired. Gemini native checks need rerun now that MCP is published.
+Continue from `.tmp/release-20261117/HANDOFF.md`; main core/site merges, canonical
+releases, reader bridge, capability enablement and production verification remain.

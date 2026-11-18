@@ -1,3 +1,4 @@
+import { pruneOfferTransientState } from "./offer-transient-retention.js";
 import { createReportHealthStore } from "./report-health-store.js";
 import { createReportLifecycleStore } from "./report-lifecycle-store.js";
 import { createReportSourceTextStore } from "./report-source-text-store.js";
@@ -111,6 +112,7 @@ export function createPostgresRetentionStore(db: Queryable): RetentionStore {
   const reportAvailability = createReportAvailabilityStore(db);
   return {
     ...createEvidenceContextRetentionStore(db),
+    pruneOfferTransientState: (input) => pruneOfferTransientState(db, input),
     pruneExpiredReportLifecycleFacts: (input) => reportFacts.prune(input),
     pruneExpiredReportSourceText: (input) => reportText.prune(input),
     pruneExpiredReportAvailability: async (input) => {
@@ -553,7 +555,8 @@ export function createRetentionCleanupService(input: {
       for (const method of [
         "pruneExpiredReportLifecycleFacts",
         "pruneExpiredReportAvailability",
-        "pruneExpiredReportSourceText"
+        "pruneExpiredReportSourceText",
+        "pruneOfferTransientState"
       ] as const) {
         if (input.retentionStore[method] === undefined) continue;
         let hasMore = false;

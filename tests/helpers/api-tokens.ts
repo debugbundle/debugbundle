@@ -36,6 +36,9 @@ export function createTokenApiServer(
     tokenManagement?: TokenManagementDependency;
     organizationManagement?: ApiServerDependencies["organizationManagement"];
     referrals?: ApiServerDependencies["referrals"];
+    offers?: ApiServerDependencies["offers"];
+    payoutPreferences?: ApiServerDependencies["payoutPreferences"];
+    billingManagement?: ApiServerDependencies["billingManagement"];
     reportDefinitions?: ApiServerDependencies["reportDefinitions"];
     reportAllowance?: ApiServerDependencies["reportAllowance"];
     reportRuns?: ApiServerDependencies["reportRuns"];
@@ -53,6 +56,9 @@ export function createTokenApiServer(
   } = {}
 ): ReturnType<typeof createApiServer> {
   return createApiServer({
+    ...(overrides.billingManagement === undefined
+      ? {}
+      : { billingManagement: overrides.billingManagement }),
     ...(overrides.accountManagement === undefined
       ? {}
       : { accountManagement: overrides.accountManagement }),
@@ -73,6 +79,10 @@ export function createTokenApiServer(
       ? {}
       : { reportDefinitions: overrides.reportDefinitions }),
     ...(overrides.referrals === undefined ? {} : { referrals: overrides.referrals }),
+    ...(overrides.offers === undefined ? {} : { offers: overrides.offers }),
+    ...(overrides.payoutPreferences === undefined
+      ? {}
+      : { payoutPreferences: overrides.payoutPreferences }),
     ...(overrides.organizationManagement === undefined
       ? {}
       : { organizationManagement: overrides.organizationManagement }),

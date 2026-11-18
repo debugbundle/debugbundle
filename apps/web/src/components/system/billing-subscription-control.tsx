@@ -1,3 +1,12 @@
+import {
+  basisPointAmount,
+  LEGACY_REFERRAL_DISCOUNT_BASIS_POINTS
+} from "../../../../../packages/referrals/src/programme-policy.js";
+import type { OfferClaim } from "../../../../../packages/referrals/src/programme-policy.js";
+import { OfferApiError } from "../../../../../packages/referral-client/src/offer-api.js";
+import type { OfferPurchaseQuote } from "../../../../../packages/referrals/src/offer-quote.js";
+import { offerApi, offerErrorMessage } from "../../lib/offer-api.js";
+import { OfferPriceSummary } from "./offer-price-summary.js";
 import { MetadataSeparator } from "./metadata-separator.js";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -48,6 +57,10 @@ import {
 
 interface Props {
   billing: BillingSummaryRecord;
+  offerClaim?: OfferClaim | null;
+  earlyPurchaseAllowed?: boolean;
+  offerReady?: boolean;
+  legacyDiscountEligible?: boolean;
   requestedPlan?: {
     plan: PaidTierName;
     interval?: BillingOfferSelection["interval"];
@@ -73,6 +86,7 @@ export function BillingSubscriptionControl(props: Props): JSX.Element {
   });
   const [intervalTouched, setIntervalTouched] = useState(false);
   const [quote, setQuote] = useState<BillingOfferQuote | null>(null);
+  const [introQuote, setIntroQuote] = useState<OfferPurchaseQuote | null>(null);
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attemptConfirmed, setAttemptConfirmed] = useState(false);
@@ -138,6 +152,7 @@ export function BillingSubscriptionControl(props: Props): JSX.Element {
       attemptSource.current = null;
       setAttemptConfirmed(false);
       setQuote(null);
+      setIntroQuote(null);
       setPaymentUrl(null);
       setError(null);
     }
@@ -156,6 +171,7 @@ export function BillingSubscriptionControl(props: Props): JSX.Element {
       });
       setIntervalTouched(interval !== undefined);
       setQuote(null);
+      setIntroQuote(null);
       setPaymentUrl(null);
       setError(null);
       setAttemptConfirmed(false);
@@ -172,10 +188,21 @@ export function BillingSubscriptionControl(props: Props): JSX.Element {
   }, [props.requestedPlan, openForPlan]);
   const pending = status?.pending_change ?? null;
   const action = paid && subscription ? classifyBillingOfferChange(subscription, selection) : null;
+  const activeIntroOffer =
+    props.offerClaim && ["saved", "reserved"].includes(props.offerClaim.status)
+      ? props.offerClaim
+      : null;
+  const usesIntroOffer = activeIntroOffer !== null || (attemptConfirmed && introQuote !== null);
   const purchaseAllowed =
     !paid &&
-    getBillingFirstPurchaseEligibility(billing).allowed &&
+    props.offerReady !== false &&
+    (attemptConfirmed ||
+      getBillingFirstPurchaseEligibility(billing).allowed ||
+      props.earlyPurchaseAllowed === true) &&
     canCheckoutToBillingPlan(billing, selection.target_plan);
+  useEffect(() => {
+    if (!attemptConfirmed) setIntroQuote(null);
+  }, [props.offerClaim?.claim_id, props.offerClaim?.version.version_id, attemptConfirmed]);
   const busy = phase !== null;
   const blocked =
     busy ||
@@ -183,6 +210,25 @@ export function BillingSubscriptionControl(props: Props): JSX.Element {
   const fieldsLocked = blocked || paymentUrl !== null || attemptConfirmed;
   const price = getBillingCatalogPrice(selection.target_plan, selection.interval, "plan");
   const intervalWord = selection.interval === "year" ? "year" : "month";
+  const legacyQuote =
+    !paid &&
+    !activeIntroOffer &&
+    props.legacyDiscountEligible === true &&
+    selection.target_plan === "business"
+      ? {
+          interval: selection.interval,
+          base_minor: price.amount_minor,
+          discount_minor: basisPointAmount(
+            price.amount_minor,
+            LEGACY_REFERRAL_DISCOUNT_BASIS_POINTS
+          ),
+          capacity_minor: 0,
+          initial_total_minor:
+            price.amount_minor -
+            basisPointAmount(price.amount_minor, LEGACY_REFERRAL_DISCOUNT_BASIS_POINTS),
+          renewal_total_minor: price.amount_minor
+        }
+      : null;
   const close = (): void => {
     if (inFlight.current) return;
     dialogVersion.current += 1;
@@ -234,15 +280,42 @@ export function BillingSubscriptionControl(props: Props): JSX.Element {
     setPhase("checkout");
     setError(null);
     try {
+      if (
+        usesIntroOffer &&
+        (!introQuote || (!attemptConfirmed && Date.parse(introQuote.expires_at) <= Date.now()))
+      ) {
+        const result = await offerApi.execute("quote", selection);
+        if (alive(version)) setIntroQuote(result.quote);
+        return;
+      }
       props.onBeforeCheckout?.(selection.target_plan);
       attemptSource.current = billingSource;
       setAttemptConfirmed(true);
-      const url = await startBillingOfferCheckout(selection);
+      const url =
+        usesIntroOffer && introQuote
+          ? (
+              await offerApi.execute("checkout", {
+                confirmation_token: introQuote.confirmation_token
+              })
+            ).url
+          : await startBillingOfferCheckout(selection);
       if (alive(version)) props.onNavigate(url);
-    } catch {
+    } catch (reason) {
+      if (
+        alive(version) &&
+        reason instanceof OfferApiError &&
+        reason.code === "offer_confirmation_required"
+      ) {
+        // The server rejects this before admitting a new attempt. Uncertain
+        // transport/provider failures retain their immutable confirmation.
+        setAttemptConfirmed(false);
+        setIntroQuote(null);
+      }
       if (alive(version))
         setError(
-          "Checkout could not be confirmed. Retry the same selected offer to reconcile the original request."
+          usesIntroOffer
+            ? offerErrorMessage(reason)
+            : "Checkout could not be confirmed. Retry the same selected offer to reconcile the original request."
         );
     } finally {
       inFlight.current = false;
@@ -438,6 +511,7 @@ export function BillingSubscriptionControl(props: Props): JSX.Element {
                       if (isPaidTier(value)) {
                         setSelection((previous) => ({ ...previous, target_plan: value }));
                         setQuote(null);
+                        setIntroQuote(null);
                         setError(null);
                       }
                     }}
@@ -466,6 +540,7 @@ export function BillingSubscriptionControl(props: Props): JSX.Element {
                         setIntervalTouched(true);
                         setSelection((previous) => ({ ...previous, interval: value }));
                         setQuote(null);
+                        setIntroQuote(null);
                         setError(null);
                       }
                     }}
@@ -510,6 +585,11 @@ export function BillingSubscriptionControl(props: Props): JSX.Element {
                 </div>
               ) : null}
               {quote ? <BillingOfferSummary quote={quote} currentPlan={billing.plan} /> : null}
+              {introQuote ? (
+                <OfferPriceSummary quote={introQuote} />
+              ) : legacyQuote ? (
+                <OfferPriceSummary quote={legacyQuote} />
+              ) : null}
               {paymentUrl ? (
                 <>
                   <p>
@@ -548,11 +628,15 @@ export function BillingSubscriptionControl(props: Props): JSX.Element {
             ) : (
               <PendingButton
                 pending={phase === "checkout"}
-                pendingLabel="Opening checkout…"
+                pendingLabel={
+                  activeIntroOffer && !introQuote ? "Preparing offer…" : "Opening checkout…"
+                }
                 disabled={busy || !purchaseAllowed}
                 onClick={() => void checkout()}
               >
-                Continue to Stripe
+                {activeIntroOffer && !introQuote
+                  ? "Review introductory price"
+                  : "Continue to Stripe"}
               </PendingButton>
             )}
           </DialogFooter>

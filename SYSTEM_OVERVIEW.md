@@ -1,3 +1,93 @@
+Creator payout preferences are prepared locally for FR/AC-REF-11. Verified creators
+save per-programme IBAN/Wise/Revolut setup in five currencies. Dedicated encrypted
+storage and immutable manual-payment instructions require forward migration
+`202611160002_add_referral_payout_preferences` and optional
+`REFERRAL_PAYOUT_ENCRYPTION_KEY`. Personal reads are masked; only the separate
+billing payout allowlist can reveal frozen instructions. Programme preparation
+preserves partner-wide negative offsets, holds and idempotent legacy finance.
+Routine review wording is US$50. No transfers, provider setup or deployment occur.
+Current encrypted preferences remain retained after account unlinking; destructive
+cleanup is pending explicit approval. See `spec/referral-payout-preferences-plan.md`.
+Public offer banners stay visible with a shared blue View details link and arrow;
+the shared modal retains its close control on all screen sizes. The banner
+and homepage share hover-only link underlines. Admin programme conditions/examples
+sit in closed-by-default disclosures. Creator discovery and accepted-agreement
+cards show their selected commercial summary with full terms in the app dialog;
+enrolment and operator actions remain visible.
+The public affiliate page is `/affiliates/`, with compact responsive programme
+cards and full conditions/examples in the shared terms modal. Earnings highlights
+come from the eligible catalogue and frozen policy; short annual commission
+windows show the rate instead of quoting full-year earnings. This replaces the
+unpublished `/referrals/` marketing route; account settings and API names stay Referrals.
+Both frontends use the canonical programme example projection. General terms and
+guides describe configurable rates and scope; each programme shows its exact values.
+Creator Referrals uses the existing internal tab pattern: Programme (code and
+agreement), Earnings, Referred clients and Payments (setup and history). Hidden
+panels preserve drafts and pagination; changing the signed-in person clears them.
+Saved payout preferences follow payment history; incomplete setup remains first.
+Creator programme email updates are implemented locally for FR/AC-REF-12: one
+confirmation per accepted revision, one first-paid-referral celebration per
+permanent programme, and conditional daily UTC summaries for subsequent new paying
+customers. Renewals/trials/visits do not trigger activity. The additive
+`202611170001_add_creator_referral_emails` migration and readiness checks precede
+the new API/worker. An atomic private outbox, verified personal recipient checks
+and acknowledged SES send fences avoid automatic duplicates under uncertain
+delivery. Notifications carry pending figures and never authorise a payout.
+
+Referral programmes are implemented and locally qualified on `feature/referral-programmes`
+in core and site, with a matching cloud source branch for `/r/<code>` routing.
+The approved contract is [spec/referral-programmes.md](spec/referral-programmes.md)
+and the full delivery plan is [spec/referral-programmes-plan.md](spec/referral-programmes-plan.md).
+New claims default off (`REFERRAL_PROGRAMMES_ENABLED=false`). Immutable programme
+versions, permanent creator aliases, durable signup intents/claims, signed checkout
+quotes and narrowly delegated operator control extend the existing financial lane.
+Explicit programme activation/scheduling prepares its Stripe discount automatically,
+using server-verified catalogue mode and immutable coupon identity. Catalogue
+verification checks advertised prices; duplicate eligible prices or retained
+capacity products sharing a discounted base product fail verification. The normal UI
+has no coupon-ID/mode fields. Existing bindings and manual automation stay compatible.
+Existing Business-only agreements and earned obligations remain protected.
+Versioned commissions accept the operator's selected 0–100% share of eligible
+collected cash after discounts/refunds; 50% remains an initial default, not a cap.
+The full-cash boundary prevents a negative retained share before fees/costs.
+Internal-review qualification is complete; this is not production acceptance or activation.
+Operator inventories use bounded support projections. `offer-performance.ts` and
+`offer-performance-store.ts` derive cohort reporting from verified receipt cash
+and the existing ledger; coverage and holds are explicit. The receipt worker
+updates that projection only in its lease-fenced final transaction. Hosted source
+checks `referral-offers-v1` candidate and rollback reader capability even after
+new claims are disabled. Creator reads report actual new-referral availability,
+including blocked codes and superseded agreements.
+The additive migration creates twelve tables, including immutable zero-invoice
+recovery-retirement evidence. Shared SQL-only retirement verifies the exact
+provider/customer/subscription/identity and absence of ever-collected base cash;
+it clears only obsolete draft repair, preserving Checkout and the unused benefit.
+Legacy signup hints and bounded recovery remain available with new programmes off.
+The project-consolidation inventory classifies all programme tables as unchanged
+account data; real merge tests preserve accepted terms, aliases and claims exactly.
+Checkout prioritises the same Owner's durable claim/attribution over a pending
+signup acknowledgement; an unresolved hint alone still blocks a full-price purchase.
+Public-page review uses `make referral-public-review`: the static preview is
+rebuilt against a loopback-only API running real public offer routes and a
+dedicated synthetic tmpfs database. `REVIEW20` and the labelled local programme
+have no live provider, account or payment authority. Ordinary site builds retain
+the hosted API default; see `spec/referral-programmes-review.md`.
+The private app preview runs separately on 5291 with local in-memory programme,
+referral-history and empty internal-analytics fixtures. It is a UI simulator;
+its edits do not populate the public fixture or validate real provider/auth flows.
+The internal pages use top-header titles and reciprocal navigation.
+The follow-up audit serialises operator code blocks with both claim paths,
+consumes public URL hints after successful selection/removal, distinguishes
+replacement conflicts from invalid codes, and rejects activation of discounts
+that round an eligible base invoice to zero. See `spec/referral-programmes-audit-20261116.md`.
+The public banner follows the site/docs/blog navigation widths with a compact
+REFERRAL/SALE tag and details modal. Public code entry is a closed disclosure.
+Offer details and agent prompts share the same Radix dialog frame, header/footer
+spacing and circular close control. Prompt content retains its wider top-positioned
+layout and copy/docs actions; offer details retain the compact centred layout.
+Code clearing lives beside public/signup code entry; successful clearing also
+consumes the signup URL hint without changing saved workspace benefits or trial intent.
+
 SDK safety release acceptance is complete across all 13 capture surfaces. Core 1.27.2 and site 1.10.4 are live; Python 3.0.0 deliberately changes optional diagnostic callback timing and ships migration guidance. Other SDK corrections use patch releases. Exact artifacts, full CI, preserved configuration/data, live bytes and rollback acceptance are recorded in `spec/sdk-safety-release-20261115.md`. The deep audit closes console Promise forwarding, Swift credential-shaped diagnostic codes, WordPress nonce privacy and Rust unvalidated optional reduction.
 
 SDK internal diagnostics are optional local output with no hidden reporting channel. Node scopes callback recapture suppression; Browser contains its existing local console warnings; Python dispatches diagnostics on one bounded lane outside SDK locks; Go stores fixed codes, Swift safe ACK codes and WordPress sanitised best-effort status transients. See `spec/sdks/internal-diagnostics-audit.md` for remediation and release qualification.
@@ -797,11 +887,24 @@ packages/
       lib/api-artifacts.ts   — Incident and improvement list clients, detail reads, lifecycle actions, and artifact reads behind the unchanged `lib/api.ts` exports
       lib/use-cursor-pagination.ts — First-page total-page snapshot shared by cursor-backed lists; the presentation control lives in `components/system/cursor-pagination-controls.tsx`
       lib/slack-api.ts       — Browser Slack connect/install-url helper plus reusable destination listing for the alerts UI
-      lib/session.tsx        — Session bootstrap, refresh, and context state
+      lib/session.tsx        — Session bootstrap, coalesced visible-focus/visibility revalidation, refresh, and context state; api-client.ts owns cookie-auth invalidation and revision-fenced identity/CSRF memory
       lib/theme.tsx          — Light/dark/system theme state and DOM synchronization
       components/ui/         — shadcn-based UI primitives used across the app
       pages/settings-page.tsx — Account settings page with auth-method-aware password management, explicit Gravatar import, account export, and destructive account deletion controls gated by an exact confirmation phrase plus email OTP
       components/system/     — App shell, page headers, callout cards, shared wrapping title/badge rows, theme toggle, reusable user-avatar primitive, reusable plaintext secret reveal, and billing display primitives
+
+Browser session loss returns protected routes to login with one expiry toast;
+unavailable reads retain the current session. Shared browser adapters recognize
+both session and member-auth rejection codes without changing API/CLI/MCP auth.
+The app-update notifier keeps its existing Reload toast until reload with no
+timeout or manual dismissal. Foreground session activity renews the seven-day idle
+deadline within a fixed thirty-day limit; reads/polling never renew. The auth
+policy lives in `packages/auth/src/browser-session-policy.ts`, atomic renewal in
+`packages/storage/src/auth-session-store.ts`, and its cookie/CSRF/Origin route in
+`apps/api/src/routes/auth-session-renewal.ts`. `lib/session-activity.ts` supplies
+throttled foreground events without keepalive timers. Sign-in issues the fixed
+absolute cookie; renewal never writes cookies. Existing columns suffice, with
+no migration/backfill. See FR/AC-WEB-13/14; these are local release candidates.
 
 packages/
   storage/       — Storage adapters and domain persistence

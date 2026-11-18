@@ -1,3 +1,4 @@
+import { handleOfferCommand, type offersWithAuthCommand } from "./offer-commands.js";
 import {
   handleImprovementReviewCommand,
   type improvementReviewsWithAuthCommand
@@ -97,6 +98,7 @@ export type CliDependencies = ManagementCommandDependencies &
     notificationCommand?: typeof notificationWithAuthCommand;
     organizationCommand?: typeof organizationWithAuthCommand;
     referralsCommand?: typeof referralsWithAuthCommand;
+    offersCommand?: typeof offersWithAuthCommand;
     improvementReviewsCommand?: typeof improvementReviewsWithAuthCommand;
     reportsCommand?: typeof reportsWithAuthCommand;
     reportRunsCommand?: typeof reportRunsWithAuthCommand;
@@ -835,6 +837,9 @@ export async function runCli(
 
     if (command === "organization")
       return await handleOrganizationCommand(parsedArgv, dependencies.organizationCommand);
+
+    if (command === "offers")
+      return await handleOfferCommand(parsedArgv, dependencies.offersCommand);
 
     if (command === "referrals")
       return await handleReferralCommand(parsedArgv, dependencies.referralsCommand);

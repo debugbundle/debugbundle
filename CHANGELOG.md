@@ -6,6 +6,24 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.28.0] - 2026-11-17
+
+- Bound vulnerable repeated-extglob patterns in the core/site build dependency,
+  with exact installed-file verification and timeout-based audit regressions.
+- Add configurable affiliate programmes and promotions, branded creator codes,
+  trial-safe saved discounts and all-plan commission accounting through API, CLI,
+  standard MCP and the dashboard. Preserve existing Business referral agreements.
+- Add encrypted per-programme payout preferences and manually reviewed payout
+  preparation, plus enrolment, first-purchase and conditional daily creator emails.
+- Add compact creator/admin programme views, offer pricing, an affiliate page and
+  introduction article with programme-specific commercial terms.
+- Renew active browser sessions within the bounded session policy, preserve
+  sign-in return paths, prevent stale session requests from restoring signed-out
+  state and improve session-expiry and app-update notifications.
+- Ship ordered additive migrations for programmes, payout preferences and creator
+  email delivery. Hosted activation requires compatible candidate and rollback
+  readers; SDK and existing public client contracts remain compatible.
+
 ## [1.27.2] - 2026-11-15
 
 - Adopt the corrected Node/Browser 3.2.4 SDKs in DebugBundle's hosted runtime

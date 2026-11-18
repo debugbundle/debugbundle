@@ -1,3 +1,4 @@
+import { hasVerifiedOperatorEmailAuth } from "../offer-operator-auth.js";
 import type { FastifyInstance, FastifyReply } from "fastify";
 
 import { SESSION_COOKIE_NAME, readCookieValue } from "../../../../packages/auth/src/index.js";
@@ -17,7 +18,10 @@ function sendNotFound(reply: FastifyReply): FastifyReply {
   return reply.status(404).send(NOT_FOUND_RESPONSE);
 }
 
-export function registerAdminAnalyticsRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
+export function registerAdminAnalyticsRoutes(
+  app: FastifyInstance,
+  dependencies: ApiDependencies
+): void {
   app.get("/v1/admin/analytics/access-status", async (request, reply) => {
     if (request.headers.authorization !== undefined || dependencies.webAuth === undefined) {
       return sendNotFound(reply);
@@ -39,7 +43,7 @@ export function registerAdminAnalyticsRoutes(app: FastifyInstance, dependencies:
 
     applyNoStore(reply);
 
-    if (session.email_verified_at === null || session.session_auth_method !== "email_code") {
+    if (!hasVerifiedOperatorEmailAuth(session)) {
       return reply.status(200).send(ACCESS_STATUS_EMAIL_AUTH_REQUIRED_RESPONSE);
     }
 
@@ -82,7 +86,7 @@ export function registerAdminAnalyticsRoutes(app: FastifyInstance, dependencies:
       return sendNotFound(reply);
     }
 
-    if (session.email_verified_at === null || session.session_auth_method !== "email_code") {
+    if (!hasVerifiedOperatorEmailAuth(session)) {
       await recordAuditLog(dependencies.auditLogging, {
         organization_id: session.organization_id,
         actor_user_id: session.user_id,
@@ -179,7 +183,7 @@ export function registerAdminAnalyticsRoutes(app: FastifyInstance, dependencies:
       return sendNotFound(reply);
     }
 
-    if (session.email_verified_at === null || session.session_auth_method !== "email_code") {
+    if (!hasVerifiedOperatorEmailAuth(session)) {
       await recordAuditLog(dependencies.auditLogging, {
         organization_id: session.organization_id,
         actor_user_id: session.user_id,

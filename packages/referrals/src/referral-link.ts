@@ -22,11 +22,41 @@ export interface ReferralLinkCodec {
 export function createReferralLinkCodec(
   secret: string,
   options: { secure?: boolean } = {}
-): ReferralLinkCodec {
+): ReferralLinkCodec & {
+  readHint(header: string | undefined, now?: number): { code: string; expires_at: number } | null;
+} {
   z.string().min(32).max(4096).parse(secret);
   const attributes = `Path=/; HttpOnly; SameSite=Lax${options.secure === false ? "" : "; Secure"}`;
   const sign = (body: string): Buffer =>
     createHmac("sha256", secret).update(`referral-link:v1:${body}`).digest();
+  const readHint = (
+    header: string | undefined,
+    now = Date.now()
+  ): { code: string; expires_at: number } | null => {
+    try {
+      const token = readCookieValue(header, REFERRAL_COOKIE_NAME);
+      if (!token || token.length > 1024) return null;
+      const parts = token.split(".");
+      if (parts.length !== 2 || !parts[0] || !parts[1] || !/^[A-Za-z0-9_-]+$/.test(parts[1]))
+        return null;
+      const signature = Buffer.from(parts[1], "base64url"),
+        expected = sign(parts[0]);
+      if (signature.length !== expected.length || !timingSafeEqual(signature, expected))
+        return null;
+      const payload = PayloadSchema.safeParse(
+        JSON.parse(Buffer.from(parts[0], "base64url").toString("utf8"))
+      );
+      if (
+        !payload.success ||
+        payload.data.expires_at <= now ||
+        payload.data.expires_at > now + seconds * 1000
+      )
+        return null;
+      return { code: payload.data.code, expires_at: payload.data.expires_at };
+    } catch {
+      return null;
+    }
+  };
   return {
     issue(raw, now = Date.now()) {
       const code = ReferralCodeSchema.parse(raw);
@@ -35,31 +65,8 @@ export function createReferralLinkCodec(
       ).toString("base64url");
       return `${REFERRAL_COOKIE_NAME}=${body}.${sign(body).toString("base64url")}; ${attributes}; Max-Age=${seconds}`;
     },
-    read(header, now = Date.now()) {
-      try {
-        const token = readCookieValue(header, REFERRAL_COOKIE_NAME);
-        if (!token || token.length > 1024) return null;
-        const parts = token.split(".");
-        if (parts.length !== 2 || !parts[0] || !parts[1] || !/^[A-Za-z0-9_-]+$/.test(parts[1]))
-          return null;
-        const signature = Buffer.from(parts[1], "base64url"),
-          expected = sign(parts[0]);
-        if (signature.length !== expected.length || !timingSafeEqual(signature, expected))
-          return null;
-        const payload = PayloadSchema.safeParse(
-          JSON.parse(Buffer.from(parts[0], "base64url").toString("utf8"))
-        );
-        if (
-          !payload.success ||
-          payload.data.expires_at <= now ||
-          payload.data.expires_at > now + seconds * 1000
-        )
-          return null;
-        return payload.data.code;
-      } catch {
-        return null;
-      }
-    },
+    read: (header, now) => readHint(header, now)?.code ?? null,
+    readHint,
     clear() {
       return `${REFERRAL_COOKIE_NAME}=; ${attributes}; Max-Age=0`;
     }

@@ -111,7 +111,7 @@ export interface ApiDependencies extends ApiAnalyticsDependencies, ApiManagement
   agentReads?: OpenAiHostedReadDependencies;
   agentDashboardBaseUrl?: string;
   webAuth?:
-    | Pick<
+    | (Pick<
         WebSessionAuthService,
         | "requestEmailCode"
         | "verifyEmailCode"
@@ -120,7 +120,8 @@ export interface ApiDependencies extends ApiAnalyticsDependencies, ApiManagement
         | "acceptInviteForSession"
         | "resolveSessionByToken"
         | "revokeSessionByToken"
-      >
+      > &
+        Partial<Pick<WebSessionAuthService, "renewSessionByToken">>)
     | undefined;
   githubCliAuth?:
     | Pick<
@@ -134,6 +135,8 @@ export interface ApiDependencies extends ApiAnalyticsDependencies, ApiManagement
   inviteEmails?: Pick<AuthEmailSender, "sendProjectInviteEmail">;
   organizationManagement?: OrganizationManagementStore;
   referrals?: ReferralManagement;
+  payoutPreferences?: import("../../../packages/referrals/src/payout-management.js").PayoutManagement;
+  offers?: import("../../../packages/referrals/src/offer-management.js").OfferManagement;
   reportDefinitions?: ReportDefinitionStore;
   improvementReviewsEnabled?: boolean;
   improvementReviews?: {
