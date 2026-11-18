@@ -34,7 +34,10 @@ documented contract; automatic destructive cleanup still requires separate appro
 ClawHub's exact skill/plugin versions pass final security review and normal
 installation. External search is 6/7 (incident response rank 17); the owner's
 18 November policy accepts at least five of seven queries in the top 10. This
-release is accepted, and all individual ranks remain recorded. Historical
+release's 03:50 UTC six-query snapshot is accepted, and all individual ranks remain
+recorded. A later 06:51 UTC lookup returned only three qualifying searches, with
+sparse/empty responses for three previously passing queries. That later lookup
+fails the new minimum; no additional exception or threshold change is implied. Historical
 dated local-review entries below retain their original scope and are superseded
 by this publication record for current release status.
 

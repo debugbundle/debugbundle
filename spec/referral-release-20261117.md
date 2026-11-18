@@ -210,3 +210,11 @@ installation gates are unchanged. This release-tooling change retains all packag
 and hosted runtime versions. No package was republished or scanner finding hidden. Pull-based
 directory follow-up and Gemini gallery indexing are separate from verified public
 Git/registry availability.
+
+The accepted six-query snapshot was verified at 03:50 UTC. A subsequent 06:51 UTC
+read after the policy update returned only three passing searches; runtime error
+reporting, crash reporting and production monitoring returned sparse/empty results
+without this skill. Security still passed for both exact versions. The new command
+correctly fails that later snapshot against the five-query minimum. Preserve both
+receipts; acceptance of the earlier release snapshot does not turn the later
+three-query result into a pass or further relax the permanent policy.
