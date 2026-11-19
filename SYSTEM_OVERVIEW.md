@@ -1,3 +1,8 @@
+Core 1.30.1 and site 1.11.3 contain shared tab-scroll containment, responsive
+offer-banner wording and homepage loading/overflow corrections. Installed APIs,
+SDKs and client packages retain their versions. See `spec/release-1.30.1.md`;
+the private cloud release record owns production receipts.
+
 Core 1.30.0 table UX: shared shadcn row selection reveals the bulk-action bar and mixed
 header select-all only after the first selected row; clearing the page hides
 both. Selection/clearing no longer duplicates long buttons in the top bar.

@@ -21,7 +21,7 @@ import {
   CardTitle
 } from "../components/ui/card.js";
 import { Skeleton } from "../components/ui/skeleton.js";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs.js";
+import { Tabs, TabsContent, TabsList, TabsScrollArea, TabsTrigger } from "../components/ui/tabs.js";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../components/ui/tooltip.js";
 import {
   getIncident,
@@ -210,14 +210,14 @@ export function IncidentDetailPage(): JSX.Element {
           />
 
           <Tabs defaultValue="bundle">
-            <div className="overflow-x-auto overscroll-x-contain pb-1">
+            <TabsScrollArea>
               <TabsList className="w-max min-w-full justify-start">
                 <TabsTrigger value="bundle">Debug Bundle</TabsTrigger>
                 <TabsTrigger value="reproduction">Reproduction</TabsTrigger>
                 <TabsTrigger value="context">Context</TabsTrigger>
                 <TabsTrigger value="logs">Logs</TabsTrigger>
               </TabsList>
-            </div>
+            </TabsScrollArea>
 
             <TabsContent value="bundle" className="mt-6">
               <BundleTab incidentId={incidentId} />

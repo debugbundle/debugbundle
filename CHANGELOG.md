@@ -6,6 +6,11 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.30.1] - 2026-11-19
+
+- Keep shared tab rows horizontally scrollable while preventing vertical scrollbars.
+- Render underline indicators only for line-style tabs and reserve their full height.
+
 ## [1.30.0] - 2026-11-19
 
 - Choose a custom promotional code during programme creation and save the draft

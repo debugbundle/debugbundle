@@ -1,7 +1,7 @@
 import { CreatorPayoutPreferences } from "../components/system/creator-payout-preferences.js";
 import { ResourceEmptyState } from "../components/system/resource-empty-state.js";
 import { WalletIcon } from "lucide-react";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs.js";
+import { Tabs, TabsList, TabsScrollArea, TabsTrigger, TabsContent } from "../components/ui/tabs.js";
 import { Notice } from "../components/ui/notice.js";
 import { CreatorProgrammeControl } from "../components/system/creator-programme-control.js";
 import { offerApi } from "../lib/offer-api.js";
@@ -156,14 +156,14 @@ export function ReferralsPage(): JSX.Element {
         }
       />
       <Tabs key={identity} value={activeTab} onValueChange={setActiveTab} className="min-w-0 gap-4">
-        <div className="max-w-full overflow-x-auto">
+        <TabsScrollArea>
           <TabsList aria-label="Referral sections">
             <TabsTrigger value="programme">Programme</TabsTrigger>
             <TabsTrigger value="earnings">Earnings</TabsTrigger>
             <TabsTrigger value="clients">Referred clients</TabsTrigger>
             <TabsTrigger value="payments">Payments</TabsTrigger>
           </TabsList>
-        </div>
+        </TabsScrollArea>
         {/* Keep forms mounted while hidden so a tab change cannot discard a draft.
             The identity key clears every panel when the signed-in person changes. */}
         <TabsContent

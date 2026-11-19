@@ -164,6 +164,11 @@ The agent must:
 - keep alignment intentional and predictable
 - support responsive reflow cleanly across breakpoints
 
+Horizontally scrollable tab rows wrap `TabsList` in the shared `TabsScrollArea`
+from `components/ui/tabs.tsx`. It explicitly disables vertical overflow and
+reserves space for focus rings and line indicators. Underline pseudo-elements
+belong only to the line variant; pill tabs must not contribute invisible overflow.
+
 ## Responsive strategy
 
 Default to a mobile-first responsive approach, but not a mobile-only mindset.
