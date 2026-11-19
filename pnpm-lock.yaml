@@ -52,8 +52,8 @@ importers:
         specifier: 3.2.4
         version: 3.2.4
       "@debugbundle/shared-types":
-        specifier: 3.7.0
-        version: 3.7.0
+        specifier: 3.8.0
+        version: 3.8.0
       "@modelcontextprotocol/sdk":
         specifier: 1.32.1
         version: 1.32.1(zod@4.6.7)
@@ -859,10 +859,10 @@ packages:
         integrity: sha512-aXm3r0V5/huk62jW9jQdcifDwGCsawidlJkYojIf4IoT/9ZBPwR0XLyvQa/Wlt23AmLbK8xxlbJmia2l/Yx7gQ==
       }
 
-  "@debugbundle/shared-types@3.7.0":
+  "@debugbundle/shared-types@3.8.0":
     resolution:
       {
-        integrity: sha512-HK1QhXGu8nUz4err+6O+jp6ntaCRwWF4ewTIDo9UedKKCFbbHPdtZb0b7H59KCAR8/g4rd2j9v3AgwtX7ZZPHg==
+        integrity: sha512-lk/qLSCzScndRKrifWetZk9kVc5Ov5nMUCUtEPRyE3YQzQuDMfrrr+ieM3GIvAvkJ8a+6tZRnS/dniNPxNyKlA==
       }
 
   "@earendil-works/pi-tui@0.78.0":
@@ -8429,7 +8429,7 @@ snapshots:
     dependencies:
       zod: 4.6.7
 
-  "@debugbundle/shared-types@3.7.0":
+  "@debugbundle/shared-types@3.8.0":
     dependencies:
       zod: 4.6.7
 
