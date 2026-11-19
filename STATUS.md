@@ -1,3 +1,25 @@
+# 19 November core 1.30.1 and site 1.11.3 patch release
+
+Core 1.30.1 contains shared tab-scroll containment across Referrals, project
+navigation, project analytics and incident detail. Pill tabs omit the unused
+underline; line tabs reserve its full height. Site 1.11.3 contains homepage
+artwork containment, responsive offer titles and wording, a smaller hero image
+and the deferred canvas enhancement. See [the release contract](spec/release-1.30.1.md).
+
+Core PR23 source qualification passes all 146 coverage shards with 7,258 tests,
+all five changed-source coverage checks and 18 PDF cases. Typecheck, lint,
+Rust ingestion and native Gemini/CLI compatibility pass. All 132 site tests and
+67 actual core/site contract cases pass. Site PR10, main CI and canonical release
+are green. Merged core and site trees match their qualified candidates.
+
+Publication and production acceptance are tracked in the private cloud runbook
+`runbooks/core-1.30.1-site-1.11.3.md` and ignored `.tmp/release-1.30.1/` receipts.
+The release uses exact qualified source refs and the existing migration/readiness
+and rollback gates. Protected-setting comparison returns only a boolean result
+from the host. The retained Next.js version has two moderate cache advisories;
+the static export does not enable their server cache paths. High/critical audit
+gates pass. SDK and client-package versions are retained.
+
 # 19 November core 1.30.0 and site 1.11.2 release
 
 Core 1.30.0 and site 1.11.2 are published and deployed. Custom promotional codes
