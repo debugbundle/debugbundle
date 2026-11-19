@@ -46,9 +46,10 @@ it("validates a revised agreement, preserves failed drafts and never activates w
   change("Name", "Reviewed launch");
   change("Public description", "Reviewed terms");
   change("Customer discount (%)", "25");
-  change("Claims start (UTC)", "2026-11-16T00:00:00.000Z");
-  change("Claims end (UTC, optional)", "2027-01-01T00:00:00.000Z");
-  change("Redeem by (UTC, optional)", "2027-03-01T00:00:00.000Z");
+  expect(screen.getByLabelText("Claims start")).toHaveAttribute("type", "datetime-local");
+  change("Claims start", "2026-11-16T10:30");
+  change("Claims end (optional)", "2027-01-01T12:00");
+  change("Redeem by (optional)", "2027-03-01T12:00");
   change("Maximum claims", "75");
   change("Terms version", "reviewed-terms");
   for (const label of ["Solo", "Monthly", "Allow individually approved early-purchase grants"]) {
@@ -67,7 +68,10 @@ it("validates a revised agreement, preserves failed drafts and never activates w
       discount_basis_points: 2500,
       commission_basis_points: 6667,
       commission_months: 10,
-      max_claims: 75
+      max_claims: 75,
+      claims_start_at: new Date("2026-11-16T10:30").toISOString(),
+      claims_end_at: new Date("2027-01-01T12:00").toISOString(),
+      redeem_by: new Date("2027-03-01T12:00").toISOString()
     }
   });
   expect(writes[1]).not.toHaveProperty("state");

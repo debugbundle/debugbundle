@@ -1,5 +1,5 @@
 import { programmeTransitions as transitions } from "../../../../../packages/referrals/src/programme-lifecycle.js";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type {
   ProgrammeState,
   ProgrammeVersion
@@ -12,7 +12,7 @@ import { PendingButton } from "./pending-button.js";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../ui/card.js";
 import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
-import { Field, FieldLabel, FieldError, FieldGroup } from "../ui/field.js";
+import { Field, FieldLabel, FieldError, FieldGroup, FieldDescription } from "../ui/field.js";
 import { Input } from "../ui/input.js";
 import { Checkbox } from "../ui/checkbox.js";
 import { Notice } from "../ui/notice.js";
@@ -30,12 +30,18 @@ export function OfferProgrammeVersionControl({
   version,
   claimsEnabled = true,
   onRevise,
-  onChanged
+  onChanged,
+  children,
+  readOnly = false,
+  embedded = false
 }: {
   version: ProgrammeVersion;
   claimsEnabled?: boolean;
   onRevise: () => void;
   onChanged: () => void;
+  children?: ReactNode;
+  readOnly?: boolean;
+  embedded?: boolean;
 }): JSX.Element {
   const [code, setCode] = useState(""),
     [unlimited, setUnlimited] = useState(false),
@@ -43,6 +49,7 @@ export function OfferProgrammeVersionControl({
     [error, setError] = useState<string | null>(null),
     [notice, setNotice] = useState<string | null>(null);
   const { pending, run } = usePendingAction();
+  const Container = embedded ? "section" : Card;
   const mutate = (action: () => Promise<unknown>, success: string): void =>
     void run(async () => {
       setError(null);
@@ -57,7 +64,7 @@ export function OfferProgrammeVersionControl({
       }
     });
   return (
-    <Card>
+    <Container className={embedded ? "flex flex-col gap-4" : undefined}>
       <CardHeader>
         <div className="flex flex-wrap items-center gap-2">
           <CardTitle>{version.name}</CardTitle>
@@ -85,11 +92,14 @@ export function OfferProgrammeVersionControl({
           </dl>
           <OfferPolicyDetails policy={version.policy} />
         </OfferProgrammeDetails>
-        <p className="text-sm text-muted-foreground">
-          Payment discounts are prepared and verified automatically when you activate or schedule
-          this programme.
-        </p>
-        {version.policy.kind === "promotion" ? (
+        {!readOnly && version.state !== "ended" ? (
+          <p className="text-sm text-muted-foreground">
+            Payment discounts are prepared and verified automatically when you activate or schedule
+            this programme. Promotional offers appear in the shared public banner during their claim
+            window.
+          </p>
+        ) : null}
+        {!readOnly && version.state !== "ended" && version.policy.kind === "promotion" ? (
           <form
             onSubmit={(event) => {
               event.preventDefault();
@@ -111,6 +121,10 @@ export function OfferProgrammeVersionControl({
                   maxLength={24}
                   onChange={(event) => setCode(event.target.value)}
                 />
+                <FieldDescription>
+                  Optional branded code. Activation reserves a public code automatically. Review
+                  saved codes in Inventory.
+                </FieldDescription>
               </Field>
               <PendingButton
                 type="submit"
@@ -125,33 +139,38 @@ export function OfferProgrammeVersionControl({
         ) : null}
         {error ? <FieldError role="alert">{error}</FieldError> : null}
         {notice ? <Notice>{notice}</Notice> : null}
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" disabled={pending} onClick={onRevise}>
-            Create revised draft
-          </Button>
-          {transitions[version.state].map((state) => (
-            <Button
-              key={state}
-              variant={state === "active" ? "default" : "outline"}
-              disabled={
-                pending || (!claimsEnabled && (state === "active" || state === "scheduled"))
-              }
-              onClick={() => {
-                setTarget(state);
-                setUnlimited(false);
-                setError(null);
-              }}
-            >
-              {state === "active"
-                ? "Activate"
-                : state === "scheduled"
-                  ? "Schedule"
-                  : state === "paused"
-                    ? "Pause"
-                    : "End"}
+        {!readOnly ? (
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" disabled={pending} onClick={onRevise}>
+              Create revised draft
             </Button>
-          ))}
-        </div>
+            {transitions[version.state].map((state) => (
+              <Button
+                key={state}
+                variant={state === "active" ? "default" : "outline"}
+                disabled={
+                  pending || (!claimsEnabled && (state === "active" || state === "scheduled"))
+                }
+                onClick={() => {
+                  setTarget(state);
+                  setUnlimited(false);
+                  setError(null);
+                }}
+              >
+                {state === "active"
+                  ? "Activate"
+                  : state === "scheduled"
+                    ? "Schedule"
+                    : state === "paused"
+                      ? "Pause"
+                      : version.state === "draft"
+                        ? "Discard draft"
+                        : "End and archive"}
+              </Button>
+            ))}
+          </div>
+        ) : null}
+        {children}
         <AlertDialog
           open={target !== null}
           onOpenChange={(open) => {
@@ -167,12 +186,16 @@ export function OfferProgrammeVersionControl({
                     ? "Schedule this offer?"
                     : target === "paused"
                       ? "Pause new claims?"
-                      : "End new claims?"}
+                      : version.state === "draft"
+                        ? "Discard this draft?"
+                        : "End and archive this programme?"}
               </AlertDialogTitle>
               <AlertDialogDescription>
                 {target === "active" || target === "scheduled"
                   ? `${version.name}, revision ${version.revision}: ${version.policy.discount_basis_points / 100}% first-invoice discount. New claims can be accepted within the configured window after this action. The payment discount will be prepared and verified automatically. A new referral revision requires creators to accept its terms.`
-                  : "Existing promised discounts, attribution and financial obligations remain recorded. New claims stop; fraud revocation is a separate action."}
+                  : target === "paused"
+                    ? `${version.name}, revision ${version.revision}. New claims pause. Existing promised discounts, attribution and financial obligations remain recorded.`
+                    : `${version.name}, revision ${version.revision}. This revision moves to history. Existing promised discounts, attribution and financial obligations remain recorded. New claims stop; fraud revocation is a separate action.`}
               </AlertDialogDescription>
             </AlertDialogHeader>
             {(target === "active" || target === "scheduled") &&
@@ -220,6 +243,6 @@ export function OfferProgrammeVersionControl({
           </AlertDialogContent>
         </AlertDialog>
       </CardContent>
-    </Card>
+    </Container>
   );
 }

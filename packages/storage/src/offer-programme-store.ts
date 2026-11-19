@@ -1,7 +1,11 @@
-import { assertProgrammeStateChange } from "../../referrals/src/programme-lifecycle.js";
+import {
+  assertProgrammeStateChange,
+  defaultPromotionCode
+} from "../../referrals/src/programme-lifecycle.js";
 import { readOfferPerformance } from "./offer-performance-store.js";
 import { createOfferInventoryStore, type OfferInventoryStore } from "./offer-inventory-store.js";
 import { resolveOfferCode } from "./offer-code-resolver.js";
+import { readPublicPromotion, type PromotionSelection } from "./offer-promotion-selection.js";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import {
@@ -33,6 +37,11 @@ export interface OfferProgrammeStore {
   creators: ReturnType<typeof createOfferCreatorStore>;
   claims: ReturnType<typeof createOfferClaimStore>;
   getVersion(versionId: string): Promise<ProgrammeVersion>;
+  publicPromotion(input?: PromotionSelection): Promise<{
+    code: string;
+    version: ProgrammeVersion;
+    available: boolean;
+  } | null>;
   list(input: {
     limit: number;
     before?: string | undefined;
@@ -77,6 +86,10 @@ export function createOfferProgrammeStore(
     creators: createOfferCreatorStore(db, options),
     claims: createOfferClaimStore(db, options),
     getVersion: (versionId: string) => readOfferVersion(db, versionId),
+    async publicPromotion(input) {
+      const resolved = await readPublicPromotion(db, input);
+      return resolved ? this.preview(resolved.code) : null;
+    },
     async list(input: {
       limit: number;
       before?: string | undefined;
@@ -237,6 +250,18 @@ export function createOfferProgrammeStore(
             ).rows.length
           )
             throw new ProgrammeError("programme_unavailable");
+          if (version.policy.kind === "promotion") {
+            // A blocked code is intentional: never generate a replacement to bypass it.
+            await tx.query(
+              `INSERT INTO offer_codes(id,code,kind,version_id)
+              SELECT $1,$2,'promotion',$3 WHERE NOT EXISTS(SELECT 1 FROM offer_codes WHERE version_id=$3)`,
+              [randomUUID(), defaultPromotionCode(version.version_id), version.version_id]
+            );
+          }
+          await tx.query(
+            "UPDATE offer_programme_versions SET state='ended' WHERE programme_id=$1 AND id<>$2 AND state IN ('active','scheduled','paused')",
+            [version.programme_id, version.version_id]
+          );
           await tx.query("UPDATE offer_programmes SET current_version_id=$2 WHERE id=$1", [
             version.programme_id,
             version.version_id

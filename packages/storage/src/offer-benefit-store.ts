@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { getFirstPurchaseEligibility } from "../../shared-types/src/first-purchase-eligibility.js";
 import {
   OfferPolicySchema,
   ProgrammeError,
@@ -190,6 +191,8 @@ export async function consumeOfferEarlyPurchase(
 export interface OfferBenefitStore {
   context(actor: OfferActor): Promise<OfferCheckoutContext | null>;
   earlyPurchaseAllowed(actor: OfferActor): Promise<boolean>;
+  standardPurchaseAllowed(actor: OfferActor): Promise<boolean>;
+  newPurchaseAllowed(actor: OfferActor): Promise<boolean>;
   grantEarlyPurchase(raw: {
     claim_id: string;
     operator_user_id: string;
@@ -197,6 +200,27 @@ export interface OfferBenefitStore {
     reason: string;
   }): Promise<{ grant_id: string; expires_at: string }>;
   revokeEarlyPurchase(grantId: string): Promise<void>;
+}
+/** Caller holds the organisation lock. Mirrors the ordinary Checkout admission
+ * policy; previously-paid accounts still cannot claim another introductory benefit. */
+export async function readOfferPurchaseEligibility(
+  tx: Queryable,
+  organizationId: string
+): Promise<{ allowed: boolean; previously_paid: boolean }> {
+  const row = (
+    await tx.query<{ trial_started_at: string | null; previously_paid: boolean }>(
+      `SELECT to_jsonb(o)->>'trial_started_at' AS trial_started_at,
+      EXISTS(SELECT 1 FROM processed_billing_events receipt WHERE receipt.organization_id=o.id AND receipt.event_type='invoice.paid') AS previously_paid
+      FROM organizations o WHERE o.id=$1`,
+      [organizationId]
+    )
+  ).rows[0];
+  return row
+    ? {
+        allowed: getFirstPurchaseEligibility(row, Date.now()).allowed,
+        previously_paid: row.previously_paid
+      }
+    : { allowed: false, previously_paid: false };
 }
 export function createOfferBenefitStore(db: Queryable): OfferBenefitStore {
   return {
@@ -206,6 +230,22 @@ export function createOfferBenefitStore(db: Queryable): OfferBenefitStore {
       runInTransaction(db, async (tx) => {
         await lockOfferOwner(tx, OfferActorSchema.parse(actor));
         return offerEarlyPurchaseAllowed(tx, actor.organization_id);
+      }),
+    standardPurchaseAllowed: (actor: OfferActor) =>
+      runInTransaction(db, async (tx) => {
+        await lockOfferOwner(tx, OfferActorSchema.parse(actor));
+        return (await readOfferPurchaseEligibility(tx, actor.organization_id)).allowed;
+      }),
+    newPurchaseAllowed: (actor: OfferActor) =>
+      runInTransaction(db, async (tx) => {
+        await lockOfferOwner(tx, OfferActorSchema.parse(actor));
+        const eligibility = await readOfferPurchaseEligibility(tx, actor.organization_id);
+        if (!eligibility.allowed || eligibility.previously_paid) return false;
+        return !(
+          await tx.query("SELECT id FROM billing_checkout_attempts WHERE organization_id=$1", [
+            actor.organization_id
+          ])
+        ).rows.length;
       }),
     async grantEarlyPurchase(raw: {
       claim_id: string;

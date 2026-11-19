@@ -40,7 +40,7 @@ export function ImprovementReviewContent({ bundle }: { bundle: ReviewPlanDocumen
           <h3 className="font-semibold">Next steps</h3>
           <ol className="flex list-decimal flex-col gap-4 pl-5">
             {bundle.plans.map((plan) => (
-              <li key={plan.ref} className="flex flex-col gap-2">
+              <li key={plan.ref} className="space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium">{sources.get(plan.source_refs[0]!)?.title}</span>
                   <Badge variant="outline">

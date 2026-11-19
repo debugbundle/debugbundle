@@ -550,6 +550,17 @@ restarts the preview container and checks its HTTP response. Rebuilding `site/ou
 alone can leave nginx attached to the previous directory and returning 403.
 This command is local only; it does not publish or deploy the site.
 
+Run `make dev-review` to start the complete local stack and both populated
+referral previews in the same `debugbundle` Docker Compose group. Open
+<http://localhost:5291/programmes> for the private app simulator and
+<http://localhost:5292/affiliates/> for the public page (sample code `REVIEW20`).
+The ordinary API uses port 3003; the isolated public fixture uses loopback port
+3004 and a disposable database. Both previews have independent synthetic state.
+The command waits for service readiness and rebuilds the public site against its
+local fixture. Existing standalone referral fixtures are adopted with their
+synthetic data preserved. `make referral-public-review-stop` removes only those
+review services and their disposable data, leaving the ordinary app stack running.
+
 ## Self-Hosting
 
 The supported self-host bootstrap lives in `deploy/selfhost/`.

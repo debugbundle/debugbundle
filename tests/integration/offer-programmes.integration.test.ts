@@ -81,6 +81,71 @@ runIntegration("versioned offer programmes and permanent creator codes", () => {
     await pool.end();
   });
 
+  it("publishes an active promotion without a manually reserved code and withdraws it on pause", async () => {
+    expect(await store.publicPromotion()).toBeNull();
+    await programme();
+    expect(await store.publicPromotion()).toBeNull();
+    const promotion = await programme({ kind: "promotion", commission_basis_points: 0 });
+    const publicOffer = await store.publicPromotion();
+    expect(publicOffer).toMatchObject({ version: promotion, available: true });
+    expect(await store.preview(publicOffer!.code)).toEqual(publicOffer);
+    const saved = await claim(publicOffer!.code);
+    await store.setState({
+      actor_user_id: operator,
+      version_id: promotion.version_id,
+      expected_state: "active",
+      state: "paused",
+      acknowledge_unlimited: true
+    });
+    expect(await store.publicPromotion()).toBeNull();
+    expect(await store.claims.read({ organization_id: org, actor_user_id: owner })).toEqual(saved);
+  });
+
+  it("ends superseded revisions atomically and preserves the original customer promise", async () => {
+    const original = await programme({ kind: "promotion", commission_basis_points: 0 });
+    await store.createPromotionCode({
+      actor_user_id: operator,
+      version_id: original.version_id,
+      code: "FIRST20"
+    });
+    const saved = await claim("FIRST20");
+    const revised = await store.createDraft({
+      actor_user_id: operator,
+      programme_id: original.programme_id,
+      name: "Corrected name",
+      public_description: "Revised offer",
+      policy: { ...original.policy, discount_basis_points: 3000 }
+    });
+    expect((await store.getVersion(original.version_id)).state).toBe("active");
+    await store.bindProvider({
+      actor_user_id: operator,
+      version_id: revised.version_id,
+      coupon_id: "revised_coupon",
+      livemode: false
+    });
+    await store.setState({
+      actor_user_id: operator,
+      version_id: revised.version_id,
+      expected_state: "draft",
+      state: "active",
+      acknowledge_unlimited: true
+    });
+    expect((await store.getVersion(original.version_id)).state).toBe("ended");
+    expect(await store.publicPromotion()).toMatchObject({
+      version: { version_id: revised.version_id }
+    });
+    expect(await store.claims.read({ organization_id: org, actor_user_id: owner })).toEqual(saved);
+    await expect(
+      store.setState({
+        actor_user_id: operator,
+        version_id: original.version_id,
+        expected_state: "active",
+        state: "paused",
+        acknowledge_unlimited: true
+      })
+    ).rejects.toMatchObject({ code: "programme_changed" });
+  });
+
   it("requires the forward migration and exact enabled guards without changing installed checksums", async () => {
     expect(await offerProgrammeSchemaAvailable(db)).toBe(true);
     await assertStorageSchemaMigrationsApplied(db);

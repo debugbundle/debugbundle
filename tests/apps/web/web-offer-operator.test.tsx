@@ -171,9 +171,12 @@ it("clears an anonymous signup code and its auth links without losing trial inte
   await user.click(screen.getByRole("button", { name: "Clear code" }));
   await waitFor(() => expect(screen.getByLabelText("Code")).toHaveValue(""));
   expect(screen.queryByText(/OWEN20: 20%/)).toBeNull();
-  expect(screen.getByRole("link", { name: "Login here" })).toHaveAttribute(
-    "href",
-    "/login?next=%2Fprojects&trial=team"
+  // Router navigation can commit after the local input state has cleared.
+  await waitFor(() =>
+    expect(screen.getByRole("link", { name: "Login here" })).toHaveAttribute(
+      "href",
+      "/login?next=%2Fprojects&trial=team"
+    )
   );
   expect(screen.getByText("Team trial selected")).toBeInTheDocument();
   expect(writes).toEqual(["POST", "DELETE"]);

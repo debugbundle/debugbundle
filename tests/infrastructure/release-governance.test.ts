@@ -73,6 +73,17 @@ describe("release governance baseline", () => {
     for (const name of tests) expect(registry).toContain(`tests/integration/${name}`);
   });
 
+  it("includes every introductory offer database regression in the isolated coverage registry", () => {
+    const registry = readFileSync(
+      join(repoRoot, "scripts/business-service-test-files.mjs"),
+      "utf8"
+    );
+    const tests = readdirSync(join(repoRoot, "tests/integration")).filter((name) =>
+      /^offer-.*\.integration\.test\.ts$/.test(name)
+    );
+    for (const name of tests) expect(registry).toContain(`tests/integration/${name}`);
+  });
+
   it("runs observed analytics choice isolation and privacy regressions in CI", () => {
     const registry = readFileSync(
       join(repoRoot, "scripts/business-service-test-files.mjs"),

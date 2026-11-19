@@ -65,6 +65,7 @@ const BILLING_BACKGROUND_REFRESH_MIN_INTERVAL_MS = 1_000;
 export function BillingPage(): JSX.Element {
   const { session, refreshSession } = useSession();
   const [workspaceOffer, setWorkspaceOffer] = useState<WorkspaceOfferState | null>(null);
+  const [offerRefreshKey, setOfferRefreshKey] = useState(0);
   const [searchParams, setSearchParams] = useSearchParams();
   const [billing, setBilling] = useState<BillingSummaryRecord | null>(null);
   const [subscription, setSubscription] = useState<BillingSubscriptionOffer | null>(null);
@@ -401,6 +402,7 @@ export function BillingPage(): JSX.Element {
         <CustomerOfferControl
           key={session.organization_id}
           organizationId={session.organization_id}
+          refreshKey={offerRefreshKey}
           onState={setWorkspaceOffer}
         />
       ) : null}
@@ -513,6 +515,7 @@ export function BillingPage(): JSX.Element {
 
                 {!isBillingManagedInternally ? (
                   <BillingSubscriptionControl
+                    discoverIntroOffers={workspaceOffer?.status === "ready"}
                     offerReady={
                       workspaceOffer?.status === "ready" || workspaceOffer?.status === "disabled"
                     }
@@ -526,7 +529,10 @@ export function BillingPage(): JSX.Element {
                       writePendingBillingCheckout({ previousPlan: billing.plan, targetPlan })
                     }
                     onNavigate={(url) => window.location.assign(url)}
-                    onRefresh={retry}
+                    onRefresh={() => {
+                      setOfferRefreshKey((value) => value + 1);
+                      return retry();
+                    }}
                   />
                 ) : null}
 

@@ -9,12 +9,28 @@ import {
 } from "../../../../../packages/referrals/src/programme-policy.js";
 import { offerApi, offerErrorMessage } from "../../lib/offer-api.js";
 import { usePendingAction } from "../../lib/use-pending-action.js";
+import { localDateTimeInput, localDateTimeUtc } from "../../lib/local-datetime.js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card.js";
-import { Field, FieldLabel, FieldGroup, FieldDescription, FieldError } from "../ui/field.js";
+import {
+  Field,
+  FieldLabel,
+  FieldGroup,
+  FieldDescription,
+  FieldError,
+  FieldSet,
+  FieldLegend
+} from "../ui/field.js";
 import { Input } from "../ui/input.js";
 import { Textarea } from "../ui/textarea.js";
 import { Checkbox } from "../ui/checkbox.js";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "../ui/select.js";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+  SelectGroup
+} from "../ui/select.js";
 import { Button } from "../ui/button.js";
 import { PendingButton } from "./pending-button.js";
 
@@ -39,9 +55,10 @@ export function OfferProgrammeEditor({
       String((initial?.commission_basis_points ?? 5000) / 100)
     ),
     [months, setMonths] = useState(String(initial?.commission_months ?? 12)),
-    [start, setStart] = useState(initial?.claims_start_at ?? new Date().toISOString()),
-    [end, setEnd] = useState(initial?.claims_end_at ?? ""),
-    [redeem, setRedeem] = useState(initial?.redeem_by ?? ""),
+    [originalStart] = useState(initial?.claims_start_at ?? new Date().toISOString()),
+    [start, setStart] = useState(() => localDateTimeInput(originalStart)),
+    [end, setEnd] = useState(() => localDateTimeInput(initial?.claims_end_at)),
+    [redeem, setRedeem] = useState(() => localDateTimeInput(initial?.redeem_by)),
     [cap, setCap] = useState(String(initial?.max_claims ?? 100)),
     [terms, setTerms] = useState(initial?.terms_version ?? "referrals-2026-11"),
     [plans, setPlans] = useState<OfferPolicy["eligible_plans"]>(
@@ -69,9 +86,9 @@ export function OfferProgrammeEditor({
           commission_months: Number(months),
           eligible_plans: plans,
           eligible_intervals: intervals,
-          claims_start_at: start,
-          claims_end_at: end || null,
-          redeem_by: redeem || null,
+          claims_start_at: localDateTimeUtc(start, originalStart),
+          claims_end_at: end ? (localDateTimeUtc(end, initial?.claims_end_at) ?? end) : null,
+          redeem_by: redeem ? (localDateTimeUtc(redeem, initial?.redeem_by) ?? redeem) : null,
           max_claims: cap === "" ? null : Number(cap),
           allow_early_purchase_grants: early,
           terms_version: terms
@@ -81,7 +98,7 @@ export function OfferProgrammeEditor({
         setError(
           parsed.error.issues.some((issue) => issue.path[1] === "commission_basis_points")
             ? "Commission must be between 0% and 100% of collected base cash, with up to two decimal places, so the retained amount cannot be negative."
-            : "Check percentages, eligible plans and intervals, claim limit and UTC dates. End must follow start; commission months must be between 1 and 12."
+            : "Check percentages, eligible plans and intervals, claim limit and dates. End must follow start; commission months must be between 1 and 12."
         );
         return;
       }
@@ -136,7 +153,27 @@ export function OfferProgrammeEditor({
           }}
         >
           <FieldGroup>
-            {text("programme-name", "Name", name, setName)}
+            <FieldGroup className="grid gap-4 md:grid-cols-2">
+              {text("programme-name", "Name", name, setName)}
+              <Field>
+                <FieldLabel htmlFor="programme-kind">Programme type</FieldLabel>
+                <Select
+                  value={kind}
+                  disabled={pending}
+                  onValueChange={(value) => setKind(value as OfferPolicy["kind"])}
+                >
+                  <SelectTrigger id="programme-kind">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="referral">Creator referrals</SelectItem>
+                      <SelectItem value="promotion">Promotional offer</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
+            </FieldGroup>
             <Field>
               <FieldLabel htmlFor="programme-description">Public description</FieldLabel>
               <Textarea
@@ -147,23 +184,7 @@ export function OfferProgrammeEditor({
                 onChange={(event) => setDescription(event.target.value)}
               />
             </Field>
-            <Field>
-              <FieldLabel htmlFor="programme-kind">Programme type</FieldLabel>
-              <Select
-                value={kind}
-                disabled={pending}
-                onValueChange={(value) => setKind(value as OfferPolicy["kind"])}
-              >
-                <SelectTrigger id="programme-kind">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="referral">Creator referrals</SelectItem>
-                  <SelectItem value="promotion">Promotional offer</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <FieldGroup className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {text(
                 "programme-discount",
                 "Customer discount (%)",
@@ -194,91 +215,100 @@ export function OfferProgrammeEditor({
                     "number"
                   )
                 : null}
-            </div>
-            <Field>
-              <FieldLabel>Eligible plans</FieldLabel>
-              <div className="flex flex-wrap gap-4">
-                {(["solo", "team", "business"] as const).map((plan) => (
-                  <Field key={plan} orientation="horizontal">
-                    <Checkbox
-                      id={`programme-${plan}`}
-                      checked={plans.includes(plan)}
-                      disabled={pending}
-                      onCheckedChange={(checked) =>
-                        setPlans((value) =>
-                          checked === true
-                            ? [...value, plan]
-                            : value.filter((item) => item !== plan)
-                        )
-                      }
-                    />
-                    <FieldLabel htmlFor={`programme-${plan}`}>
-                      {plan[0]!.toUpperCase() + plan.slice(1)}
-                    </FieldLabel>
-                  </Field>
-                ))}
-              </div>
-            </Field>
-            <Field>
-              <FieldLabel>Eligible intervals</FieldLabel>
-              <div className="flex flex-wrap gap-4">
-                {(["month", "year"] as const).map((interval) => (
-                  <Field key={interval} orientation="horizontal">
-                    <Checkbox
-                      id={`programme-${interval}`}
-                      checked={intervals.includes(interval)}
-                      disabled={pending}
-                      onCheckedChange={(checked) =>
-                        setIntervals((value) =>
-                          checked === true
-                            ? [...value, interval]
-                            : value.filter((item) => item !== interval)
-                        )
-                      }
-                    />
-                    <FieldLabel htmlFor={`programme-${interval}`}>
-                      {interval === "year" ? "Yearly" : "Monthly"}
-                    </FieldLabel>
-                  </Field>
-                ))}
-              </div>
-            </Field>
-            {text(
-              "programme-start",
-              "Claims start (UTC)",
-              start,
-              setStart,
-              "ISO date, for example 2026-11-16T00:00:00.000Z."
-            )}
-            {text(
-              "programme-end",
-              "Claims end (UTC, optional)",
-              end,
-              setEnd,
-              "Blank means no closing date."
-            )}
-            {text(
-              "programme-redeem",
-              "Redeem by (UTC, optional)",
-              redeem,
-              setRedeem,
-              "Blank means saved offers do not expire. Campaign claims cover the remaining trial plus seven days."
-            )}
-            {text(
-              "programme-cap",
-              "Maximum claims",
-              cap,
-              setCap,
-              "Blank means unlimited and requires explicit acknowledgement at activation.",
-              "number"
-            )}
-            {text(
-              "programme-terms",
-              "Terms version",
-              terms,
-              setTerms,
-              "Must match the published terms reviewed by creators."
-            )}
+            </FieldGroup>
+            <FieldGroup className="grid gap-4 md:grid-cols-2">
+              <FieldSet>
+                <FieldLegend variant="label">Eligible plans</FieldLegend>
+                <div className="flex flex-wrap gap-4">
+                  {(["solo", "team", "business"] as const).map((plan) => (
+                    <Field key={plan} orientation="horizontal">
+                      <Checkbox
+                        id={`programme-${plan}`}
+                        checked={plans.includes(plan)}
+                        disabled={pending}
+                        onCheckedChange={(checked) =>
+                          setPlans((value) =>
+                            checked === true
+                              ? [...value, plan]
+                              : value.filter((item) => item !== plan)
+                          )
+                        }
+                      />
+                      <FieldLabel htmlFor={`programme-${plan}`}>
+                        {plan[0]!.toUpperCase() + plan.slice(1)}
+                      </FieldLabel>
+                    </Field>
+                  ))}
+                </div>
+              </FieldSet>
+              <FieldSet>
+                <FieldLegend variant="label">Eligible intervals</FieldLegend>
+                <div className="flex flex-wrap gap-4">
+                  {(["month", "year"] as const).map((interval) => (
+                    <Field key={interval} orientation="horizontal">
+                      <Checkbox
+                        id={`programme-${interval}`}
+                        checked={intervals.includes(interval)}
+                        disabled={pending}
+                        onCheckedChange={(checked) =>
+                          setIntervals((value) =>
+                            checked === true
+                              ? [...value, interval]
+                              : value.filter((item) => item !== interval)
+                          )
+                        }
+                      />
+                      <FieldLabel htmlFor={`programme-${interval}`}>
+                        {interval === "year" ? "Yearly" : "Monthly"}
+                      </FieldLabel>
+                    </Field>
+                  ))}
+                </div>
+              </FieldSet>
+            </FieldGroup>
+            <FieldGroup className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {text(
+                "programme-start",
+                "Claims start",
+                start,
+                setStart,
+                "Your device’s local time. Saved in UTC.",
+                "datetime-local"
+              )}
+              {text(
+                "programme-end",
+                "Claims end (optional)",
+                end,
+                setEnd,
+                "Local time. Blank means no closing date.",
+                "datetime-local"
+              )}
+              {text(
+                "programme-redeem",
+                "Redeem by (optional)",
+                redeem,
+                setRedeem,
+                "Local time. Blank means saved offers do not expire. Campaign claims cover the remaining trial plus seven days.",
+                "datetime-local"
+              )}
+            </FieldGroup>
+            <FieldGroup className="grid gap-4 md:grid-cols-2">
+              {text(
+                "programme-cap",
+                "Maximum claims",
+                cap,
+                setCap,
+                "Blank means unlimited and requires explicit acknowledgement at activation.",
+                "number"
+              )}
+              {text(
+                "programme-terms",
+                "Terms version",
+                terms,
+                setTerms,
+                "Must match the published terms reviewed by creators."
+              )}
+            </FieldGroup>
             <Field orientation="horizontal">
               <Checkbox
                 id="programme-early"

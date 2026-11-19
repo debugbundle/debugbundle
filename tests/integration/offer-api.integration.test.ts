@@ -143,6 +143,7 @@ runIntegration("offer HTTP and default domain composition", () => {
               ...offerIntegrationPolicy,
               kind: "promotion",
               commission_basis_points: 0,
+              allow_early_purchase_grants: true,
               discount_basis_points: 3000
             }
           })
@@ -206,7 +207,8 @@ runIntegration("offer HTTP and default domain composition", () => {
           additional_capacity_units: 1
         })
       )["quote"] as { initial_total_minor: number };
-      expect(quote.initial_total_minor).toBe(18360);
+      // The live 30% promotion beats the 20% referral; capacity is unchanged.
+      expect(quote.initial_total_minor).toBe(16440);
       await request("operator/creator-codes", {
         partner_id: (await offers.store.creators.read(creator))!.partner_id,
         code: "RENAMED20",

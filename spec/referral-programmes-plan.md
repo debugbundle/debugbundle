@@ -155,7 +155,12 @@ Commission follows actual discounted cash under the frozen referral agreement.
 An offer incompatible with commission must declare that before acceptance; the
 initial campaigns remain commission-compatible.
 
-The first valid passive link wins. Explicit entry can replace a pending/saved
+The first valid passive referral link wins. An earlier promotion hint does not
+block a subsequently presented creator code. Owner policy, 18 November 2026:
+compare eligible invoice amounts, prefer the referral on a rounded-money tie,
+and preserve the creator agreement even when a cheaper promotion supplies the
+discount. Preserve all eligible scope before a plan/interval is selected.
+Explicit entry can replace a pending/saved
 referral only before Checkout reservation, with confirmation naming the public
 codes and showing the resulting offer. A new URL parameter cannot change it.
 After checkout, retain the existing reconciliation and terminal-retirement rules;

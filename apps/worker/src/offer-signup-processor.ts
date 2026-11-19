@@ -6,6 +6,7 @@ import { createOfferProgrammeStore } from "../../../packages/storage/src/offer-p
 import { createOfferSignupStore } from "../../../packages/storage/src/offer-signup-store.js";
 import { createReferralEligibilityReader } from "../../../packages/storage/src/referral-customer-eligibility.js";
 import { retryOfferSignupIntent } from "../../../packages/referrals/src/offer-signup.js";
+import { applyPresentedOffer } from "../../../packages/referrals/src/offer-selection.js";
 
 /** Recovery shares the financial lane but never calls a payment mutation. One
  * due verified Owner per pass; storage backoff/attempt bounds survive restarts. */
@@ -38,16 +39,11 @@ export function createOfferSignupProcessor(input: {
       {
         signup,
         enabled: true,
-        apply: async (current, code) =>
-          (await legacy.preview(code))
-            ? legacy.attribute(current, code, false, "link")
-            : store.claims.apply({
-                ...current,
-                ...(await eligibility(current)),
-                code,
-                explicit_correction: false,
-                source: "link"
-              })
+        apply: (current, code) =>
+          applyPresentedOffer(
+            { store, legacy, enabled: input.enabled, readEligibility: eligibility },
+            { actor: current, code, explicit: false, source: "link", allowLegacy: true }
+          )
       },
       actor
     );

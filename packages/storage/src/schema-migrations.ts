@@ -1,3 +1,4 @@
+import { OFFER_PUBLICATION_MIGRATION } from "./offer-publication-migration.js";
 import {
   OFFER_PROGRAMME_MIGRATION,
   offerProgrammeSchemaAvailable
@@ -172,7 +173,8 @@ export const STORAGE_SCHEMA_MIGRATIONS: readonly StorageSchemaMigration[] = [
   IMPROVEMENT_REVIEW_PLANNING_MIGRATION,
   OFFER_PROGRAMME_MIGRATION,
   PAYOUT_PREFERENCE_MIGRATION,
-  CREATOR_EMAIL_MIGRATION
+  CREATOR_EMAIL_MIGRATION,
+  OFFER_PUBLICATION_MIGRATION
 ].sort((left, right) => left.id.localeCompare(right.id));
 
 function validateStorageSchemaMigrations(migrations: readonly StorageSchemaMigration[]): void {
@@ -264,6 +266,8 @@ async function reconcileMigrationLedgerInTransaction(
   const creatorEmailReady = await creatorEmailSchemaAvailable(db);
   const verifiedBaseline = STORAGE_SCHEMA_MIGRATIONS.filter(
     (migration) =>
+      // Publication reconciliation is data-only; schema shape cannot prove it ran.
+      migration.id !== OFFER_PUBLICATION_MIGRATION.id &&
       (migration.id !== CREATOR_EMAIL_MIGRATION.id || creatorEmailReady) &&
       (migration.id !== PAYOUT_PREFERENCE_MIGRATION.id || payoutPreferenceReady) &&
       (migration.id !== OFFER_PROGRAMME_MIGRATION.id || offerProgrammeReady) &&

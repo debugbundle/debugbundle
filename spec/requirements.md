@@ -540,6 +540,12 @@ remain authoritative.
 
 **FR-WEB-10:** An explicitly opted-in local UI preview must populate the ordinary dashboard and related review surfaces with synthetic data. Simulated edits are held in memory, never forwarded to real services, and reset on preview restart. The preview is development-only, loopback-only, excluded from production builds, and disables frontend telemetry.
 
+`make dev-review` starts the full local Compose stack plus the private app and
+public referral previews under one `debugbundle` project. The public fixture uses
+an isolated disposable database and loopback port 3004, independently of the real
+app API on 3003. Startup waits for readiness and preserves existing local app data;
+adopting legacy standalone review containers preserves their synthetic records.
+
 Billing preview includes Free/Solo/Team/Business, month/year and paid/complimentary/
 trial-day-1/trial-day-8 fixtures through existing form primitives. Ordinary paid
 offer dialogs support upgrades after confirmation and reductions/interval switches
@@ -1172,12 +1178,33 @@ for new versioned programmes while preserving legacy Business-only claims.
 
 - **FR-REF-01:** Verified creators can reserve a unique normalised branded code; aliases and old generated codes remain bound to the permanent partner, including after deletion.
 - **FR-REF-02:** Programmes have immutable commercial versions and explicit lifecycle; claimed benefits and earnings survive revision, pause and end.
+  Activation/scheduling replaces the permanent programme's live revision atomically;
+  drafts do not replace it. Group revision history and archive ended mistakes without
+  deleting recorded agreements. Programme dates use native local inputs with UTC storage.
 - **FR-REF-03:** Validated manual entry works without cookies. Verified signup and explicit Owner claim persist exact attribution/offer across trial, session and device changes, with durable bounded signup recovery.
 - **FR-REF-04:** Public notices, signup, pricing, Billing, quote and provider discount must agree on eligible plans, first-invoice amount, tax/capacity exclusions and normal renewal.
+  The shared public context compares the presented code with eligible current
+  promotions, including on the homepage, without creating a claim or cookie.
+  Empty contexts and failed background discovery without a supplied code or known
+  offer show no banner. Retain recovery controls for a supplied code or previously
+  loaded offer; never advertise unverified discount prices after a failed lookup.
   Explicit activation/scheduling automatically prepares or verifies the provider
   discount from immutable programme terms and server-selected mode. Preserve
   existing bindings; normal operator UI requires no Stripe coupon ID.
 - **FR-REF-05:** Introductory referral/first-purchase/holiday percentage offers share one identity-level benefit. Explicit offer replacement preserves partner attribution and cannot stack benefits.
+  Prefer the lowest eligible rounded base-invoice amount; referrals win equal-price
+  comparisons. A cheaper promotion keeps the original creator and frozen commission
+  agreement. Before a plan is selected, do not trade away eligible scope. Quote
+  previews preserve saved terms; replacement occurs only at explicit confirmation.
+  Customers without a saved claim may explicitly request a read-only public-offer
+  quote. Create its nonce-bound claim only at purchase confirmation, preserving
+  any creator and rechecking source attribution, eligibility and admitted attempts.
+  Legacy referrals win equal prices on their existing redemption path. Lookup
+  failure cannot permit a silent full-price fallback.
+  Replacement rechecks the saved claim's eligibility under the transaction locks
+  after provider reads and lock waits. Removal or expiry cannot be undone by an
+  older confirmation. Definitive pre-admission rejection permits a fresh price
+  review; uncertain provider outcomes retain the original confirmation.
 - **FR-REF-06:** FR-BIL-10 retains its default seven-day rule. Only an audited, scoped, unexpired operator grant permits early admission; public code possession is insufficient. Preserve provider/payment reconciliation and existing hosted URL limitations.
 - **FR-REF-07:** Programme management uses the internal Analytics allowlist and email-authenticated operator gate; API/CLI/ordinary MCP share domain services and short-lived scoped delegation without gaining Analytics/payout authority.
 - **FR-REF-08:** New-programme all-paid-plan commission uses frozen rates/windows and verified cash, cumulative rounding, refund/dispute holds and immutable deltas; legacy outputs remain compatible.

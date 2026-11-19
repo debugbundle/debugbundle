@@ -11,7 +11,8 @@ import { OfferApiError } from "../../../../packages/referral-client/src/offer-ap
 import { PageHeader } from "../components/system/page-header.js";
 import { OperatorEmailGate } from "../components/system/operator-email-gate.js";
 import { OfferProgrammeEditor } from "../components/system/offer-programme-editor.js";
-import { OfferProgrammeVersionControl } from "../components/system/offer-programme-version-control.js";
+import { OfferProgrammeGroup } from "../components/system/offer-programme-group.js";
+import { OfferProgrammeDetails } from "../components/system/offer-programme-details.js";
 import { OfferOperatorTools } from "../components/system/offer-operator-tools.js";
 import { Button } from "../components/ui/button.js";
 import { Notice } from "../components/ui/notice.js";
@@ -72,6 +73,27 @@ export function OfferProgrammesPage(): JSX.Element {
     };
   }, [session?.user_id, session?.organization_id, revision, navigate]);
   const reload = (): void => setRevision((value) => value + 1);
+  const groups = new Map<string, ProgrammeVersion[]>();
+  for (const version of versions) {
+    const group = groups.get(version.programme_id) ?? [];
+    group.push(version);
+    groups.set(version.programme_id, group);
+  }
+  const currentGroups = [...groups.values()].filter((group) =>
+    group.some((v) => v.state !== "ended")
+  );
+  const archivedGroups = [...groups.values()].filter((group) =>
+    group.every((v) => v.state === "ended")
+  );
+  const programmeGroup = (group: ProgrammeVersion[]): JSX.Element => (
+    <OfferProgrammeGroup
+      key={group[0]!.programme_id}
+      versions={group}
+      claimsEnabled={claimsEnabled}
+      onRevise={setEditor}
+      onChanged={reload}
+    />
+  );
   const loadMore = async (): Promise<void> => {
     const last = versions.at(-1);
     if (!last || pending) return;
@@ -168,15 +190,12 @@ export function OfferProgrammesPage(): JSX.Element {
                 programme is activated automatically.
               </Notice>
             ) : null}
-            {versions.map((version) => (
-              <OfferProgrammeVersionControl
-                key={version.version_id}
-                version={version}
-                claimsEnabled={claimsEnabled}
-                onRevise={() => setEditor(version)}
-                onChanged={reload}
-              />
-            ))}
+            {currentGroups.map(programmeGroup)}
+            {archivedGroups.length ? (
+              <OfferProgrammeDetails label={`Archived programmes (${archivedGroups.length})`}>
+                {archivedGroups.map(programmeGroup)}
+              </OfferProgrammeDetails>
+            ) : null}
             {error ? <Notice tone="warning">{error}</Notice> : null}
             {more ? (
               <div>

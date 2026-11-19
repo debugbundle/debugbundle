@@ -29,12 +29,14 @@ const summaries: Record<OfferOperation, string> = {
     "Reveal sensitive frozen payment instructions as a billing payout operator; audited and never cached",
   capabilities: "Read whether new programme claims are enabled",
   programmes: "List currently available programme terms",
-  context: "Preview a public offer code or signed pending hint",
+  context:
+    "Preview the cheapest eligible code/promotion; supply target_plan and interval together for exact prices. Referrals win ties.",
   creator: "Read your accepted creator programme and codes",
   join: "Join after explicit acceptance of the exact programme terms",
   code: "Reserve your one branded creator code",
   customer: "Read the verified Owner's saved workspace offer",
-  quote: "Review the exact initial and renewal amounts before purchase",
+  quote:
+    "Review exact initial and renewal amounts; include_public_offers opts into read-only discovery without a saved claim",
   checkout: "Confirm or reconcile the exact signed introductory purchase",
   apply: "Apply or explicitly replace an eligible workspace offer",
   remove: "Explicitly remove an unused workspace discount",

@@ -1,3 +1,33 @@
+Unreleased best-price policy: `referrals/offer-choice.ts` compares rounded invoice
+totals and eligible scope, with referral priority on ties. `offer-selection.ts`
+shares public previews and presented-code application between API management and
+the worker signup processor. `storage/offer-promotion-selection.ts` filters/ranks
+eligible current unblocked promotions; `offer-referrer.ts` independently resolves
+the original versioned or legacy creator agreement. Claim writes lock/recheck both
+codes and programmes. `offer-quote.ts` signs private source-version/code metadata
+for a quoted replacement, or a fresh claim nonce and attribution snapshot for
+opted-in no-claim previews. `prepareCheckout` rechecks and applies that exact
+choice at explicit confirmation. Public response DTOs stay unchanged; the quote
+request adds optional `include_public_offers: true`. Site pricing cards reuse
+their existing presentation with exact plan/interval context queries.
+`offer-claim-store.ts` repeats canonical checkout eligibility under its locks
+before replacement. The API distinguishes definitive preparation rejection from
+provider uncertainty; Billing invalidates the quote and refreshes the existing
+`useWorkspaceOffer` reader only after the definitive rejection.
+See `spec/referral-offer-selection.md`.
+
+Unreleased publication correction: `offer-programme-store.ts` selects one eligible
+current promotion through its ordinary code resolver, reserves a missing code at
+activation and atomically ends superseded live revisions. `offer-management.ts`
+keeps signed hints separate from public fallback context; the existing API route
+serves the same minimal contract to site, CLI and MCP. The additive data migration
+`offer-publication-migration.ts` repairs existing publication metadata before
+runtime readiness. It cannot be inferred from schema shape during ledger recovery.
+`offer-programme-group.tsx` composes existing version controls and closed history;
+`local-datetime.ts` converts native device-local inputs while preserving untouched
+timestamp precision. Existing site provider, banner, pricing and signup links are
+reused. See `spec/referral-programme-publication-correction.md`.
+
 Hosted publication is recorded in `spec/referral-release-20261117.md`: core
 1.28.1/site 1.11.0, additive migrations before consumers, compatible retained
 offer/email readers and API-only payout encryption. The private cloud repository
@@ -78,8 +108,15 @@ See [the approved plan](spec/referral-programmes-plan.md) and `STATUS.md`.
 `scripts/referral-public-review.ts` seeds only the named disposable review
 database and composes the real public offer routes without private authentication
 or provider transports. Its ownership-checked shell launcher publishes the API on
-loopback; `make referral-public-review` rebuilds the static site with an explicit
-local API override. This review fixture does not configure production runtime.
+loopback port 3004; `make referral-public-review` rebuilds the static site with an
+explicit local API override. The root `docker-compose.yml` owns `public`,
+`referral-review-api` and `referral-review-db` under opt-in profiles in the same
+`debugbundle` project. A dedicated network/tmpfs keeps fixtures separate from the
+ordinary API on 3003 and its persistent database. `scripts/public-site-preview.nginx.conf`
+serves the static export. `make dev-review` starts all local services and the mock
+app, waits for readiness and rebuilds the public preview. The launcher dumps and
+restores legacy standalone review data before container adoption. This review
+fixture does not configure production runtime.
 The separate private app preview on 5291 uses `scripts/dev-mock/referral-offers.ts`
 and `admin-analytics.ts` for synthetic in-memory operator/referral views. The
 development-only middleware intercepts v1/v2 requests, validates offer contracts,
@@ -977,7 +1014,18 @@ is local, following the automatic bootstrap released in site 1.9.0.
 
 **Homepage hero discovery:** `src/components/hero-signal-field.tsx` emits a
 high-priority image preload for the exact CSS background when the hero is rendered.
-The shared root layout does not preload that artwork on unrelated pages.
+The hint matches the existing desktop/tablet visibility rule. The shared root
+layout does not preload that artwork on unrelated pages. `SiteShell` adds a
+homepage-only CSS gradient behind the CTA and footer using the shared theme glow,
+without an image or another preload. Root font configuration
+preloads both Inter Latin subsets used by the homepage's testimonial names.
+
+**Homepage product illustration:** `site/src/components/bundle-evidence-flow.tsx`
+and `bundle-evidence-stack.tsx` retain the supplied HTML artwork in server-rendered
+markup with scoped CSS and namespaced SVG IDs. The small client canvas wrapper
+mounts `src/lib/bundle-evidence-animation.ts` for continuous 1.75× playback,
+source highlighting and cycling telemetry, with site-theme synchronization,
+reduced-motion support and observer/listener cleanup.
 
 **Pricing documentation:** `/pricing/` owns public prices and plan comparisons. The
 existing `/docs/pricing/` route is the Plans and capacity guide; it explains shared

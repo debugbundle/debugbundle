@@ -1,3 +1,28 @@
+Unreleased price policy: `offer-selection.ts` shares comparison between browser
+signup and durable worker recovery. Public previews retain the presented referral
+code as the attribution carrier while showing cheaper eligible promotion terms.
+Exact plan/interval comparisons use rounded invoice totals; referrals win ties.
+Saved-offer quote previews do not mutate claims. Explicit confirmation can select
+the quoted better discount while retaining the original creator agreement; already
+reserved purchases retain their exact terms. Checkout without a saved offer can
+opt into a read-only public-offer quote; explicit confirmation creates its exact
+claim while preserving the captured creator and rechecking purchase eligibility.
+Saved replacements repeat eligibility under the transaction locks after provider
+reads. Definitive pre-admission rejection refreshes Billing's workspace offer and
+requires a new price review; uncertain provider requests retain their exact proof.
+See `spec/referral-offer-selection.md`.
+
+Unreleased programme correction: anonymous `/v2/offers/context` preserves selected
+code identity and compares it with eligible public promotions for the existing
+site-wide referral/promotion banner. Activation reserves a missing public code;
+the ordered `202611180001_reconcile_offer_publication` data migration covers
+already-approved current promotions and retires stale superseded live labels.
+It preserves blocked codes, saved claims, provider bindings and financial terms.
+The operator list groups permanent programmes, retains revisions in history and
+collapses ended programmes into Archives; discarding a draft uses the existing
+ended state. The editor uses native local date/time inputs with UTC persistence
+and responsive field columns. These changes are local, not deployed.
+
 Hosted core 1.28.1 and site 1.11.0 are live from the coordinated
 [affiliate release](spec/referral-release-20261117.md). Programme capability is
 enabled after two verified compatible backend bridges; no commercial programme
@@ -93,6 +118,11 @@ rebuilt against a loopback-only API running real public offer routes and a
 dedicated synthetic tmpfs database. `REVIEW20` and the labelled local programme
 have no live provider, account or payment authority. Ordinary site builds retain
 the hosted API default; see `spec/referral-programmes-review.md`.
+The `public-preview` and `referral-review` Compose profiles group those services
+under `debugbundle`. The public fixture API uses host port 3004, leaving 3003 for
+the ordinary app API. `make dev-review` starts the full local stack, the private
+UI simulator on 5291 and the rebuilt public preview on 5292, with readiness checks.
+The launcher preserves legacy standalone fixture data while adopting its containers.
 The private app preview runs separately on 5291 with local in-memory programme,
 referral-history and empty internal-analytics fixtures. It is a UI simulator;
 its edits do not populate the public fixture or validate real provider/auth flows.
@@ -235,6 +265,15 @@ The homepage alone also preloads its existing hero background at high priority.
 These changes pass source, automated export and live HTTP checks. Browser,
 Lighthouse and provider-interaction acceptance remain separate. See FR-DOC-13
 and AC-DOC-18.
+
+The homepage's separate product illustration now uses the supplied HTML animation
+with its original artwork and interactions at 1.75× speed. It follows the site
+theme, suspends offscreen/in hidden tabs and respects reduced motion. Its controls
+and the old illustration caption are removed. This is a local preview change.
+The homepage privacy section follows the capture/setup guide. Its closing CTA
+and footer reuse the existing soft theme glow through a CSS gradient. The image
+preload follows its existing phone visibility rule, and Inter's extended Latin
+subset is discovered alongside Latin for accented testimonial names.
 
 Dashboard empty resource lists and data panels reuse `ResourceEmptyState` with
 the existing Empty primitives, scoped help and permitted actions. The former

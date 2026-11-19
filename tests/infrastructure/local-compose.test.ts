@@ -66,3 +66,45 @@ it("uses the exposed local API port for referral links while keeping enrolment o
   );
   expect(example).toContain("REFERRAL_API_BASE_URL=http://localhost:3003");
 });
+
+it("groups isolated referral previews with the main stack without occupying the app API port", () => {
+  const compose = readFileSync(composePath, "utf8");
+  const api = getServiceBlock(compose, "referral-review-api");
+  const db = getServiceBlock(compose, "referral-review-db");
+  expect(api).toContain("container_name: debugbundle-referral-review-api");
+  expect(api).toContain('"127.0.0.1:3004:3003"');
+  expect(api).toContain(".:/workspace:ro");
+  expect(api).toContain("condition: service_healthy");
+  expect(api).toContain("referral-review");
+  expect(db).toContain("container_name: debugbundle-referral-review-db");
+  expect(db).toContain("/var/lib/postgresql/data");
+  expect(db).toContain("tmpfs:");
+  expect(db).not.toContain("ports:");
+  expect(db).not.toContain("postgres-data:");
+  expect(getServiceBlock(compose, "api")).toContain('"3003:3000"');
+});
+
+it("keeps the public preview and readiness checks in the reproducible Compose setup", () => {
+  const compose = readFileSync(composePath, "utf8");
+  const publicSite = getServiceBlock(compose, "public");
+  expect(publicSite).toContain('"127.0.0.1:${PUBLIC_SITE_PORT:-5292}:80"');
+  expect(publicSite).toContain("./scripts/public-site-preview.nginx.conf:");
+  for (const service of [
+    "api",
+    "worker",
+    "web",
+    "public",
+    "referral-review-api",
+    "referral-review-db"
+  ])
+    expect(getServiceBlock(compose, service)).toContain("healthcheck:");
+  const launcher = readFileSync(join(process.cwd(), "scripts/referral-public-review.sh"), "utf8");
+  expect(launcher).toContain("docker compose");
+  expect(launcher).not.toContain("docker run");
+  expect(launcher).toContain("pg_dump");
+  expect(launcher).toContain("com.debugbundle.review-owner");
+  const makefile = readFileSync(join(process.cwd(), "Makefile"), "utf8");
+  expect(makefile.match(/^dev-down:[\s\S]*?(?=^\.PHONY:)/m)?.[0]).toContain(
+    "--profile dev --profile public-preview --profile referral-review down"
+  );
+});
