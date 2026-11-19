@@ -31,8 +31,15 @@ export function createOfferInventoryStore(db: Queryable): OfferInventoryStore {
         await db.query(
           `SELECT c.id AS code_id,c.code,c.kind,c.partner_id,COALESCE(c.version_id,m.version_id) AS version_id,c.blocked,c.preferred,c.created_at
   FROM offer_codes c LEFT JOIN offer_creator_memberships m ON m.partner_id=c.partner_id AND m.preferred
-  WHERE ($1::text IS NULL OR c.code=$1) AND ($2::uuid IS NULL OR c.partner_id=$2) AND ($3::uuid IS NULL OR (c.created_at,c.id)<(SELECT created_at,id FROM offer_codes WHERE id=$3)) ORDER BY c.created_at DESC,c.id DESC LIMIT $4`,
-          [input.code ?? null, input.partner_id ?? null, input.before ?? null, input.limit]
+  WHERE ($1::text IS NULL OR c.code=$1) AND ($2::uuid IS NULL OR c.partner_id=$2) AND ($3::uuid IS NULL OR (c.created_at,c.id)<(SELECT created_at,id FROM offer_codes WHERE id=$3))
+  AND ($5::uuid IS NULL OR COALESCE(c.version_id,m.version_id)=$5) ORDER BY c.created_at DESC,c.id DESC LIMIT $4`,
+          [
+            input.code ?? null,
+            input.partner_id ?? null,
+            input.before ?? null,
+            input.limit,
+            input.version_id ?? null
+          ]
         )
       ).rows;
       return rows.map((row) =>

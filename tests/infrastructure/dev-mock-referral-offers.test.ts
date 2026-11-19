@@ -15,6 +15,31 @@ function preview() {
   });
   return { mock, client };
 }
+it("keeps chosen draft codes and version-filtered inventory aligned with the real creation flow", async () => {
+  const { client } = preview();
+  const before = (await client.execute("operator_programmes", {})).programmes.length;
+  const input = {
+    name: "Black Friday",
+    public_description: "Local only",
+    policy: { ...offerPolicy, kind: "promotion" as const, commission_basis_points: 0 },
+    promotion_code: "blckfryd26"
+  };
+  const { programme } = await client.execute("draft", input);
+  expect(
+    (await client.execute("operator_codes", { version_id: programme.version_id })).codes
+  ).toMatchObject([{ code: "BLCKFRYD26", version_id: programme.version_id }]);
+  await expect(client.execute("draft", input)).rejects.toMatchObject({
+    code: "creator_code_unavailable"
+  });
+  expect((await client.execute("operator_programmes", {})).programmes).toHaveLength(before + 1);
+  await client.execute("state", {
+    version_id: programme.version_id,
+    expected_state: "draft",
+    state: "active",
+    acknowledge_unlimited: false
+  });
+  expect((await client.execute("context", {})).offer).toMatchObject({ code: "BLCKFRYD26" });
+});
 it("models per-programme payment setup with masked state and stale/identity guards", async () => {
   const { client } = preview();
   const programme = (await client.execute("programmes", {})).programmes.find(

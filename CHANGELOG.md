@@ -6,6 +6,19 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.30.0] - 2026-11-19
+
+- Choose a custom promotional code during programme creation and save the draft
+  and code atomically. Show saved revision codes and retain existing reservation
+  and generated-code behavior for installed clients.
+- Add opt-in organisation People avatar metadata and protected per-person image
+  reads across API, CLI and ordinary MCP; retain default response fields and access rules.
+- Reveal table bulk actions and mixed-state header selection after the first row
+  selection, reuse shared checkboxes and preserve keyboard focus when controls disappear.
+- Add People profile pictures with initials fallback and refine selection-column spacing.
+- Publish independently versioned CLI/MCP/OpenClaw 1.28.0 and shared-types 3.8.0;
+  retain redaction, SDKs and editor-plugin versions.
+
 ## [1.29.0] - 2026-11-19
 
 - Add optional plan/interval public-offer comparison and explicit no-claim quote

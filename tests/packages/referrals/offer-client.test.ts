@@ -7,6 +7,43 @@ import {
 import { createOfferMcpTools, OFFER_MCP_TOOL_CATALOG } from "../../../apps/mcp/src/offer-tools.js";
 import { buildPublicOpenApiSpec } from "../../../apps/api/src/openapi.js";
 import { offerVersion } from "../../helpers/offer-fixtures.js";
+it("carries a chosen promotional code through the shared client and MCP without a second reservation", async () => {
+  const version = {
+    ...offerVersion,
+    state: "draft" as const,
+    policy: { ...offerVersion.policy, kind: "promotion" as const, commission_basis_points: 0 }
+  };
+  const payload = {
+    name: version.name,
+    public_description: version.public_description,
+    policy: version.policy,
+    promotion_code: "blckfryd26"
+  };
+  const request = vi.fn().mockResolvedValue({ status: 200, body: { programme: version } });
+  const client = createOfferApi({ request });
+  const auth = { bearerToken: "member", operatorProof: "a".repeat(43) };
+  await client.execute("draft", payload, auth);
+  await createOfferMcpTools(client)["create_offer_programme_draft"]({
+    ...payload,
+    bearerToken: auth.bearerToken,
+    operatorAuthorization: auth.operatorProof
+  });
+  expect(request).toHaveBeenCalledTimes(2);
+  for (const [sent] of request.mock.calls)
+    expect(sent).toMatchObject({
+      path: "/v2/offers/operator/programmes",
+      body: { promotion_code: "BLCKFRYD26" }
+    });
+  expect(
+    OFFER_OPERATIONS.promotion_code.input.parse({
+      version_id: version.version_id,
+      code: "blckfryd26"
+    }).code
+  ).toBe("BLCKFRYD26");
+  expect(
+    OFFER_OPERATIONS.operator_codes.input.parse({ version_id: version.version_id })
+  ).toMatchObject({ version_id: version.version_id });
+});
 it.each([7500, 10000])(
   "uses the selected %i basis-point rate through the shared client and MCP",
   async (rate) => {

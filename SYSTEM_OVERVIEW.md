@@ -1,3 +1,19 @@
+Local table UX: shared shadcn row selection reveals the bulk-action bar and mixed
+header select-all only after the first selected row; clearing the page hides
+both. Selection/clearing no longer duplicates long buttons in the top bar.
+Organisation People reuses project-member avatars through opt-in cached metadata
+and a currently authorised per-person image reader. Default People response keys
+and existing permissions remain unchanged. These changes are not deployed.
+
+Local promotional-code correction: the operator chooses a code while creating a
+promotion. Draft and code save in one transaction; a conflict leaves neither
+saved. Programme cards read their saved codes through the shared inventory API.
+Promotional codes accept ordinary ten-character campaign names while creator
+aliases retain their legacy namespace restriction. API/CLI/MCP keep the older
+optional-code/fallback path and reservation operation. The public skip link is
+viewport-anchored and hidden by its own height until focus; activation focuses
+`main#content`. These source changes are not deployed.
+
 Unreleased price policy: `offer-selection.ts` shares comparison between browser
 signup and durable worker recovery. Public previews retain the presented referral
 code as the attribution carrier while showing cheaper eligible promotion terms.
@@ -266,14 +282,18 @@ These changes pass source, automated export and live HTTP checks. Browser,
 Lighthouse and provider-interaction acceptance remain separate. See FR-DOC-13
 and AC-DOC-18.
 
-The homepage's separate product illustration now uses the supplied HTML animation
-with its original artwork and interactions at 1.75× speed. It follows the site
-theme, suspends offscreen/in hidden tabs and respects reduced motion. Its controls
-and the old illustration caption are removed. This is a local preview change.
+The homepage's separate product illustration uses the supplied HTML artwork at
+1.75× speed. Desktop mouse hover highlights the matching source and telemetry
+blocks with the default cursor. The blocks are outside the tab order. The
+animation follows the site theme, suspends offscreen/in hidden tabs and respects
+reduced motion.
 The homepage privacy section follows the capture/setup guide. Its closing CTA
 and footer reuse the existing soft theme glow through a CSS gradient. The image
 preload follows its existing phone visibility rule, and Inter's extended Latin
 subset is discovered alongside Latin for accented testimonial names.
+Testimonial raster logos use lossless WebP alpha masks. The homepage brand links
+skip prefetching their own route. The hosted-site workflows give the existing web
+manifest a short browser and CDN cache lifetime.
 
 Dashboard empty resource lists and data panels reuse `ResourceEmptyState` with
 the existing Empty primitives, scoped help and permitted actions. The former

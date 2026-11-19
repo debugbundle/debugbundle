@@ -9,6 +9,41 @@ const temporary: string[] = [];
 afterEach(async () => {
   await Promise.all(temporary.splice(0).map((path) => rm(path, { recursive: true, force: true })));
 });
+it("saves a chosen promotional code through the existing delegated draft command", async () => {
+  const root = await mkdtemp(join(tmpdir(), "debugbundle-promotion-draft-"));
+  temporary.push(root);
+  const file = join(root, "proof");
+  await writeFile(file, "a".repeat(43), { mode: 0o600 });
+  const version = {
+    ...offerVersion,
+    state: "draft" as const,
+    policy: { ...offerVersion.policy, kind: "promotion" as const, commission_basis_points: 0 }
+  };
+  const request = vi.fn().mockResolvedValue({ status: 200, body: { programme: version } });
+  const result = await offersWithAuthCommand(
+    {
+      action: "draft",
+      operatorProofFile: file,
+      payload: {
+        name: version.name,
+        public_description: version.public_description,
+        policy: version.policy,
+        promotion_code: "blckfryd26"
+      }
+    },
+    {
+      readAuthState: async () => ({ base_url: "https://api.test", bearer_token: "member" }),
+      createHttpClient: () => ({ request })
+    }
+  );
+  expect(result.exitCode).toBe(0);
+  expect(request).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({
+      path: "/v2/offers/operator/programmes",
+      body: expect.objectContaining({ promotion_code: "BLCKFRYD26" })
+    })
+  );
+});
 it("submits a commission above 50 percent without changing the selected rate", async () => {
   const root = await mkdtemp(join(tmpdir(), "debugbundle-offer-rate-"));
   temporary.push(root);

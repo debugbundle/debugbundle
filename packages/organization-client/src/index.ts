@@ -38,7 +38,9 @@ export interface PendingOwnershipTransfer {
 }
 export interface OrganizationApi {
   listOrganizations(input: OrganizationAuth): Promise<OrganizationSummary[]>;
-  listPeople(input: OrganizationScope): Promise<OrganizationPerson[]>;
+  listPeople(
+    input: OrganizationScope & { includeAvatars?: boolean | undefined }
+  ): Promise<OrganizationPerson[]>;
   listInvites(input: OrganizationScope): Promise<OrganizationInvite[]>;
   invite(
     input: OrganizationScope & { invitation: OrganizationInviteBody }
@@ -116,7 +118,7 @@ export function createOrganizationApi(client: OrganizationHttpClient): Organizat
         await request(
           input,
           "GET",
-          `${path(input)}/people`,
+          `${path(input)}/people${input.includeAvatars === true ? "?include_avatars=true" : ""}`,
           z.object({ people: z.array(OrganizationPersonSchema) }).strict()
         )
       ).people;

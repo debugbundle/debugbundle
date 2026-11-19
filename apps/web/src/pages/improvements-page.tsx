@@ -14,6 +14,9 @@ import { PageHeader } from "../components/system/page-header.js";
 import { ResourceListState } from "../components/system/resource-list-state.js";
 import {
   SelectableTableActions,
+  TableSelectionCheckbox,
+  TableSelectAllCheckbox,
+  tableSelectionCellClassName,
   StickyMobileTableActions,
   shouldIgnoreTableRowActivation,
   useVisibleRowSelection
@@ -198,7 +201,9 @@ export function ImprovementsPage(): JSX.Element {
             <Card className="min-w-0">
               <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex w-full items-center justify-between gap-3 sm:w-auto">
-                  <CardTitle>{inventoryTitle("Improvement inventory", totalCount)}</CardTitle>
+                  <CardTitle id="workspace-improvements-title" tabIndex={-1}>
+                    {inventoryTitle("Improvement inventory", totalCount)}
+                  </CardTitle>
                   <TableRefreshButton
                     isLoading={isLoading}
                     onRefresh={refreshPage}
@@ -272,52 +277,47 @@ export function ImprovementsPage(): JSX.Element {
                   }
                 >
                   {() => (
-                    <div className="space-y-4">
-                      <div className="hidden sm:block">
-                        <SelectableTableActions
-                          itemLabel="improvement"
-                          totalCount={sortedImprovements.length}
-                          selectedCount={selection.selectedCount}
-                          allSelected={selection.allSelected}
-                          isBusy={bulkAction !== null}
-                          primaryActionLabel={
-                            bulkAction === "resolved"
-                              ? "Marking resolved..."
-                              : "Mark selected resolved"
-                          }
-                          secondaryActionLabel={
-                            bulkAction === "unresolved"
-                              ? "Marking unresolved..."
-                              : "Mark selected unresolved"
-                          }
-                          primaryActionDisabled={
-                            selection.selectedCount === 0 ||
-                            selectedImprovements.every(
-                              (improvement) => improvement.status === "resolved"
-                            )
-                          }
-                          secondaryActionDisabled={
-                            selection.selectedCount === 0 ||
-                            selectedImprovements.every(
-                              (improvement) => improvement.status === "open"
-                            )
-                          }
-                          onToggleSelectAll={selection.toggleSelectAll}
-                          onClearSelection={selection.clearSelection}
-                          onPrimaryAction={() => {
-                            void handleBulkImprovementAction("resolved");
-                          }}
-                          onSecondaryAction={() => {
-                            void handleBulkImprovementAction("unresolved");
-                          }}
-                        />
-                      </div>
+                    <div className="flex flex-col gap-4">
+                      <SelectableTableActions
+                        focusTargetId="workspace-improvements-title"
+                        className="hidden sm:flex"
+                        itemLabel="improvement"
+                        selectedCount={selection.selectedCount}
+                        isBusy={bulkAction !== null}
+                        primaryActionLabel={
+                          bulkAction === "resolved"
+                            ? "Marking resolved..."
+                            : "Mark selected resolved"
+                        }
+                        secondaryActionLabel={
+                          bulkAction === "unresolved"
+                            ? "Marking unresolved..."
+                            : "Mark selected unresolved"
+                        }
+                        primaryActionDisabled={
+                          selection.selectedCount === 0 ||
+                          selectedImprovements.every(
+                            (improvement) => improvement.status === "resolved"
+                          )
+                        }
+                        secondaryActionDisabled={
+                          selection.selectedCount === 0 ||
+                          selectedImprovements.every((improvement) => improvement.status === "open")
+                        }
+                        onPrimaryAction={() => {
+                          void handleBulkImprovementAction("resolved");
+                        }}
+                        onSecondaryAction={() => {
+                          void handleBulkImprovementAction("unresolved");
+                        }}
+                      />
                       <ImprovementsTable
                         improvements={sortedImprovements}
                         sort={sort}
                         onSortChange={(field) => setSort((current) => toggleSort(current, field))}
                         selectedImprovementIds={selection.selectedIdSet}
                         onToggleImprovementSelection={selection.toggleId}
+                        onToggleSelectAll={selection.toggleSelectAll}
                         onImprovementRowClick={(event, improvement) => {
                           if (shouldIgnoreTableRowActivation(event.target)) {
                             return;
@@ -353,6 +353,7 @@ export function ImprovementsPage(): JSX.Element {
             </Card>
           )}
           <StickyMobileTableActions
+            focusTargetId="workspace-improvements-title"
             selectedCount={selection.selectedCount}
             totalCount={sortedImprovements.length}
             allSelected={selection.allSelected}
@@ -398,6 +399,7 @@ export function ImprovementsTable(input: {
   onSortChange: (field: ImprovementSortField) => void;
   selectedImprovementIds: Set<string>;
   onToggleImprovementSelection: (improvementId: string) => void;
+  onToggleSelectAll?: () => void;
   onImprovementRowClick: (
     event: MouseEvent<HTMLTableRowElement>,
     improvement: ImprovementRecord
@@ -410,6 +412,7 @@ export function ImprovementsTable(input: {
     onSortChange,
     selectedImprovementIds,
     onToggleImprovementSelection,
+    onToggleSelectAll,
     onImprovementRowClick,
     projectScoped = false
   } = input;
@@ -418,8 +421,17 @@ export function ImprovementsTable(input: {
     <Table className="min-w-[980px]">
       <TableHeader>
         <TableRow>
-          <TableHead className="w-8">
-            <span className="sr-only">Select improvements</span>
+          <TableHead className={tableSelectionCellClassName} aria-label="Select improvements">
+            {onToggleSelectAll ? (
+              <TableSelectAllCheckbox
+                label="Select all visible improvements"
+                ids={improvements.map((improvement) => improvement.improvement_id)}
+                selectedIds={selectedImprovementIds}
+                onToggle={onToggleSelectAll}
+              />
+            ) : (
+              <span className="sr-only">Select improvements</span>
+            )}
           </TableHead>
           <SortableTableHead
             label="Improvement"
@@ -492,16 +504,12 @@ export function ImprovementsTable(input: {
               onImprovementRowClick(event, improvement);
             }}
           >
-            <TableCell className="align-middle" data-row-interactive="true">
-              <input
-                type="checkbox"
-                aria-label={`Select improvement ${improvement.title}`}
+            <TableCell className={tableSelectionCellClassName} data-row-interactive="true">
+              <TableSelectionCheckbox
+                label={`Select improvement ${improvement.title}`}
                 checked={selectedImprovementIds.has(improvement.improvement_id)}
-                onChange={() => {
+                onToggle={() => {
                   onToggleImprovementSelection(improvement.improvement_id);
-                }}
-                onClick={(event) => {
-                  event.stopPropagation();
                 }}
               />
             </TableCell>

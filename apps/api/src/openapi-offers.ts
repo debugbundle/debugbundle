@@ -47,7 +47,8 @@ const summaries: Record<OfferOperation, string> = {
   operator_codes: "Page public code ownership and programme bindings as an authorised operator",
   operator_claims: "Page minimal customer offer states as an authorised operator",
   operator_grants: "Page early-purchase approval history as an authorised operator",
-  draft: "Create an immutable programme draft or revised agreement",
+  draft:
+    "Create an immutable draft with an optional promotion_code saved atomically; code conflicts roll back the draft",
   provider: "Validate and bind an existing base-only Stripe coupon",
   state: "Explicitly activate, schedule, pause or end a programme",
   promotion_code: "Reserve a permanent promotional code",

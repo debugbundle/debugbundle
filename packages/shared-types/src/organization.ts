@@ -46,6 +46,7 @@ export const OrganizationPersonSchema = z
     user_id: z.uuid(),
     email: z.email(),
     role: OrganizationRoleSchema.nullable(),
+    avatar_url: z.string().nullable().optional(),
     project_access: z.enum(["selected", "all"]),
     default_project_role: z.enum(["member", "viewer"]),
     suspended_at: z.string().nullable(),

@@ -10,6 +10,7 @@ import {
 
 const auth = z.object({ bearerToken: z.string().min(1) }).strict();
 const scope = auth.extend({ organizationId: z.uuid() });
+const people = scope.extend({ includeAvatars: z.boolean().optional() });
 const person = scope.extend({ userId: z.uuid() });
 const invite = scope.extend({ invitation: OrganizationInviteBodySchema });
 const cancelInvite = scope.extend({ inviteId: z.uuid() });
@@ -42,9 +43,9 @@ export const ORGANIZATION_MCP_TOOL_CATALOG = [
   },
   {
     name: ORGANIZATION_MCP_TOOL_NAMES[1],
-    inputSchema: scope,
+    inputSchema: people,
     description:
-      "List retained Business people, direct project counts, org grants and suspension. Owner or explicitly scoped Org Admin only.",
+      "List retained Business people, direct project counts, org grants and suspension. Set includeAvatars to include protected cached avatar URLs. Owner or explicitly scoped Org Admin only.",
     read: true
   },
   {
@@ -179,7 +180,7 @@ export function createOrganizationMcpTools(
     list_organizations: forward(auth, async (input) => ({
       organizations: await api.listOrganizations(input)
     })),
-    list_organization_people: forward(scope, async (input) => ({
+    list_organization_people: forward(people, async (input) => ({
       people: await api.listPeople(input)
     })),
     list_organization_invites: forward(scope, async (input) => ({

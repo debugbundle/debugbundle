@@ -10,6 +10,20 @@ import {
 import { mockedObject } from "../../helpers/vitest.js";
 const org = "11111111-1111-4111-8111-111111111111";
 describe("organization MCP tools", () => {
+  it("preserves the explicit avatar opt-in through the shared people reader", async () => {
+    const listPeople = vi.fn().mockResolvedValue([]);
+    const tools = createOrganizationMcpTools(mockedObject<OrganizationApi>({ listPeople }));
+    await tools.list_organization_people({
+      bearerToken: "member",
+      organizationId: org,
+      includeAvatars: true
+    });
+    expect(listPeople).toHaveBeenCalledExactlyOnceWith({
+      bearerToken: "member",
+      organizationId: org,
+      includeAvatars: true
+    });
+  });
   it("validates explicit org grants and forwards the same domain request", async () => {
     const update = vi.fn().mockResolvedValue(undefined);
     const tools = createOrganizationMcpTools(

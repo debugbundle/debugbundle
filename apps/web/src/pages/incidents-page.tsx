@@ -11,6 +11,9 @@ import { PageHeader } from "../components/system/page-header.js";
 import { ResourceListState } from "../components/system/resource-list-state.js";
 import {
   SelectableTableActions,
+  TableSelectionCheckbox,
+  TableSelectAllCheckbox,
+  tableSelectionCellClassName,
   StickyMobileTableActions,
   shouldIgnoreTableRowActivation,
   useVisibleRowSelection
@@ -144,7 +147,9 @@ export function IncidentsPage(): JSX.Element {
       <Card className="min-w-0">
         <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex w-full items-center justify-between gap-3 sm:w-auto">
-            <CardTitle>{inventoryTitle("Incident inventory", totalCount)}</CardTitle>
+            <CardTitle id="workspace-incidents-title" tabIndex={-1}>
+              {inventoryTitle("Incident inventory", totalCount)}
+            </CardTitle>
             <TableRefreshButton
               isLoading={isLoading}
               onRefresh={refreshPage}
@@ -218,45 +223,49 @@ export function IncidentsPage(): JSX.Element {
             }
           >
             {() => (
-              <div className="space-y-4">
-                <div className="hidden sm:block">
-                  <SelectableTableActions
-                    itemLabel="incident"
-                    totalCount={sortedIncidents.length}
-                    selectedCount={selection.selectedCount}
-                    allSelected={selection.allSelected}
-                    isBusy={bulkAction !== null}
-                    primaryActionLabel={
-                      bulkAction === "resolved" ? "Marking resolved..." : "Mark selected resolved"
-                    }
-                    secondaryActionLabel={
-                      bulkAction === "unresolved"
-                        ? "Marking unresolved..."
-                        : "Mark selected unresolved"
-                    }
-                    primaryActionDisabled={
-                      selection.selectedCount === 0 ||
-                      selectedIncidents.every((incident) => incident.status === "resolved")
-                    }
-                    secondaryActionDisabled={
-                      selection.selectedCount === 0 ||
-                      selectedIncidents.every((incident) => incident.status !== "resolved")
-                    }
-                    onToggleSelectAll={selection.toggleSelectAll}
-                    onClearSelection={selection.clearSelection}
-                    onPrimaryAction={() => {
-                      void handleBulkIncidentAction("resolved");
-                    }}
-                    onSecondaryAction={() => {
-                      void handleBulkIncidentAction("unresolved");
-                    }}
-                  />
-                </div>
+              <div className="flex flex-col gap-4">
+                <SelectableTableActions
+                  focusTargetId="workspace-incidents-title"
+                  className="hidden sm:flex"
+                  itemLabel="incident"
+                  selectedCount={selection.selectedCount}
+                  isBusy={bulkAction !== null}
+                  primaryActionLabel={
+                    bulkAction === "resolved" ? "Marking resolved..." : "Mark selected resolved"
+                  }
+                  secondaryActionLabel={
+                    bulkAction === "unresolved"
+                      ? "Marking unresolved..."
+                      : "Mark selected unresolved"
+                  }
+                  primaryActionDisabled={
+                    selection.selectedCount === 0 ||
+                    selectedIncidents.every((incident) => incident.status === "resolved")
+                  }
+                  secondaryActionDisabled={
+                    selection.selectedCount === 0 ||
+                    selectedIncidents.every((incident) => incident.status !== "resolved")
+                  }
+                  onPrimaryAction={() => {
+                    void handleBulkIncidentAction("resolved");
+                  }}
+                  onSecondaryAction={() => {
+                    void handleBulkIncidentAction("unresolved");
+                  }}
+                />
                 <Table className="min-w-[980px]">
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-8">
-                        <span className="sr-only">Select incidents</span>
+                      <TableHead
+                        className={tableSelectionCellClassName}
+                        aria-label="Select incidents"
+                      >
+                        <TableSelectAllCheckbox
+                          label="Select all visible incidents"
+                          ids={sortedIncidents.map((incident) => incident.incident_id)}
+                          selectedIds={selection.selectedIdSet}
+                          onToggle={selection.toggleSelectAll}
+                        />
                       </TableHead>
                       <SortableTableHead
                         label="Incident"
@@ -331,16 +340,15 @@ export function IncidentsPage(): JSX.Element {
                           void navigate(`/incidents/${incident.incident_id}`);
                         }}
                       >
-                        <TableCell className="align-middle" data-row-interactive="true">
-                          <input
-                            type="checkbox"
-                            aria-label={`Select incident ${incident.title}`}
+                        <TableCell
+                          className={tableSelectionCellClassName}
+                          data-row-interactive="true"
+                        >
+                          <TableSelectionCheckbox
+                            label={`Select incident ${incident.title}`}
                             checked={selection.selectedIdSet.has(incident.incident_id)}
-                            onChange={() => {
+                            onToggle={() => {
                               selection.toggleId(incident.incident_id);
-                            }}
-                            onClick={(event) => {
-                              event.stopPropagation();
                             }}
                           />
                         </TableCell>
@@ -415,6 +423,7 @@ export function IncidentsPage(): JSX.Element {
       </Card>
 
       <StickyMobileTableActions
+        focusTargetId="workspace-incidents-title"
         selectedCount={selection.selectedCount}
         totalCount={sortedIncidents.length}
         allSelected={selection.allSelected}

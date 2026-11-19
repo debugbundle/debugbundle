@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { App } from "../../../apps/web/src/app.js";
 import { resetBrowserSessionClientState } from "../../../apps/web/src/lib/api.js";
@@ -42,7 +42,7 @@ function setup(role: "owner" | "admin" | "member" = "owner") {
       return jsonResponse(200, {
         organizations: [{ organization_id: org, name: "Example", plan: "business", role }]
       });
-    if (url.endsWith("/people"))
+    if (new URL(url, "http://localhost").pathname.endsWith("/people"))
       return jsonResponse(200, {
         people: [
           { ...person, user_id: owner, email: "owner@example.test", role: "owner" },
@@ -66,6 +66,15 @@ function setup(role: "owner" | "admin" | "member" = "owner") {
   return { mutate, fetchMock };
 }
 describe("organisation people controls", () => {
+  it("uses the project-members avatar and initials pattern beside each person's email", async () => {
+    setup();
+    render(<App initialEntries={["/settings/people"]} />);
+    const row = await screen.findByRole("row", { name: /member@example.test/ });
+    const cell = within(row).getAllByRole("cell")[0]!;
+    expect(cell.querySelector('[data-slot="avatar"]')).not.toBeNull();
+    expect(within(cell).getByText("ME")).toBeVisible();
+    expect(within(cell).getByText("member@example.test")).toBeVisible();
+  });
   it("keeps a failed ownership cancellation visible and refreshes current ownership after a successful retry", async () => {
     const { fetchMock: base } = setup(),
       user = userEvent.setup();
@@ -200,9 +209,11 @@ describe("organisation people controls", () => {
     const { fetchMock } = setup("member");
     render(<App initialEntries={["/settings/people"]} />);
     await screen.findByText(/Owner or Admin access is required/i);
-    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/people"))).toBe(
-      false
-    );
+    expect(
+      fetchMock.mock.calls.some(([input]) =>
+        new URL(requestUrl(input), "http://localhost").pathname.endsWith("/people")
+      )
+    ).toBe(false);
   });
 
   it("never accepts an ownership link on GET and requires an explicit responsibility choice", async () => {

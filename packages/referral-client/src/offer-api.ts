@@ -15,6 +15,7 @@ import { PublicOfferContextQuerySchema } from "../../referrals/src/offer-choice.
 import { PAYOUT_OPERATIONS } from "./payout-operations.js";
 import {
   CreatorCodeSchema,
+  PromotionCodeSchema,
   CreatorProgrammeSchema,
   OfferClaimSchema,
   OfferDefinitionSchema,
@@ -219,7 +220,7 @@ export const OFFER_OPERATIONS = {
   draft: {
     method: "POST",
     path: "/v2/offers/operator/programmes",
-    input: ProgrammeDraftSchema.extend({ programme_id: z.uuid().optional() }),
+    input: ProgrammeDraftSchema.safeExtend({ programme_id: z.uuid().optional() }),
     response: z.object({ programme: ProgrammeVersionSchema }).strict(),
     read: false,
     operator: true
@@ -256,7 +257,7 @@ export const OFFER_OPERATIONS = {
   promotion_code: {
     method: "POST",
     path: "/v2/offers/operator/promotion-codes",
-    input: z.object({ version_id: z.uuid(), code: CreatorCodeSchema }).strict(),
+    input: z.object({ version_id: z.uuid(), code: PromotionCodeSchema }).strict(),
     response: ok,
     read: false,
     operator: true

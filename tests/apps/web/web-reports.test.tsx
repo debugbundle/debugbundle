@@ -137,7 +137,8 @@ function setup(
           ]
         });
       if (url.endsWith("/v1/organizations")) return jsonResponse(200, { organizations: [] });
-      if (url.endsWith("/people")) return jsonResponse(200, { people: [] });
+      if (new URL(url, "http://localhost").pathname.endsWith("/people"))
+        return jsonResponse(200, { people: [] });
       return jsonResponse(404, { error: "not_found" });
     })
   );

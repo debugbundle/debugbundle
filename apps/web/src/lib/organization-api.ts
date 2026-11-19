@@ -25,7 +25,8 @@ const auth = { bearerToken: "" };
 const scope = (organizationId: string): OrganizationScope => ({ ...auth, organizationId });
 export const organizationApi = {
   list: () => api.listOrganizations(auth),
-  people: (organizationId: string) => api.listPeople(scope(organizationId)),
+  people: (organizationId: string) =>
+    api.listPeople({ ...scope(organizationId), includeAvatars: true }),
   invites: (organizationId: string) => api.listInvites(scope(organizationId)),
   invite: (organizationId: string, invitation: OrganizationInviteBody) =>
     api.invite({ ...scope(organizationId), invitation }),

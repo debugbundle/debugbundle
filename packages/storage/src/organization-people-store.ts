@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
-import type { OrganizationPerson } from "../../shared-types/src/index.js";
 import type { Queryable } from "./types.js";
 import { runInTransaction } from "./transaction.js";
 import {
   OrganizationManagementError,
+  type OrganizationPersonRecord,
   type OrganizationManagementStore
 } from "./organization-management-types.js";
 import {
@@ -21,22 +21,23 @@ export function createOrganizationPeopleStore(
   return {
     async listOrganizationPeople(input) {
       await requireOrganizationAdministrator(db, input, false);
-      const result = await db.query<OrganizationPerson & Record<string, unknown>>(
+      const result = await db.query<OrganizationPersonRecord & Record<string, unknown>>(
         `
         WITH people AS (
           SELECT user_id FROM organization_members WHERE organization_id=$1::uuid
           UNION SELECT pm.user_id FROM project_members pm JOIN projects p ON p.id=pm.project_id WHERE p.organization_id=$1::uuid
           UNION SELECT owner_user_id FROM projects WHERE organization_id=$1::uuid AND owner_user_id IS NOT NULL
-        ) SELECT u.id AS user_id,u.email,om.role,COALESCE(om.project_access,'selected') AS project_access,
+        ) SELECT u.id AS user_id,u.email${input.include_avatar_metadata === true ? ",u.avatar_object_key" : ""},om.role,COALESCE(om.project_access,'selected') AS project_access,
           COALESCE(om.default_project_role,'member') AS default_project_role,
           om.suspended_at::text AS suspended_at,om.grants_paused_at::text AS grants_paused_at,
           (SELECT COUNT(*)::integer FROM project_members pm JOIN projects p ON p.id=pm.project_id
             WHERE pm.user_id=u.id AND p.organization_id=$1::uuid) AS direct_project_count
         FROM people JOIN users u ON u.id=people.user_id
         LEFT JOIN organization_members om ON om.organization_id=$1::uuid AND om.user_id=u.id
+        WHERE ($2::uuid IS NULL OR u.id=$2::uuid)
         ORDER BY CASE om.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END,lower(u.email),u.id
         LIMIT 1000`,
-        [input.organization_id]
+        [input.organization_id, input.user_id ?? null]
       );
       return result.rows;
     },

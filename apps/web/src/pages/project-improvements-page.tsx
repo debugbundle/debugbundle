@@ -195,7 +195,7 @@ export function ProjectImprovementsPage(): JSX.Element {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4">
       {!hostedImprovementsEnabled ? (
         <HostedImprovementsUpgradeCallout scope="project" />
       ) : (
@@ -203,7 +203,9 @@ export function ProjectImprovementsPage(): JSX.Element {
           <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex w-full items-start justify-between gap-3 sm:block sm:w-auto">
               <div className="space-y-1.5">
-                <CardTitle>{inventoryTitle("Project improvements", totalCount)}</CardTitle>
+                <CardTitle id="project-improvements-title" tabIndex={-1}>
+                  {inventoryTitle("Project improvements", totalCount)}
+                </CardTitle>
                 <CardDescription>
                   Deterministic improvement opportunities for this project.
                 </CardDescription>
@@ -276,48 +278,43 @@ export function ProjectImprovementsPage(): JSX.Element {
               }
             >
               {() => (
-                <div className="space-y-4">
-                  <div className="hidden sm:block">
-                    <SelectableTableActions
-                      itemLabel="improvement"
-                      totalCount={sortedImprovements.length}
-                      selectedCount={selection.selectedCount}
-                      allSelected={selection.allSelected}
-                      isBusy={bulkAction !== null}
-                      primaryActionLabel={
-                        bulkAction === "resolved" ? "Marking resolved..." : "Mark selected resolved"
-                      }
-                      secondaryActionLabel={
-                        bulkAction === "unresolved"
-                          ? "Marking unresolved..."
-                          : "Mark selected unresolved"
-                      }
-                      primaryActionDisabled={
-                        selection.selectedCount === 0 ||
-                        selectedImprovements.every(
-                          (improvement) => improvement.status === "resolved"
-                        )
-                      }
-                      secondaryActionDisabled={
-                        selection.selectedCount === 0 ||
-                        selectedImprovements.every((improvement) => improvement.status === "open")
-                      }
-                      onToggleSelectAll={selection.toggleSelectAll}
-                      onClearSelection={selection.clearSelection}
-                      onPrimaryAction={() => {
-                        void handleBulkImprovementAction("resolved");
-                      }}
-                      onSecondaryAction={() => {
-                        void handleBulkImprovementAction("unresolved");
-                      }}
-                    />
-                  </div>
+                <div className="flex flex-col gap-4">
+                  <SelectableTableActions
+                    focusTargetId="project-improvements-title"
+                    className="hidden sm:flex"
+                    itemLabel="improvement"
+                    selectedCount={selection.selectedCount}
+                    isBusy={bulkAction !== null}
+                    primaryActionLabel={
+                      bulkAction === "resolved" ? "Marking resolved..." : "Mark selected resolved"
+                    }
+                    secondaryActionLabel={
+                      bulkAction === "unresolved"
+                        ? "Marking unresolved..."
+                        : "Mark selected unresolved"
+                    }
+                    primaryActionDisabled={
+                      selection.selectedCount === 0 ||
+                      selectedImprovements.every((improvement) => improvement.status === "resolved")
+                    }
+                    secondaryActionDisabled={
+                      selection.selectedCount === 0 ||
+                      selectedImprovements.every((improvement) => improvement.status === "open")
+                    }
+                    onPrimaryAction={() => {
+                      void handleBulkImprovementAction("resolved");
+                    }}
+                    onSecondaryAction={() => {
+                      void handleBulkImprovementAction("unresolved");
+                    }}
+                  />
                   <ImprovementsTable
                     improvements={sortedImprovements}
                     sort={sort}
                     onSortChange={(field) => setSort((current) => toggleSort(current, field))}
                     selectedImprovementIds={selection.selectedIdSet}
                     onToggleImprovementSelection={selection.toggleId}
+                    onToggleSelectAll={selection.toggleSelectAll}
                     onImprovementRowClick={(event, improvement) => {
                       if (shouldIgnoreTableRowActivation(event.target)) {
                         return;
@@ -354,6 +351,7 @@ export function ProjectImprovementsPage(): JSX.Element {
         </Card>
       )}
       <StickyMobileTableActions
+        focusTargetId="project-improvements-title"
         selectedCount={selection.selectedCount}
         totalCount={sortedImprovements.length}
         allSelected={selection.allSelected}

@@ -5,6 +5,7 @@ import { userEvent } from "@testing-library/user-event";
 import { OfferProgrammeEditor } from "../../../apps/web/src/components/system/offer-programme-editor.js";
 import { OfferOperatorTools } from "../../../apps/web/src/components/system/offer-operator-tools.js";
 import { OfferProgrammeVersionControl } from "../../../apps/web/src/components/system/offer-programme-version-control.js";
+import { OfferPromotionCodes } from "../../../apps/web/src/components/system/offer-promotion-codes.js";
 import { resetBrowserSessionClientState } from "../../../apps/web/src/lib/api.js";
 import { jsonResponse, requestUrl } from "./web-test-helpers.js";
 import { offerVersion } from "../../helpers/offer-fixtures.js";
@@ -16,6 +17,48 @@ afterEach(() => {
 const change = (label: string, value: string): void => {
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
 };
+it("chooses the promotional code during creation, reports validation locally and preserves a conflicting draft", async () => {
+  const user = userEvent.setup(),
+    saved = vi.fn(),
+    writes: unknown[] = [];
+  let fail = true;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      writes.push(JSON.parse(typeof init?.body === "string" ? init.body : "{}"));
+      if (fail) {
+        fail = false;
+        return jsonResponse(409, { error: "creator_code_unavailable" });
+      }
+      return jsonResponse(200, {
+        programme: {
+          ...offerVersion,
+          state: "draft",
+          policy: { ...offerVersion.policy, kind: "promotion", commission_basis_points: 0 }
+        }
+      });
+    })
+  );
+  render(<OfferProgrammeEditor source={null} onSaved={saved} onCancel={vi.fn()} />);
+  expect(screen.queryByLabelText("Promotional code")).toBeNull();
+  screen.getByRole("combobox", { name: "Programme type" }).focus();
+  await user.keyboard("{ArrowDown}{End}{Enter}");
+  change("Promotional code", "bad/code");
+  await user.click(screen.getByRole("button", { name: "Save draft" }));
+  expect(writes).toHaveLength(0);
+  expect(screen.getByRole("alert")).toHaveTextContent(/letters, numbers/);
+  expect(screen.getByLabelText("Promotional code")).toHaveAttribute("aria-invalid", "true");
+  change("Promotional code", "blckfryd26");
+  await user.click(screen.getByRole("button", { name: "Save draft" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent(/already in use/);
+  expect(screen.getByLabelText("Promotional code")).toHaveAttribute("aria-invalid", "true");
+  expect(screen.getByLabelText("Promotional code")).toHaveValue("blckfryd26");
+  await user.click(screen.getByRole("button", { name: "Save draft" }));
+  await waitFor(() => expect(saved).toHaveBeenCalledOnce());
+  expect(writes).toHaveLength(2);
+  expect(writes[1]).toMatchObject({ promotion_code: "BLCKFRYD26", policy: { kind: "promotion" } });
+  expect(screen.queryByRole("button", { name: "Reserve promotional code" })).toBeNull();
+});
 it("validates a revised agreement, preserves failed drafts and never activates while saving", async () => {
   const user = userEvent.setup(),
     saved = vi.fn(),
@@ -78,6 +121,90 @@ it("validates a revised agreement, preserves failed drafts and never activates w
   await user.click(screen.getByRole("button", { name: "Cancel" }));
   expect(cancel).toHaveBeenCalledOnce();
 });
+it("reads the saved promotional code for the exact version and retries without presenting an unsaved reservation", async () => {
+  const user = userEvent.setup(),
+    requests: string[] = [];
+  let fail = true;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL) => {
+      const path = requestUrl(input);
+      requests.push(path);
+      if (fail) {
+        fail = false;
+        return jsonResponse(503, { error: "programme_unavailable" });
+      }
+      return jsonResponse(200, {
+        codes: [
+          {
+            code_id: offerVersion.programme_id,
+            code: "BLCKFRYD26",
+            kind: "promotion",
+            partner_id: null,
+            version_id: offerVersion.version_id,
+            blocked: false,
+            preferred: false,
+            created_at: offerVersion.created_at
+          }
+        ]
+      });
+    })
+  );
+  render(<OfferPromotionCodes versionId={offerVersion.version_id} state="active" />);
+  await user.click(await screen.findByRole("button", { name: "Retry code" }));
+  expect(await screen.findByText("BLCKFRYD26")).toBeVisible();
+  expect(requests).toHaveLength(2);
+  for (const path of requests)
+    expect(new URL(path, "http://localhost").searchParams.get("version_id")).toBe(
+      offerVersion.version_id
+    );
+  expect(screen.queryByRole("button", { name: "Reserve promotional code" })).toBeNull();
+});
+it("refreshes an older draft's generated code after activation without remounting the programme", async () => {
+  let active = false;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () =>
+      jsonResponse(200, {
+        codes: active
+          ? [
+              {
+                code_id: offerVersion.programme_id,
+                code: "PROMO-LEGACY20",
+                kind: "promotion",
+                partner_id: null,
+                version_id: offerVersion.version_id,
+                blocked: false,
+                preferred: false,
+                created_at: offerVersion.created_at
+              }
+            ]
+          : []
+      })
+    )
+  );
+  const programme = (state: "draft" | "active" | "ended") => (
+    <OfferProgrammeVersionControl
+      version={{
+        ...offerVersion,
+        state,
+        policy: { ...offerVersion.policy, kind: "promotion", commission_basis_points: 0 }
+      }}
+      onChanged={vi.fn()}
+      onRevise={vi.fn()}
+      readOnly
+    />
+  );
+  const view = render(programme("draft"));
+  expect(await screen.findByText(/Activation will generate one/)).toBeVisible();
+  active = true;
+  view.rerender(programme("active"));
+  expect(await screen.findByText("PROMO-LEGACY20")).toBeVisible();
+  active = false;
+  view.rerender(programme("ended"));
+  expect(await screen.findByText("No promotional code recorded for this revision.")).toBeVisible();
+  expect(screen.queryByText(/Activation will generate one/)).toBeNull();
+});
 it("prepares payment discounts through activation and retries failure without manual coupon fields", async () => {
   const user = userEvent.setup(),
     changed = vi.fn(),
@@ -88,6 +215,7 @@ it("prepares payment discounts through activation and retries failure without ma
     "fetch",
     vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const path = requestUrl(input);
+      if (path.includes("/operator/codes?")) return jsonResponse(200, { codes: [] });
       writes.push({ path, body: JSON.parse(typeof init?.body === "string" ? init.body : "{}") });
       if (path.endsWith("/state") && fail) {
         fail = false;
@@ -123,13 +251,10 @@ it("prepares payment discounts through activation and retries failure without ma
   expect(changed).not.toHaveBeenCalled();
   await user.click(screen.getByRole("button", { name: "Confirm change" }));
   await waitFor(() => expect(changed).toHaveBeenCalledTimes(1));
-  change("Promotional code", "HOLIDAY30");
-  await user.click(screen.getByRole("button", { name: "Reserve promotional code" }));
-  await waitFor(() => expect(changed).toHaveBeenCalledTimes(2));
+  expect(screen.queryByRole("button", { name: "Reserve promotional code" })).toBeNull();
   expect(writes.map((w) => w.path)).toEqual([
     expect.stringContaining("/state"),
-    expect.stringContaining("/state"),
-    expect.stringContaining("/promotion-codes")
+    expect.stringContaining("/state")
   ]);
   expect(writes[0]!.body).toEqual({
     state: "active",

@@ -123,12 +123,12 @@ it.each(inventories)(
       screen.getByRole("table").compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
     if (key === "improvements") {
-      const hint = screen.getByText("Select improvements on this page to apply a bulk action.");
       expect(
-        hint.compareDocumentPosition(
-          screen.getByRole("button", { name: "Select all visible improvements" })
-        ) & Node.DOCUMENT_POSITION_FOLLOWING
-      ).toBeTruthy();
+        screen.queryByText("Select improvements on this page to apply a bulk action.")
+      ).toBeNull();
+      expect(
+        screen.queryByRole("checkbox", { name: "Select all visible improvements" })
+      ).toBeNull();
     }
     expect(within(footer).getByText("Page 1 of 4")).toBeInTheDocument();
     await user.click(within(footer).getByRole("button", { name: "Go to next page" }));

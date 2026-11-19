@@ -533,10 +533,17 @@ attention filter and ten-row default. Weekly reviews reads the existing
 authorised metadata pages (50 per request, at most 100 requests, cancelled between
 pages on scope/unmount), counts unique returned reviews only after the complete
 read succeeds, and pages that retained history locally. Failed/incomplete reads
-never supply a total. Workspace Improvements restores `Select improvements on
-this page to apply a bulk action.` before its Select all visible improvements
-button. Existing permissions, filters, selections and review-generation consent
-remain authoritative.
+never supply a total. Selectable Incident and Improvement tables use the shared
+shadcn checkbox. Their bulk-action bar and header select-all checkbox appear only
+after a visible row is selected and disappear when selection clears or leaves
+the page. The header shows a mixed state for partial selection and selects or
+clears the visible page. The top bar retains count/actions without redundant
+Select all/Clear selection text buttons. Existing permissions, filters,
+selections and review-generation consent remain authoritative.
+Organisation People shows the same small cached profile avatar and initials
+fallback beside the email as project members. Avatar metadata is an explicit
+read opt-in; default People responses retain their shape and avatar bytes
+require current organisation-administrator access to that retained person.
 
 **FR-WEB-10:** An explicitly opted-in local UI preview must populate the ordinary dashboard and related review surfaces with synthetic data. Simulated edits are held in memory, never forwarded to real services, and reset on preview restart. The preview is development-only, loopback-only, excluded from production builds, and disables frontend telemetry.
 
@@ -1191,6 +1198,12 @@ for new versioned programmes while preserving legacy Business-only claims.
   Explicit activation/scheduling automatically prepares or verifies the provider
   discount from immutable programme terms and server-selected mode. Preserve
   existing bindings; normal operator UI requires no Stripe coupon ID.
+  Promotional programme creation selects its public code in the draft form and
+  saves both atomically. Invalid or conflicting codes retain the form with a
+  field error; the programme shows its authoritative saved code without a
+  separate reservation action. Operator promotion codes may use ten-character
+  campaign names; global uniqueness and reserved official names still apply.
+  Creator namespace restrictions and compatible optional-code API clients remain.
 - **FR-REF-05:** Introductory referral/first-purchase/holiday percentage offers share one identity-level benefit. Explicit offer replacement preserves partner attribution and cannot stack benefits.
   Prefer the lowest eligible rounded base-invoice amount; referrals win equal-price
   comparisons. A cheaper promotion keeps the original creator and frozen commission
