@@ -1,5 +1,20 @@
 # Agent distribution ledger
 
+## Offer comparison release — npm clients published 19 November 2026
+
+CLI/MCP 1.27.0 are published from qualified core `92f97427`, merged through PR21
+with an identical tree. Packed installs, clean npm installs and native client
+checks pass; both downloaded artifacts match their registry SHA-512 integrity.
+The new optional offer inputs preserve installed-client defaults. Codex 1.9.0,
+Claude Code 1.25.0 and Gemini 1.8.0 retain their compatible MCP 1.26.0 pins and
+are not republished. The restricted hosted OpenAI distribution is unchanged.
+
+The portable skill and OpenClaw companion select 1.27.0 independently. Their
+exact-version platform security, normal installation and capability discovery
+remain separate from npm acceptance; see [the release record](release-20261119.md)
+and the private cloud execution receipts rather than treating npm publication
+as a platform-security pass. Smithery publication remains retired.
+
 ## Affiliate release - published 18 November 2026, discovery accepted
 
 CLI and MCP 1.26.0 are published with registry-install and native client checks.

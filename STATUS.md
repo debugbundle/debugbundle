@@ -1,4 +1,4 @@
-# 19 November production release train — authorized, qualifying
+# 19 November release qualification — core 1.29.0 and clients 1.27.0
 
 The owner now authorizes all pending DebugBundle commits and the production
 release flow. Selected versions are core 1.29.0, CLI/MCP/OpenClaw/portable skill
@@ -9,11 +9,21 @@ and the hosted OpenAI plugin retain their versions. See
 production preservation and final gates. Earlier withheld-release notes below
 are historical and superseded by this authorization.
 
-Read-only production baseline confirms core 1.28.1 and 94 migration checksums,
-with existing Business, reports, reviews, project merges and referrals enabled.
-Credentials and commercial/financial fingerprints are retained only in ignored
-local evidence. Full CI, isolated affected-path coverage and artifact checks are
-in progress; publication and deployment have not yet occurred.
+Core PR21 is merged after full CI passed all 146 coverage shards and 7,236 tests,
+the unchanged coverage gates, 18 PDF regressions and the production build.
+The merged tree matches the qualified candidate. CLI/MCP 1.27.0 are published;
+fresh registry/native installations and downloaded SHA-512 integrity checks pass.
+The CLI acceptance rerun reused the accepted artifact after delayed npm visibility.
+
+The compatible production backend is healthy on 1.29.0 with 95 migration rows.
+Every original checksum, credential/settings fingerprint and all 16 commercial
+table fingerprints are preserved. The repair adds one expected promotion alias;
+existing codes and policies remain intact. The worker is active, anonymous offer
+discovery succeeds and the healthy previous runtime is retained. Site 1.11.1 has
+passed its independent CI and tagged release. Final hosted app/site promotion,
+MCP ecosystem security/discovery acceptance and production receipts are separate
+gates recorded in the private cloud release runbook. A production Lighthouse
+score of 100 is not inferred from source checks or local comparison runs.
 
 # 18 November offer release hardening — ready locally, release withheld
 
