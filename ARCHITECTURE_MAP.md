@@ -1,3 +1,9 @@
+Core 1.30.1 uses `components/ui/tabs.tsx` TabsScrollArea for horizontal
+navigation without vertical scrollbars. Site 1.11.3 clips homepage artwork at
+the page shell and loads the existing canvas engine through a near-viewport
+dynamic import. Banner copy remains in PublicOfferNoticeControl. Contracts
+and distribution decisions are recorded in `spec/release-1.30.1.md`.
+
 Core 1.30.0 table selection: `selectable-table-actions.tsx` owns reusable shadcn row
 and conditional header checkboxes plus selection-only bulk actions. The People
 page reuses `UserAvatar`; `OrganizationPeopleStore` optionally reads existing

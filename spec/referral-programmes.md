@@ -214,6 +214,12 @@ when the displayed terms are a cheaper promotion. Invalid explicit codes never
 masquerade as a valid promotion. Preview reads create no cookie,
 claim or provider object. The existing site-wide banner, details, pricing and
 signup link consume this same context on the homepage and other public layouts.
+The public banner retains the single-line “X% off” shorthand on phones and says
+“X% off eligible plans” on larger screens. At the desktop navigation breakpoint
+it prefixes the promotion's programme name, or the fixed
+customer-facing “DebugBundle Referral Offer” title for referrals, with a dot
+separating title and discount. Referral details use that same customer-facing
+title. Full eligibility, one-invoice and renewal conditions stay in the details.
 The promotional draft form requires a chosen public code. The shared draft
 input accepts optional `promotion_code` for compatible API/CLI/MCP clients and
 saves it in the same transaction as the new version. Duplicate/reserved/invalid

@@ -5,7 +5,7 @@ import { CalloutCard } from "./callout-card.js";
 import { useProjectRoute } from "./project-route-context.js";
 import { Button } from "../ui/button.js";
 import { Skeleton } from "../ui/skeleton.js";
-import { Tabs, TabsList, TabsTrigger } from "../ui/tabs.js";
+import { Tabs, TabsList, TabsScrollArea, TabsTrigger } from "../ui/tabs.js";
 import { listProjects, type ProjectRecord } from "../../lib/api.js";
 import {
   getProjectEffectiveRole,
@@ -197,7 +197,7 @@ export function ProjectLayout(): JSX.Element {
   return (
     <div className="min-w-0 space-y-6">
       <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <div className="overflow-x-auto overscroll-x-contain pb-1">
+        <TabsScrollArea>
           <TabsList className="min-w-max justify-start">
             {visibleTabs.map((tab) => (
               <TabsTrigger key={tab.value} value={tab.value} className="shrink-0 flex-none px-3">
@@ -205,7 +205,7 @@ export function ProjectLayout(): JSX.Element {
               </TabsTrigger>
             ))}
           </TabsList>
-        </div>
+        </TabsScrollArea>
       </Tabs>
 
       <Outlet

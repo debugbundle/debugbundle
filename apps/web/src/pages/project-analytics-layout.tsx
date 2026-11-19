@@ -39,7 +39,7 @@ import {
   SelectValue
 } from "../components/ui/select.js";
 import { Skeleton } from "../components/ui/skeleton.js";
-import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs.js";
+import { Tabs, TabsList, TabsScrollArea, TabsTrigger } from "../components/ui/tabs.js";
 import {
   getProjectAnalyticsSettings,
   type AnalyticsMetricsQuery,
@@ -275,7 +275,7 @@ export function ProjectAnalyticsLayout(): JSX.Element {
   return (
     <div className="flex flex-col gap-6">
       <Tabs value={activeSection} onValueChange={changeSection}>
-        <div className="overflow-x-auto overscroll-x-contain pb-1">
+        <TabsScrollArea>
           <TabsList
             variant="line"
             aria-label="Analytics sections"
@@ -287,7 +287,7 @@ export function ProjectAnalyticsLayout(): JSX.Element {
               </TabsTrigger>
             ))}
           </TabsList>
-        </div>
+        </TabsScrollArea>
       </Tabs>
 
       <div
