@@ -1,5 +1,25 @@
 # Agent distribution ledger
 
+## Programme and People release — 19 November 2026
+
+CLI/MCP 1.28.0 are published from qualified core `e29549e3`, merged as `cfff75b6`
+with an identical tree. Their exact downloaded archives match npm SHA-512
+integrity and source identity; packed/native and genuinely fresh-cache registry
+installs pass. Optional promotion-code, revision-inventory and People-avatar
+inputs retain prior defaults. Shared-types 3.8.0 ships the additive avatar schema;
+redaction 2.7.1 and all capture SDKs retain their existing artifacts.
+
+The portable skill and OpenClaw companion 1.28.0 are public with clean final
+ClawScan reviews and clean skill moderation. Three skill heuristic warnings are
+retained and adjudicated benign by the final platform review; individual scanners
+are not all claimed clean. Capability discovery passes six of seven queries
+against the five-query minimum. A normal current-OpenClaw exact-version install
+passes without a force override, and the public portable skill body matches the
+qualified installer pins. Existing Codex 1.9.0, Claude Code 1.25.0 and Gemini 1.8.0
+retain their compatible MCP 1.26.0 pins. Smithery remains retired. See
+[release receipts](release-1.30.0.md) and the private hosted runbook for exact
+source, security, installation and production evidence.
+
 ## Offer comparison release — npm clients published 19 November 2026
 
 CLI/MCP 1.27.0 are published from qualified core `92f97427`, merged through PR21

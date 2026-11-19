@@ -1,11 +1,11 @@
-Local table selection: `selectable-table-actions.tsx` owns reusable shadcn row
+Core 1.30.0 table selection: `selectable-table-actions.tsx` owns reusable shadcn row
 and conditional header checkboxes plus selection-only bulk actions. The People
 page reuses `UserAvatar`; `OrganizationPeopleStore` optionally reads existing
 cached avatar metadata with an exact-person filter. Organisation routes strip
 object keys and recheck administrator/person scope on image reads. The shared
 organisation client supplies the optional metadata read across web/CLI/MCP.
 
-Local programme creation: `ProgrammeDraftSchema.promotion_code` and
+Core 1.30.0 programme creation: `ProgrammeDraftSchema.promotion_code` and
 `PromotionCodeSchema` share operator-code validation across API/CLI/MCP.
 `storage/offer-code-registry.ts` joins code reservation to `createDraft`'s existing
 transaction; no storage shape changes. The editor chooses the code and
@@ -13,7 +13,7 @@ transaction; no storage shape changes. The editor chooses the code and
 optional `version_id` filter. Public version DTOs remain unchanged. The site
 `SiteShell` owns viewport-based skip-link hiding and the focusable main target.
 
-Unreleased best-price policy: `referrals/offer-choice.ts` compares rounded invoice
+Core 1.29.0 best-price policy: `referrals/offer-choice.ts` compares rounded invoice
 totals and eligible scope, with referral priority on ties. `offer-selection.ts`
 shares public previews and presented-code application between API management and
 the worker signup processor. `storage/offer-promotion-selection.ts` filters/ranks
@@ -31,7 +31,7 @@ provider uncertainty; Billing invalidates the quote and refreshes the existing
 `useWorkspaceOffer` reader only after the definitive rejection.
 See `spec/referral-offer-selection.md`.
 
-Unreleased publication correction: `offer-programme-store.ts` selects one eligible
+Core 1.29.0 publication correction: `offer-programme-store.ts` selects one eligible
 current promotion through its ordinary code resolver, reserves a missing code at
 activation and atomically ends superseded live revisions. `offer-management.ts`
 keeps signed hints separate from public fallback context; the existing API route
@@ -43,11 +43,12 @@ runtime readiness. It cannot be inferred from schema shape during ledger recover
 timestamp precision. Existing site provider, banner, pricing and signup links are
 reused. See `spec/referral-programme-publication-correction.md`.
 
-Hosted publication is recorded in `spec/referral-release-20261117.md`: core
-1.28.1/site 1.11.0, additive migrations before consumers, compatible retained
-offer/email readers and API-only payout encryption. The private cloud repository
-owns rollout, `/r/<code>` edge routing, static publication and retention. Public
-pages use the hosted API; disposable local simulators remain separate.
+Current release qualification is recorded in `spec/release-1.30.0.md`: core
+1.30.0/site 1.11.2, clients 1.28.0 and additive shared-types 3.8.0. No new database
+migration or capture/transport behavior is introduced. The private cloud repo
+owns immutable rollout, `/r/<code>` edge routing, static publication, manifest
+cache metadata, retention and exact operational receipts. Public pages use the
+hosted API; disposable local simulators remain separate.
 
 MCP directory verification is owned by `scripts/mcp-ecosystem-verification.mjs` and
 `apps/mcp/ecosystem-release-manifest.json`: at least five of seven ClawHub queries

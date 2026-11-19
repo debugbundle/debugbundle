@@ -1,8 +1,9 @@
-# Pending release audit — 19 November 2026
+# Release qualification audit — 19 November 2026
 
 Status: local release qualification passed, with no remaining blocking findings
-in the reviewed scope. Source remains local and uncommitted. This audit does not
-authorize publication, deployment, campaign activation or new production writes.
+in the reviewed scope. This record captures the pre-publication source snapshot.
+Subsequent authorization, registry and hosted receipts are recorded in
+[the core 1.30.0/site 1.11.2 release](release-1.30.0.md).
 
 ## Reviewed scope
 

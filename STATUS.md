@@ -1,3 +1,34 @@
+# 19 November core 1.30.0 and site 1.11.2 release
+
+Core 1.30.0 and site 1.11.2 are published and deployed. Custom promotional codes
+save atomically with drafts; People avatars use opt-in protected reads; selectable
+tables reveal bulk controls after first selection and preserve keyboard focus.
+The public skip link, homepage hover semantics, navigation and testimonial assets
+ship with the coordinated site patch. See [release receipts](spec/release-1.30.0.md).
+
+Qualified source CI passes all 146 coverage shards: 7,258 tests passed. The 69
+conditional skips are closed by the actual site checkout, timezone and PDF lanes;
+73 site-contract and 13 date/form cases pass separately. CLI/MCP 1.28.0 and
+shared-types 3.8.0 pass exact-source/integrity and clean registry installation.
+The portable skill and OpenClaw companion 1.28.0 pass final platform security,
+moderation, six-of-seven discovery and normal public native installation. The
+three skill heuristic warnings remain recorded under its final benign review.
+
+Production API/worker are healthy on the merged core source, with the worker active,
+95 unchanged migration checksums, all 16 commercial/financial table fingerprints
+and recorded credentials/settings preserved. Exactly two verified runtime releases
+and four immutable role references remain. Public acceptance passes 26 HTTP/build
+checks, 23 current CDN/S3 asset comparisons, all 23 previous asset references and
+the manifest MIME/cache/hit policy. Delivered bytes match the final UI changes.
+No new active incident IDs appeared in the scoped DebugBundle project; the existing reviewer warning gained the two
+expected startup occurrences. No programme, payment, email or consumer-product
+canary was performed. SDKs, redaction and editor packages retain their versions.
+
+The final documentation-only reconciliation is separate from the runtime tag;
+its current-main CI is the final source-tree gate. The private hosted runbook owns
+exact commits, digests and operational receipts. Earlier release-qualification
+notes below are historical snapshots.
+
 # 19 November release qualification — core 1.29.0 and clients 1.27.0
 
 The owner now authorizes all pending DebugBundle commits and the production
@@ -955,7 +986,7 @@ rollback pair, report/receipt/allowance hashes and environment hashes pass.
 Authenticated choices/private reports work; anonymous choices are denied with
 no-store. All 26 checked CDN resources match S3, including the exact app build,
 generated references and cache policy. All eight alarms and three saved checks
-pass. No new active incident IDs appeared; the pre-existing reviewer credential
+pass. No new active incident IDs appeared in the scoped DebugBundle project; the pre-existing reviewer credential
 expiry warning increased from 36 to 38 occurrences and remains open.
 
 No new paid report, automatic retry, email resend or consumer-product action was

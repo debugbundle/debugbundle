@@ -1,20 +1,20 @@
-Local table UX: shared shadcn row selection reveals the bulk-action bar and mixed
+Core 1.30.0 table UX: shared shadcn row selection reveals the bulk-action bar and mixed
 header select-all only after the first selected row; clearing the page hides
 both. Selection/clearing no longer duplicates long buttons in the top bar.
 Organisation People reuses project-member avatars through opt-in cached metadata
 and a currently authorised per-person image reader. Default People response keys
-and existing permissions remain unchanged. These changes are not deployed.
+and existing permissions remain unchanged. These changes ship in core 1.30.0.
 
-Local promotional-code correction: the operator chooses a code while creating a
+Core 1.30.0 promotional-code correction: the operator chooses a code while creating a
 promotion. Draft and code save in one transaction; a conflict leaves neither
 saved. Programme cards read their saved codes through the shared inventory API.
 Promotional codes accept ordinary ten-character campaign names while creator
 aliases retain their legacy namespace restriction. API/CLI/MCP keep the older
 optional-code/fallback path and reservation operation. The public skip link is
 viewport-anchored and hidden by its own height until focus; activation focuses
-`main#content`. These source changes are not deployed.
+`main#content`. The site correction ships in site 1.11.2; see `spec/release-1.30.0.md`.
 
-Unreleased price policy: `offer-selection.ts` shares comparison between browser
+Core 1.29.0 price policy: `offer-selection.ts` shares comparison between browser
 signup and durable worker recovery. Public previews retain the presented referral
 code as the attribution carrier while showing cheaper eligible promotion terms.
 Exact plan/interval comparisons use rounded invoice totals; referrals win ties.
@@ -28,7 +28,7 @@ reads. Definitive pre-admission rejection refreshes Billing's workspace offer an
 requires a new price review; uncertain provider requests retain their exact proof.
 See `spec/referral-offer-selection.md`.
 
-Unreleased programme correction: anonymous `/v2/offers/context` preserves selected
+Core 1.29.0 programme correction: anonymous `/v2/offers/context` preserves selected
 code identity and compares it with eligible public promotions for the existing
 site-wide referral/promotion banner. Activation reserves a missing public code;
 the ordered `202611180001_reconcile_offer_publication` data migration covers
@@ -37,14 +37,16 @@ It preserves blocked codes, saved claims, provider bindings and financial terms.
 The operator list groups permanent programmes, retains revisions in history and
 collapses ended programmes into Archives; discarding a draft uses the existing
 ended state. The editor uses native local date/time inputs with UTC persistence
-and responsive field columns. These changes are local, not deployed.
+and responsive field columns. These changes were released in core 1.29.0/site 1.11.1.
 
-Hosted core 1.28.1 and site 1.11.0 are live from the coordinated
-[affiliate release](spec/referral-release-20261117.md). Programme capability is
-enabled after two verified compatible backend bridges; no commercial programme
-or sample campaign was activated. The affiliate page and introduction article
-are public. Existing credentials, settings, migration checksums and financial
-obligations remain preserved. SDK/shared-library versions are retained.
+The coordinated core 1.30.0/site 1.11.2 release is recorded in
+[the release record](spec/release-1.30.0.md). CLI/MCP/OpenClaw and the portable
+skill use 1.28.0; shared-types uses 3.8.0 for the additive avatar schema.
+Redaction, all capture SDKs, editor packages and the restricted hosted OpenAI
+plugin retain their versions. The private cloud runbook owns exact deployed
+commits, digests, preservation and runtime/asset acceptance. Existing credentials,
+settings, migration checksums and financial obligations remain protected; no
+commercial programme or payment/email canary is activated by the release.
 
 ClawHub discovery passes when at least five of seven configured capability queries
 rank in the top 10, with every result retained. Exact-version security and native
