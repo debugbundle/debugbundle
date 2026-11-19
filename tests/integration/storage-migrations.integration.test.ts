@@ -147,21 +147,36 @@ runIntegration("storage bootstrap integration", () => {
     expect(deleteBehaviorByConstraint.get("project_usage_counters_project_id_fkey")).toBe("c");
   });
 
-  it("seeds the migration ledger for a current bootstrap schema instead of replaying historical migrations", async (): Promise<void> => {
+  it("seeds bootstrap-backed history and applies newer forward migrations before readiness", async (): Promise<void> => {
     await pool.query("DROP SCHEMA IF EXISTS public CASCADE");
     await pool.query("CREATE SCHEMA public");
 
-    await bootstrapStorageSchema(createQueryable(pool));
-
-    const migrated = await migrateStorageSchema(createQueryable(pool));
-
-    expect(migrated.applied).toEqual([]);
-    expect(migrated.already_applied).toEqual(
-      STORAGE_SCHEMA_MIGRATIONS.map((migration) => migration.id)
+    const db = createQueryable(pool);
+    await bootstrapStorageSchema(db);
+    await expect(assertStorageSchemaMigrationsApplied(db)).rejects.toThrow(
+      "storage_schema_missing_migrations"
     );
-    await expect(
-      assertStorageSchemaMigrationsApplied(createQueryable(pool))
-    ).resolves.toBeUndefined();
+    // These features deliberately ship only through forward migrations. Bootstrap
+    // cannot attest their checksums or infer publication data repair from shape.
+    const forwardMigrations = [
+      "202611160001_add_offer_programmes",
+      "202611160002_add_referral_payout_preferences",
+      "202611170001_add_creator_referral_emails",
+      "202611180001_reconcile_offer_publication"
+    ];
+    const migrated = await migrateStorageSchema(db);
+
+    expect(migrated.applied).toEqual(forwardMigrations);
+    expect(migrated.already_applied).toEqual(
+      STORAGE_SCHEMA_MIGRATIONS.map((migration) => migration.id).filter(
+        (id) => !forwardMigrations.includes(id)
+      )
+    );
+    await expect(assertStorageSchemaMigrationsApplied(db)).resolves.toBeUndefined();
+    expect(await migrateStorageSchema(db)).toEqual({
+      applied: [],
+      already_applied: STORAGE_SCHEMA_MIGRATIONS.map((migration) => migration.id)
+    });
   });
 
   it("adds public flow storage to populated databases before readiness", async () => {

@@ -12,9 +12,15 @@ export interface OrganizationActor {
   /** Trusted principal context; omitted for legacy tokens. */
   include_organization_grants?: boolean;
 }
+export interface OrganizationPersonRecord extends OrganizationPerson {
+  /** Internal cached metadata; HTTP projections must never expose object keys. */
+  avatar_object_key?: string | null;
+}
 export interface OrganizationManagementStore {
   listOrganizationsForUser(userId: string): Promise<OrganizationSummary[]>;
-  listOrganizationPeople(input: OrganizationActor): Promise<OrganizationPerson[]>;
+  listOrganizationPeople(
+    input: OrganizationActor & { user_id?: string; include_avatar_metadata?: boolean }
+  ): Promise<OrganizationPersonRecord[]>;
   listOrganizationInvites(input: OrganizationActor): Promise<OrganizationInvite[]>;
   createOrganizationInvite(
     input: OrganizationActor &

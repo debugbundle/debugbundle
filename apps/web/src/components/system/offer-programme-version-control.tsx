@@ -8,12 +8,12 @@ import { offerApi, offerErrorMessage } from "../../lib/offer-api.js";
 import { usePendingAction } from "../../lib/use-pending-action.js";
 import { OfferPolicyDetails } from "./offer-policy-details.js";
 import { OfferProgrammeDetails } from "./offer-programme-details.js";
+import { OfferPromotionCodes } from "./offer-promotion-codes.js";
 import { PendingButton } from "./pending-button.js";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../ui/card.js";
 import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
-import { Field, FieldLabel, FieldError, FieldGroup, FieldDescription } from "../ui/field.js";
-import { Input } from "../ui/input.js";
+import { Field, FieldLabel, FieldError } from "../ui/field.js";
 import { Checkbox } from "../ui/checkbox.js";
 import { Notice } from "../ui/notice.js";
 import {
@@ -43,8 +43,7 @@ export function OfferProgrammeVersionControl({
   readOnly?: boolean;
   embedded?: boolean;
 }): JSX.Element {
-  const [code, setCode] = useState(""),
-    [unlimited, setUnlimited] = useState(false),
+  const [unlimited, setUnlimited] = useState(false),
     [target, setTarget] = useState<ProgrammeState | null>(null),
     [error, setError] = useState<string | null>(null),
     [notice, setNotice] = useState<string | null>(null);
@@ -99,43 +98,8 @@ export function OfferProgrammeVersionControl({
             window.
           </p>
         ) : null}
-        {!readOnly && version.state !== "ended" && version.policy.kind === "promotion" ? (
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              mutate(
-                () => offerApi.execute("promotion_code", { version_id: version.version_id, code }),
-                "Promotional code reserved. It follows this programme’s availability."
-              );
-            }}
-          >
-            <FieldGroup>
-              <Field>
-                <FieldLabel htmlFor={`promotion-${version.version_id}`}>
-                  Promotional code
-                </FieldLabel>
-                <Input
-                  id={`promotion-${version.version_id}`}
-                  value={code}
-                  disabled={pending}
-                  maxLength={24}
-                  onChange={(event) => setCode(event.target.value)}
-                />
-                <FieldDescription>
-                  Optional branded code. Activation reserves a public code automatically. Review
-                  saved codes in Inventory.
-                </FieldDescription>
-              </Field>
-              <PendingButton
-                type="submit"
-                pending={pending}
-                pendingLabel="Reserving code"
-                disabled={!code.trim()}
-              >
-                Reserve promotional code
-              </PendingButton>
-            </FieldGroup>
-          </form>
+        {version.policy.kind === "promotion" ? (
+          <OfferPromotionCodes versionId={version.version_id} state={version.state} />
         ) : null}
         {error ? <FieldError role="alert">{error}</FieldError> : null}
         {notice ? <Notice>{notice}</Notice> : null}

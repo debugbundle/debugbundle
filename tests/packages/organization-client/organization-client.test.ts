@@ -6,6 +6,18 @@ import {
 
 const org = "11111111-1111-4111-8111-111111111111";
 describe("organization API client", () => {
+  it("opts into cached avatar URLs while leaving the default people request unchanged", async () => {
+    const request = vi
+      .fn<OrganizationHttpClient["request"]>()
+      .mockResolvedValue({ status: 200, body: { people: [] } });
+    const api = createOrganizationApi({ request });
+    await api.listPeople({ bearerToken: "member", organizationId: org });
+    await api.listPeople({ bearerToken: "member", organizationId: org, includeAvatars: true });
+    expect(request.mock.calls.map(([input]) => input.path)).toEqual([
+      `/v1/organizations/${org}/people`,
+      `/v1/organizations/${org}/people?include_avatars=true`
+    ]);
+  });
   it("validates named scope before sending changes", async () => {
     const request = vi
       .fn<OrganizationHttpClient["request"]>()

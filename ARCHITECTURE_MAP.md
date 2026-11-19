@@ -1,3 +1,18 @@
+Local table selection: `selectable-table-actions.tsx` owns reusable shadcn row
+and conditional header checkboxes plus selection-only bulk actions. The People
+page reuses `UserAvatar`; `OrganizationPeopleStore` optionally reads existing
+cached avatar metadata with an exact-person filter. Organisation routes strip
+object keys and recheck administrator/person scope on image reads. The shared
+organisation client supplies the optional metadata read across web/CLI/MCP.
+
+Local programme creation: `ProgrammeDraftSchema.promotion_code` and
+`PromotionCodeSchema` share operator-code validation across API/CLI/MCP.
+`storage/offer-code-registry.ts` joins code reservation to `createDraft`'s existing
+transaction; no storage shape changes. The editor chooses the code and
+`offer-promotion-codes.tsx` reads authoritative codes through the inventory's
+optional `version_id` filter. Public version DTOs remain unchanged. The site
+`SiteShell` owns viewport-based skip-link hiding and the focusable main target.
+
 Unreleased best-price policy: `referrals/offer-choice.ts` compares rounded invoice
 totals and eligible scope, with referral priority on ties. `offer-selection.ts`
 shares public previews and presented-code application between API management and
@@ -1019,13 +1034,19 @@ layout does not preload that artwork on unrelated pages. `SiteShell` adds a
 homepage-only CSS gradient behind the CTA and footer using the shared theme glow,
 without an image or another preload. Root font configuration
 preloads both Inter Latin subsets used by the homepage's testimonial names.
+The homepage brand links skip self-prefetching. `site/src/testimonials.ts` uses
+WebP for raster logo masks.
+Hosted site publishing assigns a bounded cache lifetime to `site.webmanifest`
+and preserves the install metadata and route.
 
 **Homepage product illustration:** `site/src/components/bundle-evidence-flow.tsx`
 and `bundle-evidence-stack.tsx` retain the supplied HTML artwork in server-rendered
 markup with scoped CSS and namespaced SVG IDs. The small client canvas wrapper
 mounts `src/lib/bundle-evidence-animation.ts` for continuous 1.75× playback,
-source highlighting and cycling telemetry, with site-theme synchronization,
-reduced-motion support and observer/listener cleanup.
+desktop mouse hover highlighting and cycling telemetry, with site-theme
+synchronization, reduced-motion support and observer/listener cleanup. The
+evidence cards are labeled illustrations, and the sample dashboard blocks use
+static markup outside the tab order.
 
 **Pricing documentation:** `/pricing/` owns public prices and plan comparisons. The
 existing `/docs/pricing/` route is the Plans and capacity guide; it explains shared

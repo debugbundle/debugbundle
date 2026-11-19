@@ -56,6 +56,45 @@ runIntegration("organization people and ownership", () => {
   });
 
   afterEach(() => vi.unstubAllEnvs());
+  it("reads avatar metadata only by opt-in for an exact retained person under current administrator access", async () => {
+    await pool.query("UPDATE users SET avatar_object_key='avatars/cached-member' WHERE id=$1", [
+      member
+    ]);
+    const actor = { organization_id: org, actor_user_id: owner };
+    const plain = await store.listOrganizationPeople(actor);
+    expect(plain.find((person) => person.user_id === member)).not.toHaveProperty(
+      "avatar_object_key"
+    );
+    expect(
+      await store.listOrganizationPeople({
+        ...actor,
+        user_id: member,
+        include_avatar_metadata: true
+      })
+    ).toMatchObject([{ user_id: member, avatar_object_key: "avatars/cached-member" }]);
+    expect(
+      await store.listOrganizationPeople({
+        ...actor,
+        user_id: randomUUID(),
+        include_avatar_metadata: true
+      })
+    ).toEqual([]);
+    await expect(
+      store.listOrganizationPeople({
+        ...actor,
+        actor_user_id: member,
+        user_id: owner,
+        include_avatar_metadata: true
+      })
+    ).rejects.toBeInstanceOf(OrganizationManagementError);
+    await pool.query(
+      "UPDATE organization_members SET suspended_at=now() WHERE organization_id=$1 AND user_id=$2",
+      [org, owner]
+    );
+    await expect(
+      store.listOrganizationPeople({ ...actor, user_id: member, include_avatar_metadata: true })
+    ).rejects.toBeInstanceOf(OrganizationManagementError);
+  });
   async function selfHostedFixture(mode: string): Promise<void> {
     if (mode !== "selfhost") return;
     vi.stubEnv("SELFHOST_MODE", "true");

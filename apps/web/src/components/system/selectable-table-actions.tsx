@@ -1,6 +1,77 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type RefCallback } from "react";
 
 import { Button } from "../ui/button.js";
+import { Checkbox } from "../ui/checkbox.js";
+import { cn } from "../../lib/utils.js";
+
+// The following text cell adds px-2; pl-3/pr-1 keeps a compact, balanced inset.
+export const tableSelectionCellClassName = "w-8 pl-3 pr-1";
+
+function useTableActionFocus(targetId: string | undefined): RefCallback<HTMLDivElement> {
+  return useCallback(
+    (node) => {
+      if (node === null) return;
+      // Ref cleanup runs before removal. Leave focus alone when a row/filter owns it.
+      return () => {
+        if (targetId && node.contains(document.activeElement))
+          document.getElementById(targetId)?.focus();
+      };
+    },
+    [targetId]
+  );
+}
+
+/** Shared table selection keeps pointer/keyboard changes separate from row navigation. */
+export function TableSelectionCheckbox({
+  label,
+  checked,
+  onToggle
+}: {
+  label: string;
+  checked: boolean | "indeterminate";
+  onToggle: () => void;
+}): JSX.Element {
+  return (
+    <Checkbox
+      aria-label={label}
+      className="mx-auto block"
+      checked={checked}
+      onCheckedChange={onToggle}
+      onClick={(event) => {
+        event.stopPropagation();
+        // Clearing the conditional header removes it; keep keyboard focus in the table.
+        if (checked === true && event.currentTarget.closest("thead"))
+          event.currentTarget
+            .closest("table")
+            ?.querySelector<HTMLElement>("tbody [data-slot='checkbox']")
+            ?.focus();
+      }}
+    />
+  );
+}
+
+export function TableSelectAllCheckbox({
+  label,
+  ids,
+  selectedIds,
+  onToggle
+}: {
+  label: string;
+  ids: string[];
+  selectedIds: Set<string>;
+  onToggle: () => void;
+}): JSX.Element | null {
+  const count = ids.filter((id) => selectedIds.has(id)).length;
+  // Selection controls appear after the first row selection, including in the header.
+  if (count === 0) return null;
+  return (
+    <TableSelectionCheckbox
+      label={label}
+      checked={count === ids.length ? true : "indeterminate"}
+      onToggle={onToggle}
+    />
+  );
+}
 
 const INTERACTIVE_ROW_SELECTOR = [
   "a",
@@ -32,7 +103,10 @@ export function useVisibleRowSelection(ids: string[]): {
 
   useEffect(() => {
     const visibleIdSet = new Set(ids);
-    setSelectedIds((current) => current.filter((id) => visibleIdSet.has(id)));
+    setSelectedIds((current) => {
+      const retained = current.filter((id) => visibleIdSet.has(id));
+      return retained.length === current.length ? current : retained;
+    });
   }, [ids, idsKey]);
 
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
@@ -62,76 +136,45 @@ export function useVisibleRowSelection(ids: string[]): {
 
 export function SelectableTableActions(input: {
   itemLabel: string;
-  totalCount: number;
+  focusTargetId?: string;
   selectedCount: number;
-  allSelected: boolean;
+  className?: string;
   isBusy?: boolean;
-  showEmptySelectionHint?: boolean;
   primaryActionLabel: string;
   secondaryActionLabel: string;
   primaryActionDisabled?: boolean;
   secondaryActionDisabled?: boolean;
-  onToggleSelectAll: () => void;
-  onClearSelection: () => void;
   onPrimaryAction: () => void;
   onSecondaryAction: () => void;
-}): JSX.Element {
+}): JSX.Element | null {
   const {
     itemLabel,
-    totalCount,
+    focusTargetId,
     selectedCount,
-    allSelected,
+    className,
     isBusy = false,
-    showEmptySelectionHint = true,
     primaryActionLabel,
     secondaryActionLabel,
     primaryActionDisabled = false,
     secondaryActionDisabled = false,
-    onToggleSelectAll,
-    onClearSelection,
     onPrimaryAction,
     onSecondaryAction
   } = input;
 
-  const hasItems = totalCount > 0;
-  const hasSelection = selectedCount > 0;
-  const itemLabelPlural = `${itemLabel}${itemLabel === "improvement" || itemLabel.endsWith("s") ? "s" : "s"}`;
+  const focusRef = useTableActionFocus(focusTargetId);
+  if (selectedCount === 0) return null;
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-        {hasSelection || showEmptySelectionHint ? (
-          <p className="text-sm text-muted-foreground">
-            {hasSelection
-              ? `${selectedCount} ${itemLabel}${selectedCount === 1 ? "" : "s"} selected on this page.`
-              : `Select ${itemLabelPlural} on this page to apply a bulk action.`}
-          </p>
-        ) : null}
-        <div className="flex flex-wrap items-center gap-2">
-          {!allSelected && hasItems ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled={isBusy}
-              onClick={onToggleSelectAll}
-            >
-              {`Select all visible ${itemLabelPlural}`}
-            </Button>
-          ) : null}
-          {hasSelection ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled={isBusy}
-              onClick={onClearSelection}
-            >
-              Clear selection
-            </Button>
-          ) : null}
-        </div>
-      </div>
+    <div
+      ref={focusRef}
+      className={cn(
+        "flex flex-col gap-3 rounded-lg border bg-muted/30 p-3 sm:flex-row sm:items-center sm:justify-between",
+        className
+      )}
+    >
+      <p className="text-sm text-muted-foreground">
+        {`${selectedCount} ${itemLabel}${selectedCount === 1 ? "" : "s"} selected on this page.`}
+      </p>
       <div className="flex flex-wrap items-center gap-2">
         <Button
           type="button"
@@ -158,6 +201,7 @@ export function SelectableTableActions(input: {
 
 export function StickyMobileTableActions(input: {
   selectedCount: number;
+  focusTargetId?: string;
   totalCount: number;
   allSelected: boolean;
   isBusy?: boolean;
@@ -172,6 +216,7 @@ export function StickyMobileTableActions(input: {
 }): JSX.Element | null {
   const {
     selectedCount,
+    focusTargetId,
     totalCount,
     allSelected,
     isBusy = false,
@@ -185,12 +230,14 @@ export function StickyMobileTableActions(input: {
     onSecondaryAction
   } = input;
 
+  const focusRef = useTableActionFocus(focusTargetId);
   if (selectedCount === 0) {
     return null;
   }
 
   return (
     <div
+      ref={focusRef}
       className="fixed inset-x-4 z-40 rounded-xl border bg-background/95 p-3 shadow-lg backdrop-blur sm:hidden"
       style={{ bottom: "calc(env(safe-area-inset-bottom) + 1rem)" }}
     >

@@ -81,6 +81,74 @@ runIntegration("versioned offer programmes and permanent creator codes", () => {
     await pool.end();
   });
 
+  it("saves a chosen promotion code atomically with its draft and publishes that exact code on activation", async () => {
+    const input = {
+      actor_user_id: operator,
+      name: "Black Friday",
+      public_description: "First invoice savings",
+      policy: { ...policy, kind: "promotion" as const, commission_basis_points: 0 },
+      promotion_code: " blckfryd26 "
+    };
+    const draft = await store.createDraft(input);
+    expect(await store.inventory.codes({ version_id: draft.version_id })).toMatchObject([
+      { code: "BLCKFRYD26", version_id: draft.version_id }
+    ]);
+    expect(await store.publicPromotion()).toBeNull();
+    const count = async () =>
+      (await db.query("SELECT count(*)::int AS n FROM offer_programme_versions", [])).rows[0]!["n"];
+    const before = await count();
+    await expect(store.createDraft(input)).rejects.toMatchObject({
+      code: "creator_code_unavailable"
+    });
+    expect(await count()).toBe(before);
+    expect(
+      (await db.query("SELECT count(*)::int AS n FROM offer_programmes", [])).rows[0]!["n"]
+    ).toBe(1);
+    await store.bindProvider({
+      actor_user_id: operator,
+      version_id: draft.version_id,
+      coupon_id: "coupon_custom_code",
+      livemode: false
+    });
+    await store.setState({
+      actor_user_id: operator,
+      version_id: draft.version_id,
+      expected_state: "draft",
+      state: "active",
+      acknowledge_unlimited: true
+    });
+    expect(await store.publicPromotion()).toMatchObject({ code: "BLCKFRYD26", available: true });
+    const saved = await claim("BLCKFRYD26");
+    expect(saved.code).toBe("BLCKFRYD26");
+    expect(saved.version.version_id).toBe(draft.version_id);
+    expect(await store.inventory.codes({ version_id: randomUUID() })).toEqual([]);
+    expect(
+      (await store.inventory.codes({ version_id: draft.version_id })).map((c) => c.code)
+    ).toEqual(["BLCKFRYD26"]);
+  });
+
+  it("admits only one complete draft when operators race to choose the same code", async () => {
+    const input = {
+      actor_user_id: operator,
+      name: "Same code",
+      public_description: "First invoice savings",
+      policy: { ...policy, kind: "promotion" as const, commission_basis_points: 0 },
+      promotion_code: "RACE30"
+    };
+    const results = await Promise.allSettled([store.createDraft(input), store.createDraft(input)]);
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(results.find((result) => result.status === "rejected")).toMatchObject({
+      reason: { code: "creator_code_unavailable" }
+    });
+    expect(
+      (await db.query("SELECT count(*)::int AS n FROM offer_programmes", [])).rows[0]!["n"]
+    ).toBe(1);
+    expect(
+      (await db.query("SELECT count(*)::int AS n FROM offer_programme_versions", [])).rows[0]!["n"]
+    ).toBe(1);
+    expect(await store.inventory.codes({ code: "RACE30" })).toHaveLength(1);
+  });
+
   it("publishes an active promotion without a manually reserved code and withdraws it on pause", async () => {
     expect(await store.publicPromotion()).toBeNull();
     await programme();

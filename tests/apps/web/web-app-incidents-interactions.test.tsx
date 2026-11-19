@@ -322,7 +322,8 @@ describe("web app — incident table interactions", () => {
     await chooseStatusFilterOption(user, "workspace-incidents-status-filter", /all statuses/i);
     expect(await screen.findByText(/resolved workspace incident/i)).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /select all visible incidents/i }));
+    await user.click(screen.getAllByRole("checkbox", { name: /^select incident /i })[0]!);
+    await user.click(screen.getByRole("checkbox", { name: /select all visible incidents/i }));
     await screen.findByText(/3 incidents selected on this page/i);
     await user.click(screen.getByRole("button", { name: /mark selected resolved/i }));
 
@@ -397,7 +398,8 @@ describe("web app — incident table interactions", () => {
     render(<App initialEntries={["/incidents"]} />);
 
     await screen.findByText(/retry workspace incident one/i);
-    await user.click(screen.getByRole("button", { name: /select all visible incidents/i }));
+    await user.click(screen.getAllByRole("checkbox", { name: /^select incident /i })[0]!);
+    await user.click(screen.getByRole("checkbox", { name: /select all visible incidents/i }));
     await screen.findByText(/2 incidents selected on this page/i);
     await user.click(screen.getByRole("button", { name: /mark selected resolved/i }));
 
@@ -553,7 +555,8 @@ describe("web app — incident table interactions", () => {
     await chooseStatusFilterOption(user, "project-incidents-status-filter", /all statuses/i);
     expect(await screen.findByText(/resolved project incident/i)).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /select all visible incidents/i }));
+    await user.click(screen.getAllByRole("checkbox", { name: /^select incident /i })[0]!);
+    await user.click(screen.getByRole("checkbox", { name: /select all visible incidents/i }));
     await screen.findByText(/3 incidents selected on this page/i);
     await user.click(screen.getByRole("button", { name: /mark selected resolved/i }));
 

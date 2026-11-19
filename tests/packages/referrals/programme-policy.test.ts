@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CreatorCodeSchema,
+  ProgrammeDraftSchema,
   PublicOfferCodeSchema,
   OfferPolicySchema,
   OfferPercentageInputSchema,
@@ -48,6 +49,26 @@ describe("creator codes", () => {
     for (const code of ["ADMIN", "Support", "debugbundle", "DEBUGBUNDLE20", "D2QM7UBHMH"])
       expect(CreatorCodeSchema.safeParse(code).success, code).toBe(false);
   });
+});
+
+it("accepts an operator's chosen promotional code in the draft without opening the creator namespace", () => {
+  const draft = {
+    name: "Black Friday",
+    public_description: "First invoice savings",
+    policy: { ...policy, kind: "promotion", commission_basis_points: 0 },
+    promotion_code: " blckfryd26 "
+  };
+  expect(ProgrammeDraftSchema.parse(draft)).toMatchObject({ promotion_code: "BLCKFRYD26" });
+  expect(CreatorCodeSchema.safeParse("BLCKFRYD26").success).toBe(false);
+  for (const promotion_code of ["ADMIN", "DEBUGBUNDLE20", "a/b", "ß20", "a".repeat(25)])
+    expect(ProgrammeDraftSchema.safeParse({ ...draft, promotion_code }).success).toBe(false);
+  expect(ProgrammeDraftSchema.safeParse({ ...draft, policy }).success).toBe(false);
+  const legacyDraft = {
+    name: draft.name,
+    public_description: draft.public_description,
+    policy: draft.policy
+  };
+  expect(ProgrammeDraftSchema.safeParse(legacyDraft).success).toBe(true);
 });
 
 describe("frozen introductory policy", () => {

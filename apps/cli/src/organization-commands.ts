@@ -44,6 +44,7 @@ type OrganizationAction = (typeof actions)[number];
 export interface OrganizationCommandInput {
   action: OrganizationAction;
   organizationId?: string;
+  includeAvatars?: boolean;
   userId?: string;
   inviteId?: string;
   invitation?: OrganizationInviteBody;
@@ -70,7 +71,12 @@ async function execute(
   const scope = { bearerToken, organizationId: input.organizationId };
   switch (input.action) {
     case "people":
-      return { people: await api.listPeople(scope) };
+      return {
+        people: await api.listPeople({
+          ...scope,
+          ...(input.includeAvatars === undefined ? {} : { includeAvatars: input.includeAvatars })
+        })
+      };
     case "invites":
       return { invites: await api.listInvites(scope) };
     case "invite":
@@ -144,6 +150,7 @@ export async function handleOrganizationCommand(
   const inviteOptions = ["email", "role", "project-access", "project-role", "projects"];
   expectNoUnknownOptions(parsed, [
     ...common,
+    ...(selected === "people" ? ["include-avatars"] : []),
     ...(selected === "invite" ? inviteOptions : []),
     ...(selected === "update-person" ? ["changes-json"] : [])
   ]);
@@ -156,6 +163,8 @@ export async function handleOrganizationCommand(
     selected === "remove-person";
   ensureNoExtraPositionals(parsed, noOrganization ? 2 : hasResource ? 4 : 3);
   const input: OrganizationCommandInput = { action: selected };
+  if (selected === "people" && readBooleanOption(parsed, "include-avatars") === true)
+    input.includeAvatars = true;
   if (!noOrganization) input.organizationId = requirePositional(parsed, 2, "organization-id");
   if (selected === "cancel-invite" || selected === "resend-invite")
     input.inviteId = requirePositional(parsed, 3, "invite-id");

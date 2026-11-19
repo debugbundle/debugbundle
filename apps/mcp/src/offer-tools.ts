@@ -78,13 +78,13 @@ const descriptions: Record<OfferOperation, string> = {
   operator_programmes:
     "List programme versions as an explicitly delegated DebugBundle operator, not an ordinary workspace Owner.",
   operator_codes:
-    "Page public code ownership and programme bindings as a delegated operator. No private customer identity or credentials.",
+    "Page public code ownership and programme bindings as a delegated operator. Filter version_id to read a programme's saved codes. No private customer identity or credentials.",
   operator_claims:
     "Page minimal customer offer states by public code, workspace or version as a delegated operator.",
   operator_grants:
     "Page early-purchase approval history as a delegated operator. Reasons are private operator support data.",
   draft:
-    "Create an immutable programme draft or revision as a delegated operator. Does not activate or publish it.",
+    "Create an immutable programme draft or revision as a delegated operator. For a promotion, supply promotion_code to save the chosen public code atomically with the draft; conflicts leave neither record saved. Does not activate or publish it.",
   provider:
     "Bind a verified existing Stripe base-only coupon to a draft. Performs read-only provider validation, not coupon creation or payment.",
   state:
@@ -123,7 +123,7 @@ export const OFFER_MCP_TOOL_CATALOG = mappings.map(([name, key]) => ({
   },
   read: OFFER_OPERATIONS[key].read,
   description: descriptions[key],
-  inputSchema: OFFER_OPERATIONS[key].input.extend({
+  inputSchema: OFFER_OPERATIONS[key].input.safeExtend({
     bearerToken: z.string().min(1),
     ...(OFFER_OPERATIONS[key].operator
       ? { operatorAuthorization: z.string().regex(/^[A-Za-z0-9_-]{43}$/) }

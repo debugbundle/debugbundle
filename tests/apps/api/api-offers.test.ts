@@ -73,6 +73,35 @@ function setup(billing?: NonNullable<ApiDependencies["billingManagement"]>) {
   });
   return { app, offers, member, resolveSession, preview, apply, list, authorize };
 }
+it("saves an operator's promotional code in the draft request while retaining CSRF and strict actor boundaries", async () => {
+  const f = setup(),
+    createDraft = vi
+      .fn()
+      .mockResolvedValue({ ...offerDefinition, state: "draft", claims_count: 0 });
+  f.offers.store.createDraft = createDraft;
+  const payload = {
+    name: "Black Friday",
+    public_description: "First invoice savings",
+    policy: { ...offerPolicy, kind: "promotion", commission_basis_points: 0 },
+    promotion_code: "blckfryd26"
+  };
+  const request = { method: "POST" as const, url: "/v2/offers/operator/programmes", payload };
+  const cookie = `${SESSION_COOKIE_NAME}=operator-session`;
+  expect((await f.app.inject({ ...request, headers: { cookie } })).statusCode).toBe(403);
+  expect(createDraft).not.toHaveBeenCalled();
+  const headers = { cookie, "x-csrf-token": buildCsrfToken("operator-session") };
+  expect((await f.app.inject({ ...request, headers })).statusCode).toBe(200);
+  expect(createDraft).toHaveBeenCalledExactlyOnceWith({
+    ...payload,
+    promotion_code: "BLCKFRYD26",
+    actor_user_id: user
+  });
+  expect(
+    (await f.app.inject({ ...request, headers, payload: { ...payload, actor_user_id: org } }))
+      .statusCode
+  ).toBe(400);
+  expect(createDraft).toHaveBeenCalledOnce();
+});
 it("returns minimal no-store public offer context with scoped credentialed CORS", async () => {
   const f = setup();
   const response = await f.app.inject({

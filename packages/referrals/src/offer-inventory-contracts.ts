@@ -2,7 +2,12 @@ import { z } from "zod";
 import { PublicOfferCodeSchema } from "./programme-policy.js";
 const page = { limit: z.number().int().min(1).max(100).default(25), before: z.uuid().optional() };
 export const OfferCodeInventoryQuerySchema = z
-  .object({ ...page, code: PublicOfferCodeSchema.optional(), partner_id: z.uuid().optional() })
+  .object({
+    ...page,
+    code: PublicOfferCodeSchema.optional(),
+    partner_id: z.uuid().optional(),
+    version_id: z.uuid().optional()
+  })
   .strict();
 export const OfferClaimInventoryQuerySchema = z
   .object({

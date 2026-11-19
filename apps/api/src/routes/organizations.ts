@@ -26,6 +26,7 @@ import {
 } from "../api-helpers.js";
 import { isProjectConsolidationDatabaseError } from "../project-consolidation-http.js";
 import { memberReadScope } from "../member-access-scope.js";
+import { buildOrganizationPersonAvatarUrl } from "../avatar-urls.js";
 import { registerOrganizationAudit, setOrganizationAuditTarget } from "../organization-audit.js";
 
 type OrganizationRequestContext = {
@@ -210,7 +211,56 @@ export function registerOrganizationRoutes(
     guarded(async (request, reply) => {
       const context = await manager(request, reply, false);
       if (context === null) return;
-      return reply.send({ people: await context.store.listOrganizationPeople(context.actor) });
+      const query = z
+        .object({ include_avatars: z.enum(["true", "false"]).optional() })
+        .strict()
+        .safeParse(request.query);
+      if (!query.success) return reply.status(400).send({ error: "invalid_query" });
+      const includeAvatars = query.data.include_avatars === "true";
+      const people = await context.store.listOrganizationPeople({
+        ...context.actor,
+        ...(includeAvatars ? { include_avatar_metadata: true } : {})
+      });
+      return reply.send({
+        people: people.map(({ avatar_object_key, ...person }) =>
+          includeAvatars
+            ? {
+                ...person,
+                avatar_url: avatar_object_key
+                  ? buildOrganizationPersonAvatarUrl(context.actor.organization_id, person.user_id)
+                  : null
+              }
+            : person
+        )
+      });
+    })
+  );
+  app.get(
+    "/v1/organizations/:id/people/:userId/avatar",
+    guarded(async (request, reply) => {
+      const context = await manager(request, reply, false);
+      if (context === null) return;
+      const params = personParams.safeParse(request.params);
+      if (!params.success) return reply.status(400).send({ error: "invalid_member_id" });
+      if (dependencies.accountManagement === undefined)
+        return reply.status(503).send({ error: "account_management_not_configured" });
+      const people = await context.store.listOrganizationPeople({
+        ...context.actor,
+        user_id: params.data.userId
+      });
+      if (!people.some((person) => person.user_id === params.data.userId))
+        return reply.status(404).send({ error: "member_not_found" });
+      const avatar = await dependencies.accountManagement.getUserAvatar({
+        user_id: params.data.userId
+      });
+      if (avatar === null) return reply.status(404).send({ error: "avatar_not_found" });
+      const body = await dependencies.objectStoreReader
+        .getObject({ key: avatar.object_key })
+        .catch(() => null);
+      if (body === null) return reply.status(404).send({ error: "avatar_not_found" });
+      reply.header("Cache-Control", "private, max-age=300");
+      reply.header("Content-Type", avatar.content_type);
+      return reply.status(200).send(body);
     })
   );
   app.patch(

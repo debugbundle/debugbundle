@@ -11,6 +11,7 @@ import {
   ProgrammeError,
   ProgrammeStateSchema,
   CreatorCodeSchema,
+  PromotionCodeSchema,
   PublicOfferCodeSchema
 } from "../../../../packages/referrals/src/programme-policy.js";
 import { OfferDelegationIssueSchema } from "../../../../packages/referrals/src/offer-operator-contracts.js";
@@ -120,7 +121,9 @@ export function registerOfferOperatorRoutes(
       name: "draft",
       run: async (request: FastifyRequest, userId: string) => ({
         programme: await dependencies.offers!.store.createDraft({
-          ...ProgrammeDraftSchema.extend({ programme_id: z.uuid().optional() }).parse(request.body),
+          ...ProgrammeDraftSchema.safeExtend({ programme_id: z.uuid().optional() }).parse(
+            request.body
+          ),
           actor_user_id: userId
         })
       })
@@ -171,7 +174,7 @@ export function registerOfferOperatorRoutes(
       name: "promotion-code",
       run: async (request: FastifyRequest, userId: string) => {
         const body = z
-          .object({ version_id: z.uuid(), code: CreatorCodeSchema })
+          .object({ version_id: z.uuid(), code: PromotionCodeSchema })
           .strict()
           .parse(request.body);
         await dependencies.offers!.store.createPromotionCode({ actor_user_id: userId, ...body });

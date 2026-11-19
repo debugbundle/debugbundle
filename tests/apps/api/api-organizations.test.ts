@@ -8,12 +8,113 @@ const org = "11111111-1111-4111-8111-111111111111";
 const user = "22222222-2222-4222-8222-222222222222";
 afterEach(() => vi.unstubAllEnvs());
 describe("organization administration HTTP boundaries", () => {
+  it("returns cached avatar URLs only by opt-in and checks person membership before serving bytes", async () => {
+    const person = {
+      user_id: user,
+      email: "person@example.test",
+      role: "owner",
+      project_access: "selected",
+      default_project_role: "member",
+      suspended_at: null,
+      grants_paused_at: null,
+      direct_project_count: 0,
+      avatar_object_key: "avatars/private-object"
+    };
+    const list = vi.fn().mockResolvedValue([person]);
+    const getUserAvatar = vi
+      .fn()
+      .mockResolvedValue({ object_key: person.avatar_object_key, content_type: "image/png" });
+    const getObject = vi.fn().mockResolvedValue(Buffer.from("cached-avatar"));
+    const resolve = vi
+      .fn()
+      .mockResolvedValue({ member_id: user, organization_id: org, role: "owner" });
+    const app = createTokenApiServer({
+      memberAuth: mockedObject<ApiDependencies["memberAuth"]>({
+        resolveMemberByTokenHash: resolve
+      }),
+      organizationManagement: mockedObject<NonNullable<ApiDependencies["organizationManagement"]>>({
+        listOrganizationPeople: list
+      }),
+      accountManagement: mockedObject<NonNullable<ApiDependencies["accountManagement"]>>({
+        getUserAvatar
+      }),
+      objectStoreReader: { getObject }
+    });
+    const headers = { authorization: "Bearer dbundle_mem_test" };
+    const plain = await app.inject({ url: `/v1/organizations/${org}/people`, headers });
+    expect(plain.json().people[0]).not.toHaveProperty("avatar_url");
+    expect(plain.body).not.toContain("private-object");
+    const enriched = await app.inject({
+      url: `/v1/organizations/${org}/people?include_avatars=true`,
+      headers
+    });
+    expect(enriched.json().people[0].avatar_url).toBe(
+      `/v1/organizations/${org}/people/${user}/avatar`
+    );
+    expect(enriched.body).not.toContain("private-object");
+    list.mockResolvedValueOnce([{ ...person, avatar_object_key: null }]);
+    expect(
+      (
+        await app.inject({ url: `/v1/organizations/${org}/people?include_avatars=true`, headers })
+      ).json().people[0].avatar_url
+    ).toBeNull();
+    const image = await app.inject({
+      url: `/v1/organizations/${org}/people/${user}/avatar`,
+      headers
+    });
+    expect(image.statusCode).toBe(200);
+    expect(image.headers["cache-control"]).toBe("private, max-age=300");
+    expect(image.headers["content-type"]).toContain("image/png");
+    expect(image.body).toBe("cached-avatar");
+    const unrelated = await app.inject({
+      url: `/v1/organizations/${org}/people/${org}/avatar`,
+      headers
+    });
+    expect(unrelated.statusCode).toBe(404);
+    expect(getUserAvatar).toHaveBeenCalledOnce();
+    expect(
+      (await app.inject({ url: `/v1/organizations/${org}/people/${user}/avatar` })).statusCode
+    ).toBe(401);
+    expect(
+      (await app.inject({ url: `/v1/organizations/${org}/people/invalid/avatar`, headers }))
+        .statusCode
+    ).toBe(400);
+    expect(
+      (
+        await app.inject({
+          url: `/v1/organizations/${org}/people?include_avatars=invalid`,
+          headers
+        })
+      ).statusCode
+    ).toBe(400);
+    getUserAvatar.mockResolvedValueOnce(null);
+    expect(
+      (await app.inject({ url: `/v1/organizations/${org}/people/${user}/avatar`, headers }))
+        .statusCode
+    ).toBe(404);
+    getObject.mockRejectedValueOnce(new Error("private storage failure"));
+    const missingObject = await app.inject({
+      url: `/v1/organizations/${org}/people/${user}/avatar`,
+      headers
+    });
+    expect(missingObject.statusCode).toBe(404);
+    expect(missingObject.json()).toEqual({ error: "avatar_not_found" });
+    resolve.mockResolvedValue({ member_id: user, organization_id: org, role: "member" });
+    expect(
+      (await app.inject({ url: `/v1/organizations/${org}/people/${user}/avatar`, headers }))
+        .statusCode
+    ).toBe(403);
+    expect(getObject).toHaveBeenCalledTimes(2);
+    await app.close();
+  });
   it.each(["true", "false"])(
     "reports the server-owned self-host entitlement hint for %s",
     async (mode) => {
       vi.stubEnv("SELFHOST_MODE", mode);
       const app = createTokenApiServer({
-        projectManagement: mockedObject<NonNullable<ApiDependencies["projectManagement"]>>({ listProjectsForOrganization: vi.fn().mockResolvedValue([]) }),
+        projectManagement: mockedObject<NonNullable<ApiDependencies["projectManagement"]>>({
+          listProjectsForOrganization: vi.fn().mockResolvedValue([])
+        }),
         webAuth: {
           resolveSessionByToken: vi.fn().mockResolvedValue({
             session_id: "session",
@@ -154,12 +255,14 @@ describe("organization administration HTTP boundaries", () => {
         listOrganizationPeople: list
       })
     });
-    const response = await app.inject({
-      method: "GET",
-      url: `/v1/organizations/${org}/people`,
-      headers: { authorization: "Bearer dbundle_mem_test" }
-    });
-    expect(response.statusCode).toBe(403);
+    for (const suffix of ["people", `people/${user}/avatar`]) {
+      const response = await app.inject({
+        method: "GET",
+        url: `/v1/organizations/${org}/${suffix}`,
+        headers: { authorization: "Bearer dbundle_mem_test" }
+      });
+      expect(response.statusCode).toBe(403);
+    }
     expect(list).not.toHaveBeenCalled();
   });
   it("audits successful and rejected organisation mutations without request secrets", async () => {
@@ -254,12 +357,14 @@ describe("organization administration HTTP boundaries", () => {
       actor_user_id: user,
       include_organization_grants: true
     });
-    const denied = await app.inject({
-      method: "GET",
-      url: `/v1/organizations/${user}/people`,
-      headers: { authorization: "Bearer dbundle_mem_test" }
-    });
-    expect(denied.statusCode).toBe(404);
+    for (const suffix of ["people", `people/${user}/avatar`]) {
+      const denied = await app.inject({
+        method: "GET",
+        url: `/v1/organizations/${user}/${suffix}`,
+        headers: { authorization: "Bearer dbundle_mem_test" }
+      });
+      expect(denied.statusCode).toBe(404);
+    }
     expect(list).toHaveBeenCalledTimes(1);
   });
   it("switches only a browser session without exposing its plaintext token", async () => {

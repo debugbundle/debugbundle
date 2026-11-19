@@ -16,6 +16,7 @@ import { OrganizationOwnershipCard } from "../components/system/organization-own
 import { PageHeader } from "../components/system/page-header.js";
 import { PendingButton } from "../components/system/pending-button.js";
 import { TableActionButton } from "../components/system/table-action-button.js";
+import { UserAvatar } from "../components/system/user-avatar.js";
 import { Button } from "../components/ui/button.js";
 import { Badge } from "../components/ui/badge.js";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.js";
@@ -207,7 +208,16 @@ export function OrganizationPeoplePage(): JSX.Element {
               <TableBody>
                 {matches.slice(currentPage * 25, currentPage * 25 + 25).map((person) => (
                   <TableRow key={person.user_id} className="grid gap-2 p-4 md:table-row md:p-0">
-                    <TableCell className="break-all">{person.email}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-3">
+                        <UserAvatar
+                          email={person.email}
+                          avatarUrl={person.avatar_url ?? null}
+                          size="sm"
+                        />
+                        <span className="min-w-0 break-all">{person.email}</span>
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <div className="flex flex-col gap-1">
                         <span>

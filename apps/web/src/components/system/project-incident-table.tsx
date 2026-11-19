@@ -11,6 +11,11 @@ import {
 import { Badge } from "../ui/badge.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table.js";
 import { BoundedTableTitle } from "./bounded-table-title.js";
+import {
+  TableSelectionCheckbox,
+  TableSelectAllCheckbox,
+  tableSelectionCellClassName
+} from "./selectable-table-actions.js";
 import { SortableTableHead, type SortState } from "./sortable-table-head.js";
 
 export function IncidentTable({
@@ -19,6 +24,7 @@ export function IncidentTable({
   onSortChange,
   selectedIncidentIds,
   onToggleIncidentSelection,
+  onToggleSelectAll,
   onIncidentRowClick
 }: {
   incidents: IncidentRecord[];
@@ -26,14 +32,24 @@ export function IncidentTable({
   onSortChange: (field: ProjectIncidentSortField) => void;
   selectedIncidentIds: Set<string>;
   onToggleIncidentSelection: (incidentId: string) => void;
+  onToggleSelectAll?: () => void;
   onIncidentRowClick: (event: MouseEvent<HTMLTableRowElement>, incident: IncidentRecord) => void;
 }): JSX.Element {
   return (
     <Table className="min-w-[900px] md:min-w-0 md:table-fixed">
       <TableHeader>
         <TableRow>
-          <TableHead className="w-8">
-            <span className="sr-only">Select incidents</span>
+          <TableHead className={tableSelectionCellClassName} aria-label="Select incidents">
+            {onToggleSelectAll ? (
+              <TableSelectAllCheckbox
+                label="Select all visible incidents"
+                ids={incidents.map((incident) => incident.incident_id)}
+                selectedIds={selectedIncidentIds}
+                onToggle={onToggleSelectAll}
+              />
+            ) : (
+              <span className="sr-only">Select incidents</span>
+            )}
           </TableHead>
           <SortableTableHead
             label="Incident"
@@ -95,16 +111,12 @@ export function IncidentTable({
               onIncidentRowClick(event, incident);
             }}
           >
-            <TableCell className="align-middle" data-row-interactive="true">
-              <input
-                type="checkbox"
-                aria-label={`Select incident ${incident.title}`}
+            <TableCell className={tableSelectionCellClassName} data-row-interactive="true">
+              <TableSelectionCheckbox
+                label={`Select incident ${incident.title}`}
                 checked={selectedIncidentIds.has(incident.incident_id)}
-                onChange={() => {
+                onToggle={() => {
                   onToggleIncidentSelection(incident.incident_id);
-                }}
-                onClick={(event) => {
-                  event.stopPropagation();
                 }}
               />
             </TableCell>

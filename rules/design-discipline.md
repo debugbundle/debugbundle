@@ -262,6 +262,21 @@ Choose the structure that best matches the information.
 
 Do not use cards by default when a list or table is clearer.
 
+### Table selection
+
+Selectable tables reuse `TableSelectionCheckbox` and `TableSelectAllCheckbox`,
+which compose the existing shadcn Checkbox. Keep both the bulk-action bar and
+header select-all control hidden until at least one visible row is selected.
+The header shows partial selection with its mixed state, selects the visible
+page and clears it when fully selected. Keep selection/clearing in the header
+instead of long duplicate buttons in the top action bar. Preserve keyboard
+operation, accessible row labels and separation from row navigation.
+Keep the shared selection-column inset, including while the header control is
+hidden. Balance its left padding against its right padding plus the following
+text cell's inset; center the checkbox without an inline baseline offset.
+When a focused bulk-action toolbar disappears, return focus to its persistent
+inventory heading. Do not move focus away from a row or filter the user is using.
+
 ## Navigation and information architecture
 
 Navigation must reflect user mental models.

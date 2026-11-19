@@ -286,12 +286,17 @@ export function createReferralOfferMocks(isSignedIn: () => boolean) {
             return respond({ programmes: versions.slice(start, start + Number(input["limit"])) });
           }
           case "draft": {
+            const promotionCode = input["promotion_code"];
+            if (typeof promotionCode === "string" && codes.has(promotionCode))
+              return error("creator_code_unavailable");
             const programmeId =
               typeof input["programme_id"] === "string" ? input["programme_id"] : randomUUID();
             const previous = versions.filter((v) => v.programme_id === programmeId);
             if (input["programme_id"] && !previous.length) return error("programme_unavailable");
+            const draft = { ...input };
+            delete draft["promotion_code"];
             const version = ProgrammeVersionSchema.parse({
-              ...input,
+              ...draft,
               programme_id: programmeId,
               version_id: randomUUID(),
               revision: Math.max(0, ...previous.map((v) => v.revision)) + 1,
@@ -299,6 +304,13 @@ export function createReferralOfferMocks(isSignedIn: () => boolean) {
               claims_count: 0,
               created_at: now()
             });
+            if (typeof promotionCode === "string")
+              codes.set(promotionCode, {
+                code_id: randomUUID(),
+                version_id: version.version_id,
+                blocked: false,
+                created_at: version.created_at
+              });
             versions.unshift(version);
             return respond({ programme: version });
           }
@@ -377,6 +389,9 @@ export function createReferralOfferMocks(isSignedIn: () => boolean) {
             return respond({
               codes: [...codes.entries()]
                 .filter(([code]) => !input["code"] || code === input["code"])
+                .filter(
+                  ([, record]) => !input["version_id"] || record.version_id === input["version_id"]
+                )
                 .map(([code, record]) => ({
                   ...record,
                   code,

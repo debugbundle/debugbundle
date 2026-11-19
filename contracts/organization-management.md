@@ -12,6 +12,7 @@ membership, plan and suspension; client role assertions are never authoritative.
 | List live memberships               | `GET /v1/organizations`                                    |
 | Select browser context              | `POST /v1/organizations/switch`                            |
 | List retained people                | `GET /v1/organizations/:id/people`                         |
+| Read a retained person's avatar     | `GET /v1/organizations/:id/people/:userId/avatar`           |
 | Change member role/grant/suspension | `PATCH /v1/organizations/:id/people/:userId`               |
 | Remove org/direct access            | `DELETE /v1/organizations/:id/people/:userId`              |
 | List pending org invitations        | `GET /v1/organizations/:id/invites`                        |
@@ -22,6 +23,17 @@ membership, plan and suspension; client role assertions are never authoritative.
 | View pending transfer               | `GET /v1/organizations/:id/ownership-transfer`             |
 | Request / cancel transfer           | `POST` / `DELETE /v1/organizations/:id/ownership-transfer` |
 | Accept transfer                     | `POST /v1/organizations/ownership-transfer/accept`         |
+
+People reads may opt into `include_avatars=true`, adding nullable `avatar_url`
+fields. Default responses retain their previous keys for installed clients.
+Only first-party cached images are used; null/missing images use the shared
+initials fallback. No import/provider fetch occurs during rendering. Image reads
+repeat current Business owner/authorised Org Admin checks and verify the exact
+person remains in that organisation before reading bytes. Object keys never
+enter public responses; image caching is private for at most five minutes.
+CLI `organization people --include-avatars` and ordinary MCP
+`list_organization_people` with `includeAvatars: true` share the same opt-in reader.
+No storage migration is needed: the existing user avatar columns are reused.
 
 Organisation Member grants are explicit `selected` or `all`, with future-project
 default `member` or `viewer`. Admin inherits administration of all current/future

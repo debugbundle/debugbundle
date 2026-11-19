@@ -27,9 +27,9 @@ const reserved = new Set([
   "SYSTEM",
   "TERMS"
 ]);
-/** Codes are public, never credentials. ASCII normalization has one storage key;
- * reject legacy-shaped aliases so future random legacy codes cannot collide. */
-export const CreatorCodeSchema = z
+/** Operator promotion codes use the same globally unique registry as creators.
+ * A ten-character campaign name is valid; registry ownership prevents collisions. */
+export const PromotionCodeSchema = z
   .string()
   .trim()
   .regex(/^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/)
@@ -37,10 +37,12 @@ export const CreatorCodeSchema = z
   .min(3)
   .max(24)
   .regex(/^[A-Z0-9]+(?:-[A-Z0-9]+)*$/)
-  .refine(
-    (code) => !legacyCode.test(code) && !reserved.has(code) && !code.startsWith("DEBUGBUNDLE"),
-    "reserved_code"
-  );
+  .refine((code) => !reserved.has(code) && !code.startsWith("DEBUGBUNDLE"), "reserved_code");
+/** Creator aliases retain the reserved legacy generation namespace. */
+export const CreatorCodeSchema = PromotionCodeSchema.refine(
+  (code) => !legacyCode.test(code),
+  "reserved_code"
+);
 export const PublicOfferCodeSchema = z
   .string()
   .trim()
@@ -125,7 +127,12 @@ export const ProgrammeDraftSchema = ProgrammeVersionSchema.pick({
   name: true,
   public_description: true,
   policy: true
-});
+})
+  .extend({ promotion_code: PromotionCodeSchema.optional() })
+  .refine((draft) => draft.promotion_code === undefined || draft.policy.kind === "promotion", {
+    message: "promotion_code_requires_promotion",
+    path: ["promotion_code"]
+  });
 export const CreatorProgrammeSchema = z
   .object({
     partner_id: z.uuid(),

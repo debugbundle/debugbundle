@@ -24,6 +24,12 @@ describe("organization CLI", () => {
         body: { people: [] }
       },
       {
+        argv: ["people", org, "--include-avatars"],
+        method: "GET",
+        path: `/v1/organizations/${org}/people?include_avatars=true`,
+        body: { people: [] }
+      },
+      {
         argv: ["invites", org],
         method: "GET",
         path: `/v1/organizations/${org}/invites`,

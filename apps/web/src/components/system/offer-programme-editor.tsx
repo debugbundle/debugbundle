@@ -5,9 +5,11 @@ import type {
 } from "../../../../../packages/referrals/src/programme-policy.js";
 import {
   ProgrammeDraftSchema,
+  PromotionCodeSchema,
   OfferPercentageInputSchema
 } from "../../../../../packages/referrals/src/programme-policy.js";
 import { offerApi, offerErrorMessage } from "../../lib/offer-api.js";
+import { OfferApiError } from "../../../../../packages/referral-client/src/offer-api.js";
 import { usePendingAction } from "../../lib/use-pending-action.js";
 import { localDateTimeInput, localDateTimeUtc } from "../../lib/local-datetime.js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card.js";
@@ -50,6 +52,8 @@ export function OfferProgrammeEditor({
         "Introductory savings for new DebugBundle customers. Review the programme details for eligible plans and current terms."
     ),
     [kind, setKind] = useState<OfferPolicy["kind"]>(initial?.kind ?? "referral"),
+    [promotionCode, setPromotionCode] = useState(""),
+    [codeError, setCodeError] = useState<string | null>(null),
     [discount, setDiscount] = useState(String((initial?.discount_basis_points ?? 2000) / 100)),
     [commission, setCommission] = useState(
       String((initial?.commission_basis_points ?? 5000) / 100)
@@ -73,9 +77,18 @@ export function OfferProgrammeEditor({
   const save = (): void =>
     void run(async () => {
       setError(null);
+      setCodeError(null);
+      const code = kind === "promotion" ? PromotionCodeSchema.safeParse(promotionCode) : null;
+      if (code && !code.success) {
+        setCodeError(
+          "Use 3–24 letters, numbers or single hyphens. Choose an unused code; official names are reserved."
+        );
+        return;
+      }
       const parsed = ProgrammeDraftSchema.safeParse({
         name,
         public_description: description,
+        ...(code?.success ? { promotion_code: code.data } : {}),
         policy: {
           kind,
           discount_basis_points: OfferPercentageInputSchema.safeParse(discount).data ?? Number.NaN,
@@ -109,7 +122,9 @@ export function OfferProgrammeEditor({
         });
         onSaved(result.programme);
       } catch (reason) {
-        setError(offerErrorMessage(reason));
+        if (reason instanceof OfferApiError && reason.code === "creator_code_unavailable")
+          setCodeError(offerErrorMessage(reason));
+        else setError(offerErrorMessage(reason));
       }
     });
   const text = (
@@ -174,6 +189,39 @@ export function OfferProgrammeEditor({
                 </Select>
               </Field>
             </FieldGroup>
+            {kind === "promotion" ? (
+              <Field data-invalid={Boolean(codeError)} data-disabled={pending}>
+                <FieldLabel htmlFor="programme-promotion-code">Promotional code</FieldLabel>
+                <Input
+                  id="programme-promotion-code"
+                  value={promotionCode}
+                  onChange={(event) => {
+                    setPromotionCode(event.target.value);
+                    setCodeError(null);
+                  }}
+                  maxLength={24}
+                  disabled={pending}
+                  aria-invalid={Boolean(codeError)}
+                  aria-describedby={
+                    codeError
+                      ? "programme-code-description programme-code-error"
+                      : "programme-code-description"
+                  }
+                  autoCapitalize="characters"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <FieldDescription id="programme-code-description">
+                  Saved with this draft and used when the offer goes live. Each revision needs an
+                  unused code.
+                </FieldDescription>
+                {codeError ? (
+                  <FieldError id="programme-code-error" role="alert">
+                    {codeError}
+                  </FieldError>
+                ) : null}
+              </Field>
+            ) : null}
             <Field>
               <FieldLabel htmlFor="programme-description">Public description</FieldLabel>
               <Textarea

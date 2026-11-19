@@ -5,7 +5,10 @@ import { userEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "../../../apps/web/src/app.tsx";
-import { resetBrowserSessionClientState, type ImprovementRecord } from "../../../apps/web/src/lib/api.ts";
+import {
+  resetBrowserSessionClientState,
+  type ImprovementRecord
+} from "../../../apps/web/src/lib/api.ts";
 import { createProject, createSession, jsonResponse, requestUrl } from "./web-test-helpers.js";
 
 function createImprovement(overrides: Partial<ImprovementRecord> = {}): ImprovementRecord {
@@ -74,7 +77,11 @@ describe("web app — improvement table interactions", () => {
   it("opens the improvement detail route when users click anywhere on a workspace row", async () => {
     const user = userEvent.setup();
     const project = createProject({ project_id: "proj_123", organization_plan: "solo" });
-    const improvement = createImprovement({ project_id: project.project_id, project_name: project.name, service_name: "Checkout API" });
+    const improvement = createImprovement({
+      project_id: project.project_id,
+      project_name: project.name,
+      service_name: "Checkout API"
+    });
 
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
@@ -87,15 +94,26 @@ describe("web app — improvement table interactions", () => {
         return jsonResponse(200, { projects: [project] });
       }
 
-      if (url.includes("/v1/improvements?") && url.includes("status=open") && init?.method === undefined) {
+      if (
+        url.includes("/v1/improvements?") &&
+        url.includes("status=open") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, { improvements: [improvement], next_cursor: null });
       }
 
-      if (url.endsWith(`/v1/improvements/${improvement.improvement_id}`) && init?.method === undefined) {
+      if (
+        url.endsWith(`/v1/improvements/${improvement.improvement_id}`) &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, { improvement });
       }
 
-      if (url.endsWith(`/v1/projects/${project.project_id}/improvements/${improvement.improvement_id}/bundle`)) {
+      if (
+        url.endsWith(
+          `/v1/projects/${project.project_id}/improvements/${improvement.improvement_id}/bundle`
+        )
+      ) {
         return jsonResponse(200, { status: "pending" });
       }
 
@@ -157,7 +175,10 @@ describe("web app — improvement table interactions", () => {
       if (url.includes("/v1/improvements?") && init?.method === undefined) {
         const request = new URL(url, "https://app.debugbundle.test");
         const status = request.searchParams.get("status");
-        const improvements = status === null ? improvementState : improvementState.filter((improvement) => improvement.status === status);
+        const improvements =
+          status === null
+            ? improvementState
+            : improvementState.filter((improvement) => improvement.status === status);
         return jsonResponse(200, { improvements, next_cursor: null });
       }
 
@@ -200,7 +221,8 @@ describe("web app — improvement table interactions", () => {
     await chooseStatusFilterOption(user, "workspace-improvements-status-filter", /all statuses/i);
     expect(await screen.findByText(/resolved workspace improvement/i)).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /select all visible improvements/i }));
+    await user.click(screen.getAllByRole("checkbox", { name: /^select improvement /i })[0]!);
+    await user.click(screen.getByRole("checkbox", { name: /select all visible improvements/i }));
     await user.click(screen.getByRole("button", { name: /mark selected resolved/i }));
 
     await waitFor(() => {
@@ -211,7 +233,8 @@ describe("web app — improvement table interactions", () => {
       ).toHaveLength(2);
     });
 
-    await user.click(await screen.findByRole("button", { name: /select all visible improvements/i }));
+    await user.click(screen.getAllByRole("checkbox", { name: /^select improvement /i })[0]!);
+    await user.click(screen.getByRole("checkbox", { name: /select all visible improvements/i }));
     await user.click(screen.getByRole("button", { name: /mark selected unresolved/i }));
 
     await waitFor(() => {
@@ -226,7 +249,11 @@ describe("web app — improvement table interactions", () => {
   it("opens the improvement detail route when users click anywhere on a project row", async () => {
     const user = userEvent.setup();
     const project = createProject({ project_id: "proj_123", organization_plan: "solo" });
-    const improvement = createImprovement({ project_id: project.project_id, project_name: project.name, service_name: "Project Checkout API" });
+    const improvement = createImprovement({
+      project_id: project.project_id,
+      project_name: project.name,
+      service_name: "Project Checkout API"
+    });
 
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
@@ -239,15 +266,27 @@ describe("web app — improvement table interactions", () => {
         return jsonResponse(200, { projects: [project] });
       }
 
-      if (url.includes("/v1/improvements?") && url.includes(`project_id=${project.project_id}`) && url.includes("status=open") && init?.method === undefined) {
+      if (
+        url.includes("/v1/improvements?") &&
+        url.includes(`project_id=${project.project_id}`) &&
+        url.includes("status=open") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, { improvements: [improvement], next_cursor: null });
       }
 
-      if (url.endsWith(`/v1/improvements/${improvement.improvement_id}`) && init?.method === undefined) {
+      if (
+        url.endsWith(`/v1/improvements/${improvement.improvement_id}`) &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, { improvement });
       }
 
-      if (url.endsWith(`/v1/projects/${project.project_id}/improvements/${improvement.improvement_id}/bundle`)) {
+      if (
+        url.endsWith(
+          `/v1/projects/${project.project_id}/improvements/${improvement.improvement_id}/bundle`
+        )
+      ) {
         return jsonResponse(200, { status: "pending" });
       }
 
@@ -307,10 +346,17 @@ describe("web app — improvement table interactions", () => {
         return jsonResponse(200, { projects: [project] });
       }
 
-      if (url.includes("/v1/improvements?") && url.includes(`project_id=${project.project_id}`) && init?.method === undefined) {
+      if (
+        url.includes("/v1/improvements?") &&
+        url.includes(`project_id=${project.project_id}`) &&
+        init?.method === undefined
+      ) {
         const request = new URL(url, "https://app.debugbundle.test");
         const status = request.searchParams.get("status");
-        const improvements = status === null ? improvementState : improvementState.filter((improvement) => improvement.status === status);
+        const improvements =
+          status === null
+            ? improvementState
+            : improvementState.filter((improvement) => improvement.status === status);
         return jsonResponse(200, { improvements, next_cursor: null });
       }
 
@@ -353,7 +399,8 @@ describe("web app — improvement table interactions", () => {
     await chooseStatusFilterOption(user, "project-improvements-status-filter", /all statuses/i);
     expect(await screen.findByText(/resolved project improvement/i)).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /select all visible improvements/i }));
+    await user.click(screen.getAllByRole("checkbox", { name: /^select improvement /i })[0]!);
+    await user.click(screen.getByRole("checkbox", { name: /select all visible improvements/i }));
     await user.click(screen.getByRole("button", { name: /mark selected resolved/i }));
 
     await waitFor(() => {
@@ -364,7 +411,8 @@ describe("web app — improvement table interactions", () => {
       ).toHaveLength(2);
     });
 
-    await user.click(await screen.findByRole("button", { name: /select all visible improvements/i }));
+    await user.click(screen.getAllByRole("checkbox", { name: /^select improvement /i })[0]!);
+    await user.click(screen.getByRole("checkbox", { name: /select all visible improvements/i }));
     await user.click(screen.getByRole("button", { name: /mark selected unresolved/i }));
 
     await waitFor(() => {

@@ -1,4 +1,4 @@
-import { apiError } from "./openapi-components.js";
+import { apiError, avatarImageResponse } from "./openapi-components.js";
 import { z } from "zod";
 import {
   OrganizationInviteBodySchema,
@@ -97,15 +97,34 @@ export function organizationOperations(): OperationSpec[] {
       operationId: "listOrganizationPeople",
       summary: "List Business people and retained grants",
       params,
+      query: z.object({ include_avatars: z.enum(["true", "false"]).optional() }).strict(),
       responses: {
         ...failures,
         "200": {
-          description: "Deduplicated retained identities and grant state.",
+          description:
+            "Deduplicated retained identities and grant state. include_avatars=true adds a nullable protected cached-avatar URL; default responses retain their existing fields.",
           schema: component(
             "OrganizationPeople",
             z.object({ people: z.array(OrganizationPersonSchema) }).strict()
           )
         }
+      }
+    },
+    {
+      ...metadata,
+      method: "get",
+      path: "/v1/organizations/{id}/people/{userId}/avatar",
+      operationId: "getOrganizationPersonAvatar",
+      summary:
+        "Read a cached avatar for a retained person after current organisation-administrator checks",
+      params: params.extend({ userId: z.uuid() }),
+      responses: {
+        ...failures,
+        "200": {
+          description: "Cached first-party avatar bytes with private five-minute caching.",
+          schema: avatarImageResponse
+        },
+        "503": { description: "Account management is not configured.", schema: apiError }
       }
     },
     {

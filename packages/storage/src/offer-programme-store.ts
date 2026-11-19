@@ -5,11 +5,12 @@ import {
 import { readOfferPerformance } from "./offer-performance-store.js";
 import { createOfferInventoryStore, type OfferInventoryStore } from "./offer-inventory-store.js";
 import { resolveOfferCode } from "./offer-code-resolver.js";
+import { registerPromotionOfferCode } from "./offer-code-registry.js";
 import { readPublicPromotion, type PromotionSelection } from "./offer-promotion-selection.js";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import {
-  CreatorCodeSchema,
+  PromotionCodeSchema,
   ProgrammeDraftSchema,
   ProgrammeError,
   ProgrammeStateSchema,
@@ -138,7 +139,7 @@ export function createOfferProgrammeStore(
         programme_id?: string | undefined;
       }
     ): Promise<ProgrammeVersion> {
-      const input = ProgrammeDraftSchema.extend({
+      const input = ProgrammeDraftSchema.safeExtend({
         actor_user_id: z.uuid(),
         programme_id: z.uuid().optional()
       }).parse(raw);
@@ -176,6 +177,8 @@ export function createOfferProgrammeStore(
             input.actor_user_id
           ]
         );
+        if (input.promotion_code !== undefined)
+          await registerPromotionOfferCode(tx, { version_id: id, code: input.promotion_code });
         return readOfferVersion(tx, id);
       });
     },
@@ -280,7 +283,7 @@ export function createOfferProgrammeStore(
       code: string;
     }): Promise<void> {
       const input = z
-        .object({ actor_user_id: z.uuid(), version_id: z.uuid(), code: CreatorCodeSchema })
+        .object({ actor_user_id: z.uuid(), version_id: z.uuid(), code: PromotionCodeSchema })
         .strict()
         .parse(raw);
       await runInTransaction(db, async (tx) => {
@@ -288,18 +291,7 @@ export function createOfferProgrammeStore(
         const version = await readOfferVersion(tx, input.version_id, true);
         if (version.policy.kind !== "promotion" || version.state === "ended")
           throw new ProgrammeError("programme_unavailable");
-        const old = (
-          await tx.query<{ version_id: string }>(
-            "SELECT version_id FROM offer_codes WHERE code=$1",
-            [input.code]
-          )
-        ).rows[0];
-        if (old?.version_id === version.version_id) return;
-        const result = await tx.query(
-          "INSERT INTO offer_codes(id,code,kind,version_id) VALUES($1,$2,'promotion',$3) ON CONFLICT(code) DO NOTHING RETURNING id",
-          [randomUUID(), input.code, version.version_id]
-        );
-        if (!result.rows.length) throw new ProgrammeError("creator_code_unavailable");
+        await registerPromotionOfferCode(tx, { version_id: input.version_id, code: input.code });
       });
     }
   };

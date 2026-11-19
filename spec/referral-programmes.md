@@ -214,6 +214,21 @@ when the displayed terms are a cheaper promotion. Invalid explicit codes never
 masquerade as a valid promotion. Preview reads create no cookie,
 claim or provider object. The existing site-wide banner, details, pricing and
 signup link consume this same context on the homepage and other public layouts.
+The promotional draft form requires a chosen public code. The shared draft
+input accepts optional `promotion_code` for compatible API/CLI/MCP clients and
+saves it in the same transaction as the new version. Duplicate/reserved/invalid
+codes cannot leave a partial programme or revision. `PromotionCodeSchema` allows
+ten-character campaign codes such as `BLCKFRYD26`; creator aliases keep their
+legacy-generation namespace restriction. All codes still share the unique
+registry and protected official-name rules. The card reads its saved codes with
+the inventory's optional `version_id` filter instead of a separate Reserve form.
+Codes belong to a version: revised drafts choose a new unused code, while saved
+claims and old aliases retain their original version. Saving a draft publishes
+nothing; activation/discovery/claims use that exact saved code. Existing clients
+may omit the new field, and the separate promotion-code operation stays supported.
+Roll out the compatible API before updated dashboard/automation clients, which
+send the new draft field and inventory filter. This uses existing tables and
+unchanged public version responses; no database migration is required.
 Activation/scheduling reserves a stable public promotion code when none exists.
 An intentionally blocked code is never bypassed by generating another code.
 
