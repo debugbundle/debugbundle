@@ -156,6 +156,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # A packed candidate may already be cached; require an actual registry download.
+          export npm_config_cache="$(mktemp -d)"
 
           for package_spec in "@debugbundle/shared-types@${RELEASE_VERSION}" "@debugbundle/redaction@${REDACTION_VERSION}"; do
             for attempt in $(seq 1 30); do

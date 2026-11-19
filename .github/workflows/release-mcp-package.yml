@@ -322,6 +322,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # A packed candidate may already be cached; require an actual registry download.
+          export npm_config_cache="$(mktemp -d)"
 
           for attempt in $(seq 1 30); do
             if npm view "@debugbundle/mcp@${RELEASE_VERSION}" version >/dev/null 2>&1; then

@@ -49,3 +49,11 @@ if rolling back to an older API that rejects the new optional inputs.
 
 In progress. Private operator evidence is retained under `.tmp/release-1.30.0/`;
 the hosted repository records production receipts separately.
+
+The initial shared-types publication was accepted with matching metadata, but
+fresh clients received tarball 404 responses. The old registry smoke reused its
+packed-candidate npm cache and therefore passed without proving download
+availability. Three failing regression cases reproduce that cache-boundary gap.
+The selected shared/CLI/MCP workflows now use an empty post-publication cache.
+No immutable version is republished; production remains held until genuine
+registry downloads and the final source CI pass.

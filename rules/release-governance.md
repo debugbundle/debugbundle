@@ -217,6 +217,10 @@ The Registry JWT is intentionally short-lived and must not be made permanent. Th
 
 ### Package Release Checklist
 
+Post-publication registry smoke tests use a fresh empty npm cache, isolated from
+packed-candidate validation. Metadata visibility alone is insufficient: the exact
+published archive must download and install before registry acceptance passes.
+
 All seven npm packages publish through GitHub Actions trusted publishers (OIDC),
 with `id-token: write` confined to the publishing job and npm CLI pinned to 11.5.2.
 Do not pass `NPM_TOKEN` or `NODE_AUTH_TOKEN` to publishing steps. Each npm trusted

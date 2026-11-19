@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -14,6 +15,20 @@ const candidates = [
 ];
 
 describe("shared JS immutable publication", () => {
+  it.each(["shared-js-packages", "cli-package", "mcp-package"])(
+    "isolates the published registry install from the candidate cache (%s)",
+    (distribution) => {
+      const workflow = readFileSync(`.github/workflows/release-${distribution}.yml`, "utf8");
+      const publishedStep = workflow
+        .split("- name: Smoke test published")[1]!
+        .split("\n      - name:")[0]!;
+      const freshCache = publishedStep.indexOf('export npm_config_cache="$(mktemp -d)"');
+      const registryInstall = publishedStep.indexOf('npm install --prefix "$tmpdir"');
+      expect(freshCache).toBeGreaterThanOrEqual(0);
+      expect(freshCache).toBeLessThan(registryInstall);
+    }
+  );
+
   it("publishes only missing artifacts, retaining exact published bytes", () => {
     expect(planSharedPublication(candidates, [null, candidates[1]])).toEqual({
       publish: ["@debugbundle/shared-types"],
