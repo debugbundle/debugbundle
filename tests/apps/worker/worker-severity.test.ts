@@ -3,7 +3,10 @@ import { gzipSync } from "node:zlib";
 import { describe, expect, it, vi } from "vitest";
 
 import { createEventEnvelope } from "../../../packages/shared-types/src/index.js";
-import { processNextGroupIncidentJob, processNextNormalizeEventsJob } from "../../../apps/worker/src/processor.js";
+import {
+  processNextGroupIncidentJob,
+  processNextNormalizeEventsJob
+} from "../../../apps/worker/src/processor.js";
 import { inferSeverity } from "../../../apps/worker/src/severity.js";
 import { browserResourceEvent } from "../../helpers/browser-resource-fixtures.js";
 
@@ -15,14 +18,19 @@ describe("worker severity inference", () => {
         service: { name: "hcp", environment: "staging", runtime: "java", framework: "wildfly" },
         payload: {
           level: "error",
-          message: "java.util.concurrent.ExecutionException: java.util.ConcurrentModificationException",
+          message:
+            "java.util.concurrent.ExecutionException: java.util.ConcurrentModificationException",
           attributes: { logger }
         }
       });
       const continuation = createEventEnvelope({
         event_type: "log_event",
         service: { name: "hcp", environment: "staging", runtime: "java", framework: "wildfly" },
-        payload: { level: "error", message: "Caused by: java.util.ConcurrentModificationException", attributes: { logger } }
+        payload: {
+          level: "error",
+          message: "Caused by: java.util.ConcurrentModificationException",
+          attributes: { logger }
+        }
       });
       expect(inferSeverity(root)).toBe("high");
       expect(inferSeverity(continuation)).toBe("low");
@@ -32,7 +40,12 @@ describe("worker severity inference", () => {
   it("keeps backend and non-opaque frontend exceptions high severity", (): void => {
     const backendException = createEventEnvelope({
       event_type: "backend_exception",
-      service: { name: "checkout-api", environment: "production", runtime: "node", framework: "fastify" },
+      service: {
+        name: "checkout-api",
+        environment: "production",
+        runtime: "node",
+        framework: "fastify"
+      },
       payload: {
         name: "TypeError",
         message: "boom",
@@ -50,7 +63,8 @@ describe("worker severity inference", () => {
       payload: {
         name: "TypeError",
         message: "Cannot read properties of undefined",
-        stack: "TypeError: Cannot read properties of undefined\n    at App (https://example.com/app.js:10:5)",
+        stack:
+          "TypeError: Cannot read properties of undefined\n    at App (https://example.com/app.js:10:5)",
         route: "/checkout",
         browser: { name: "Chrome", version: "125.0.0.0" }
       }
@@ -141,7 +155,12 @@ describe("worker severity inference", () => {
   it("enqueues opaque window errors below high severity during normalization", async (): Promise<void> => {
     const event = createEventEnvelope({
       event_type: "frontend_exception",
-      service: { name: "web", environment: "production", runtime: "browser", framework: "wordpress" },
+      service: {
+        name: "web",
+        environment: "production",
+        runtime: "browser",
+        framework: "wordpress"
+      },
       payload: {
         name: "Error",
         message: "Window error",

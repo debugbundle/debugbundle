@@ -5,7 +5,14 @@ import { useNavigate } from "react-router-dom";
 import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card.js";
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../ui/empty.js";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle
+} from "../ui/empty.js";
 import { Skeleton } from "../ui/skeleton.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table.js";
 import { CreateProjectDialog } from "./create-project-dialog.js";
@@ -14,7 +21,11 @@ import type { ProjectRecord } from "../../lib/api.js";
 import { getActiveIncidentCount } from "../../lib/project-metrics.js";
 import { useDelayedVisibility } from "../../lib/use-delayed-visibility.js";
 
-export function RecentProjectsTable({ projects }: { projects: ProjectRecord[] | null }): JSX.Element {
+export function RecentProjectsTable({
+  projects
+}: {
+  projects: ProjectRecord[] | null;
+}): JSX.Element {
   const navigate = useNavigate();
   const sortedProjects = useMemo(
     () => projects && [...projects].sort((left, right) => left.name.localeCompare(right.name)),
@@ -87,9 +98,15 @@ export function RecentProjectsTable({ projects }: { projects: ProjectRecord[] | 
                     <TableCell>
                       <Badge variant="outline">{project.environment_default}</Badge>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{getActiveIncidentCount(project.metrics).toLocaleString()}</TableCell>
-                    <TableCell className="text-muted-foreground">{project.metrics.attention_incidents_today.toLocaleString()}</TableCell>
-                    <TableCell className="text-muted-foreground">{project.metrics.opened_incidents_month.toLocaleString()}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {getActiveIncidentCount(project.metrics).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {project.metrics.attention_incidents_today.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {project.metrics.opened_incidents_month.toLocaleString()}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
