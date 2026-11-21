@@ -483,7 +483,7 @@ export function ReferralPayoutsPage(): JSX.Element {
           selectedProgramme.available_minor > 0 &&
           selectedProgramme.available_minor < 5000 ? (
             <p className="text-sm text-muted-foreground">
-              This is below the routine US$50 payout threshold. Proceed only for a manually agreed
+              This is below the routine $50 USD payout threshold. Proceed only for a manually agreed
               arrangement or final settlement.
             </p>
           ) : null}

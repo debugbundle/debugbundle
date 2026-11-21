@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { ReferralStore } from "../../storage/src/referral-store.js";
 import type { ReferralLedgerStore } from "../../storage/src/referral-ledger-store.js";
 import { ReferralError } from "./referral-contracts.js";
+import type { ReferralAnalytics, ReferralAnalyticsDays } from "./referral-analytics-contract.js";
 import {
   ReferralPayoutPageSchema,
   ReferralOperatorPayoutPageSchema,
@@ -19,6 +20,7 @@ function pagination(raw: Page): { limit: number; before?: string } {
   return { limit: page.limit, ...(page.before === undefined ? {} : { before: page.before }) };
 }
 export interface ReferralFinance {
+  analytics(userId: string, days: ReferralAnalyticsDays): Promise<ReferralAnalytics | null>;
   earnings(userId: string): Promise<ReferralEarningsResponse>;
   payouts(userId: string, page: Page): Promise<ReferralPayout[]>;
   operatorBalances(userId: string, page: Page): Promise<ReferralPartnerEarnings[]>;
@@ -36,6 +38,11 @@ export interface ReferralFinance {
 export function createReferralFinance(input: {
   partners: ReferralStore;
   ledger: ReferralLedgerStore;
+  readAnalytics(
+    userId: string,
+    days: ReferralAnalyticsDays,
+    asOf: string
+  ): Promise<ReferralAnalytics | null>;
   isOperator(userId: string): Promise<boolean>;
   now?: () => string;
 }): ReferralFinance {
@@ -56,6 +63,7 @@ export function createReferralFinance(input: {
     }
   }
   return {
+    analytics: (userId, days) => input.readAnalytics(userId, days, now()),
     async earnings(userId) {
       const partner = await input.partners.getPartner({ user_id: z.uuid().parse(userId) });
       return {

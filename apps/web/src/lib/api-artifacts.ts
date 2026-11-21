@@ -2,6 +2,7 @@ import {
   API_BASE,
   assertBrowserSessionResponse,
   buildBrowserSessionHeaders,
+  invalidateDashboardReads,
   readJson
 } from "./api-client.js";
 import { normalizeImprovementRecord, normalizeIncidentRecord } from "./api-record-normalizers.js";
@@ -44,6 +45,7 @@ async function mutateIncident(path: string): Promise<IncidentRecord> {
       headers: buildBrowserSessionHeaders()
     })
   );
+  invalidateDashboardReads("/v1/projects", "resource");
   return normalizeIncidentRecord(body.incident);
 }
 
@@ -64,6 +66,7 @@ async function mutateIncidents(path: string, incidentIds: string[]): Promise<Inc
       body: JSON.stringify({ incident_ids: incidentIds })
     })
   );
+  invalidateDashboardReads("/v1/projects", "resource");
   return body.incidents.map(normalizeIncidentRecord);
 }
 
@@ -231,7 +234,8 @@ export async function listIncidents(
     total_count?: number;
   }>(
     await fetch(`${API_BASE}/v1/incidents?${searchParams.toString()}`, {
-      credentials: "include"
+      credentials: "include",
+      cache: "no-store"
     })
   );
 
@@ -328,7 +332,8 @@ export async function listProjectIncidents(
     total_count?: number;
   }>(
     await fetch(`${API_BASE}/v1/incidents?${searchParams.toString()}`, {
-      credentials: "include"
+      credentials: "include",
+      cache: "no-store"
     })
   );
   return {

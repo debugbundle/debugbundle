@@ -1,4 +1,11 @@
-import { API_BASE, buildBrowserSessionHeaders, readJson } from "./api-client.js";
+import {
+  API_BASE,
+  buildBrowserSessionHeaders,
+  clearDashboardReads,
+  invalidateDashboardReads,
+  readDashboardJson,
+  readJson
+} from "./api-client.js";
 import type {
   GitHubDispatchDeliveryRecord,
   GitHubDispatchRuleRecord,
@@ -19,13 +26,9 @@ export async function getGitHubInstallation(
     searchParams.set("project_id", projectId);
   }
 
-  const body = await readJson<{ installation: GitHubInstallationRecord | null }>(
-    await fetch(
-      `${API_BASE}/v1/github/installation${searchParams.size === 0 ? "" : `?${searchParams.toString()}`}`,
-      {
-        credentials: "include"
-      }
-    )
+  const body = await readDashboardJson<{ installation: GitHubInstallationRecord | null }>(
+    `/v1/github/installation${searchParams.size === 0 ? "" : `?${searchParams.toString()}`}`,
+    "configuration"
   );
 
   return body.installation;
@@ -75,10 +78,9 @@ export async function listGitHubRepositories(
 export async function getProjectGitHubRepo(
   projectId: string
 ): Promise<ProjectGitHubRepoRecord | null> {
-  const body = await readJson<{ repo: ProjectGitHubRepoRecord | null }>(
-    await fetch(`${API_BASE}/v1/projects/${projectId}/github/repo`, {
-      credentials: "include"
-    })
+  const body = await readDashboardJson<{ repo: ProjectGitHubRepoRecord | null }>(
+    `/v1/projects/${projectId}/github/repo`,
+    "configuration"
   );
 
   return body.repo;
@@ -87,10 +89,9 @@ export async function getProjectGitHubRepo(
 export async function listProjectGitHubRules(
   projectId: string
 ): Promise<GitHubDispatchRuleRecord[]> {
-  const body = await readJson<{ rules: GitHubDispatchRuleRecord[] }>(
-    await fetch(`${API_BASE}/v1/projects/${projectId}/github/rules`, {
-      credentials: "include"
-    })
+  const body = await readDashboardJson<{ rules: GitHubDispatchRuleRecord[] }>(
+    `/v1/projects/${projectId}/github/rules`,
+    "configuration"
   );
 
   return body.rules;
@@ -122,6 +123,7 @@ export async function createProjectGitHubRule(
     })
   );
 
+  invalidateDashboardReads(`/v1/projects/${projectId}/github/rules`);
   return body.rule;
 }
 
@@ -149,6 +151,7 @@ export async function updateProjectGitHubRule(
     })
   );
 
+  invalidateDashboardReads(`/v1/projects/${projectId}/github/rules`);
   return body.rule;
 }
 
@@ -162,6 +165,7 @@ export async function deleteProjectGitHubRule(projectId: string, ruleId: string)
   if (!response.ok) {
     await readJson(response);
   }
+  invalidateDashboardReads(`/v1/projects/${projectId}/github/rules`);
 }
 
 export async function listProjectGitHubDeliveries(
@@ -213,6 +217,7 @@ export async function setProjectGitHubRepo(
     })
   );
 
+  invalidateDashboardReads(`/v1/projects/${projectId}/github/repo`);
   return body.repo;
 }
 
@@ -226,6 +231,7 @@ export async function removeProjectGitHubRepo(projectId: string): Promise<void> 
   if (!response.ok) {
     await readJson(response);
   }
+  invalidateDashboardReads(`/v1/projects/${projectId}/github`);
 }
 
 export async function disconnectGitHubInstallation(): Promise<void> {
@@ -235,4 +241,6 @@ export async function disconnectGitHubInstallation(): Promise<void> {
     headers: buildBrowserSessionHeaders()
   });
   if (!response.ok) await readJson(response);
+  // Disconnect removes linked repositories and dispatch rules across the workspace.
+  clearDashboardReads();
 }

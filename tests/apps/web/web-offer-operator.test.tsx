@@ -118,7 +118,21 @@ it("explains when a pending signup code stops accepting new claims", async () =>
     /Enter a valid referral or discount code/
   );
 });
-it("carries a presented signup code as a hint and never calls it a saved benefit", async () => {
+it.each([
+  { code: "OWEN20", version: offerDefinition },
+  {
+    code: "SALE20",
+    version: {
+      ...offerDefinition,
+      policy: {
+        ...offerDefinition.policy,
+        kind: "promotion",
+        commission_basis_points: 0,
+        redeem_by: "2026-12-01T00:00:00Z"
+      }
+    }
+  }
+])("carries signup code $code as a hint and explains when the discount applies", async (offer) => {
   const writes: unknown[] = [],
     loading = vi.fn();
   vi.stubGlobal(
@@ -128,16 +142,20 @@ it("carries a presented signup code as a hint and never calls it a saved benefit
       if (path.endsWith("/capabilities")) return jsonResponse(200, { enabled: true });
       if (path.endsWith("/pending")) {
         writes.push(JSON.parse(typeof init?.body === "string" ? init.body : "{}"));
-        return jsonResponse(200, {
-          offer: { code: "OWEN20", version: offerDefinition, available: true }
-        });
+        return jsonResponse(200, { offer: { ...offer, available: true } });
       }
       return jsonResponse(404, { error: "not_found" });
     })
   );
-  render(<SignupOfferControl presentedCode="OWEN20" onLoading={loading} />);
+  render(<SignupOfferControl presentedCode={offer.code} onLoading={loading} />);
   expect(await screen.findByText(/20%/)).toBeInTheDocument();
-  expect(writes).toEqual([{ code: "OWEN20", explicit_correction: false }]);
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "Your trial does not consume the offer. Once saved, the discount stays with your workspace for its first eligible paid invoice."
+  );
+  expect(screen.queryByText(/Campaign claims have a redemption deadline/) !== null).toBe(
+    offer.version.policy.redeem_by !== null
+  );
+  expect(writes).toEqual([{ code: offer.code, explicit_correction: false }]);
   expect(screen.queryByText(/discount is saved/)).toBeNull();
   await waitFor(() => expect(loading).toHaveBeenLastCalledWith(false));
 });
@@ -167,7 +185,16 @@ it("clears an anonymous signup code and its auth links without losing trial inte
   );
   render(<App initialEntries={["/signup?trial=team&next=%2Fprojects&offer=OWEN20#code"]} />);
   await screen.findByText(/OWEN20: 20%/);
-  await user.click(screen.getByText("Referral or discount code"));
+  const summary = screen.getByText("Referral or discount code");
+  const details = summary.closest("details");
+  const content = summary.closest('[data-slot="card-content"]');
+  expect(content).toHaveClass("flex", "flex-col", "gap-4");
+  expect(screen.getByText("Team trial selected").closest('[data-slot="card-content"]')).toBe(
+    content
+  );
+  expect(details).not.toHaveAttribute("open");
+  await user.click(summary);
+  expect(details).toHaveAttribute("open");
   await user.click(screen.getByRole("button", { name: "Clear code" }));
   await waitFor(() => expect(screen.getByLabelText("Code")).toHaveValue(""));
   expect(screen.queryByText(/OWEN20: 20%/)).toBeNull();

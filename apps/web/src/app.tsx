@@ -3,7 +3,7 @@ import { OfferProgrammesPage } from "./pages/offer-programmes-page.js";
 import { resolvePublicStatusRoute } from "./lib/public-status-routing.js";
 import { PublicStatusPage } from "./pages/public-status-page.js";
 import { LoaderCircleIcon } from "lucide-react";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useEffectEvent, useRef, useState } from "react";
 import {
   BrowserRouter,
   MemoryRouter,
@@ -35,9 +35,12 @@ import {
   ProjectRouteProvider,
   type ActiveProjectRoute
 } from "./components/system/project-route-context.js";
-import { SectionCards } from "./components/system/section-cards.js";
+import { SectionCards, useDashboardMetrics } from "./components/system/section-cards.js";
 import { SiteHeader } from "./components/system/site-header.js";
 import { logout, type SessionRecord } from "./lib/api.js";
+import { loadDashboardAttentionIncidentPage } from "./lib/dashboard-incidents-today-data.js";
+import { getLocalDayWindow } from "./lib/incidents-today.js";
+import { useCursorPagination } from "./lib/use-cursor-pagination.js";
 import { showErrorToast, showInfoToast, showSuccessToast } from "./lib/notify.js";
 import {
   setWebDogfoodingAnalyticsAuthState,
@@ -357,11 +360,47 @@ function ProtectedShell({
 }
 
 function DashboardPage(): JSX.Element {
+  const [pageSize, setPageSize] = useState(10);
+  const { projects, metrics, refreshMetrics } = useDashboardMetrics();
+  const pagination = useCursorPagination(
+    (cursor) => loadDashboardAttentionIncidentPage(getLocalDayWindow(), cursor, pageSize),
+    [pageSize]
+  );
+  const refresh = useEffectEvent(() => {
+    void refreshMetrics(true);
+    void pagination.refreshPage("background");
+  });
+
+  useEffect(() => {
+    let scheduled: number | undefined;
+    function refreshWhenVisible(): void {
+      if (document.visibilityState !== "visible" || scheduled !== undefined) return;
+      // Browsers can dispatch focus and visibilitychange for the same tab return.
+      scheduled = window.setTimeout(() => {
+        scheduled = undefined;
+        if (document.visibilityState === "visible") refresh();
+      }, 50);
+    }
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.clearTimeout(scheduled);
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, []);
+
+  const attentionToday =
+    pagination.totalCount ?? (pagination.hasError ? metrics?.attentionIncidentsToday : undefined);
   return (
     <div className="flex flex-col gap-4 md:gap-6">
-      <SectionCards />
-      <DashboardIncidentsToday />
-      <RecentProjectsTable />
+      <SectionCards metrics={metrics} attentionToday={attentionToday} />
+      <DashboardIncidentsToday
+        pageSize={pageSize}
+        setPageSize={setPageSize}
+        pagination={pagination}
+      />
+      <RecentProjectsTable projects={projects} />
     </div>
   );
 }

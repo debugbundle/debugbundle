@@ -238,6 +238,9 @@ it.each([false, true])(
     );
     expect(await screen.findByText("$153.60")).toBeVisible();
     expect(screen.getByText("$192.00/year")).toBeVisible();
+    expect(
+      screen.getByText(/only to the first eligible invoice, even after a trial/)
+    ).toBeVisible();
     expect(execute.mock.calls.map(([name]) => name)).toEqual(["quote"]);
     await user.click(screen.getByRole("button", { name: "Continue to Stripe" }));
     await screen.findByRole("alert");
@@ -358,6 +361,7 @@ it("keeps a saved discount visible when new programme claims are disabled", asyn
   );
   render(<CustomerOfferControl organizationId={org} />);
   expect(await screen.findByText("Your discount is saved")).toBeVisible();
+  expect(screen.getByText(/base invoice, even after your trial/)).toBeVisible();
   expect(screen.getByText("New code claims are paused")).toBeVisible();
   expect(screen.getByRole("button", { name: "Apply code" })).toBeDisabled();
   expect(screen.getByLabelText("Referral or discount code")).toHaveValue("OWEN20");

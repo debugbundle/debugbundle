@@ -4,10 +4,13 @@ import {
   type TierName
 } from "../../../../../packages/shared-types/src/index.js";
 
+const usd = new Intl.NumberFormat(undefined, {
+  style: "currency",
+  currency: "USD",
+  currencyDisplay: "narrowSymbol"
+});
 export function formatBillingAmount(amount: number): string {
-  return new Intl.NumberFormat(undefined, { style: "currency", currency: "usd" }).format(
-    amount / 100
-  );
+  return usd.format(amount / 100);
 }
 export function formatBillingTerm(value: string | null): string {
   return value === null

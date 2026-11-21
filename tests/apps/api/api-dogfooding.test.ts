@@ -10,6 +10,8 @@ import {
 import { createApiServer } from "../../../apps/api/src/server.ts";
 import { SESSION_COOKIE_NAME, generateMemberToken } from "../../../packages/auth/src/index.js";
 import { createEventEnvelope } from "../../../packages/shared-types/src/index.js";
+import { fingerprint, normalizeEvent } from "../../../packages/event-normalizer/src/index.js";
+import { inferSeverity } from "../../../apps/worker/src/severity.js";
 
 function createDependencies() {
   return {
@@ -144,7 +146,7 @@ describe("api dogfooding", () => {
         redactFields: [...REFERRAL_PAYOUT_REDACT_FIELDS],
         captureConsole: false,
         projectMode: "connected",
-        beforeSend: sanitizeApiDogfoodingEvent,
+        beforeSend: expect.any(Function),
         transport: expect.any(Function)
       })
     );
@@ -312,7 +314,9 @@ describe("api dogfooding", () => {
     monitor({
       category: "reviewer_credential_expiring",
       remainingDays: 10,
-      expired: false
+      expired: false,
+      expiresAt: "2026-12-23T07:53:34.795Z",
+      milestone: "fourteen_days"
     });
 
     expect(sdk.captureError).toHaveBeenCalledTimes(3);
@@ -338,12 +342,53 @@ describe("api dogfooding", () => {
     expect(sdk.captureError).toHaveBeenNthCalledWith(
       3,
       expect.objectContaining({
-        message: "openai_reviewer_credential_expiring remaining_days=10 expired=false",
-        stack: "Error: openai_reviewer_credential_expiring remaining_days=10 expired=false"
+        message:
+          "openai_reviewer_credential_expiring deadline=2026-12-23T07:53:34.795Z milestone=fourteen_days",
+        stack:
+          "Error: openai_reviewer_credential_expiring deadline=2026-12-23T07:53:34.795Z milestone=fourteen_days"
       }),
       { handled: true, request: {} }
     );
     expect(JSON.stringify(sdk.captureError.mock.calls)).not.toContain("token_hash");
+  });
+
+  it("groups reviewer reminders by credential deadline and deduplicates milestone events", () => {
+    function capture(deadline: string, milestone: string) {
+      const event = createEventEnvelope({
+        event_type: "backend_exception",
+        service: { name: "debugbundle-api", environment: "production", runtime: "node" },
+        sdk_name: "test",
+        sdk_version: "1",
+        payload: {
+          name: "Error",
+          message: `openai_reviewer_credential_expiring deadline=${deadline} milestone=${milestone}`,
+          stack: "Error: reviewer",
+          handled: true,
+          request: { method: "UNKNOWN", path: "/", query: {}, headers: {} },
+          response: { status_code: 0 },
+          runtime: { version: "test" }
+        }
+      });
+      const sanitized = sanitizeApiDogfoodingEvent(event);
+      if (sanitized?.event_type !== "backend_exception")
+        throw new Error("Expected reviewer reminder");
+      return sanitized;
+    }
+    const deadline = "2026-12-23T07:53:34.795Z";
+    const first = capture(deadline, "fourteen_days");
+    const sameMilestone = capture(deadline, "fourteen_days");
+    const expired = capture(deadline, "expired");
+    const later = capture("2027-01-23T07:53:34.795Z", "fourteen_days");
+    expect(first.event_id).toBe(sameMilestone.event_id);
+    expect(first.event_id).not.toBe(expired.event_id);
+    expect(fingerprint(normalizeEvent(first))).toBe(fingerprint(normalizeEvent(expired)));
+    expect(fingerprint(normalizeEvent(first))).not.toBe(fingerprint(normalizeEvent(later)));
+    expect(inferSeverity(first)).toBe("high");
+    expect(inferSeverity(expired)).toBe("critical");
+    expect(expired.payload.runtime.framework_extras).toMatchObject({
+      reviewer_milestone: "expired",
+      reviewer_deadline: deadline
+    });
   });
 
   it("strips ambient request, correlation, probes, and host details from OpenAI incidents", () => {

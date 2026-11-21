@@ -201,7 +201,7 @@ Payment setup precedes history while any accepted programme lacks saved payment
 preferences. Once all are confirmed saved, history comes first. Existing saved
 preferences use that order on return; failed saves never mark setup complete.
 
-FR/AC-REF-11 and the [payment setup contract](../contracts/referral-accounting.md#per-programme-payment-preferences) extend these programmes with encrypted per-programme recipient preferences and immutable manual payout instructions. Product defaults include IBAN/Wise/Revolut, five currencies and supported countries; programme editors have no additional controls. Routine payout review starts at US$50 without forfeiting smaller balances. See the [approved implementation plan](referral-payout-preferences-plan.md).
+FR/AC-REF-11 and the [payment setup contract](../contracts/referral-accounting.md#per-programme-payment-preferences) extend these programmes with encrypted per-programme recipient preferences and immutable manual payout instructions. Product defaults include IBAN/Wise/Revolut, five currencies and supported countries; programme editors have no additional controls. Routine payout review starts at $50 USD without forfeiting smaller balances. See the [approved implementation plan](referral-payout-preferences-plan.md).
 
 ## Public affiliate presentation
 

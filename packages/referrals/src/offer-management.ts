@@ -25,9 +25,15 @@ import {
   publicOfferDefinition
 } from "./programme-policy.js";
 import { createOfferLinkCodec } from "./offer-link.js";
+import {
+  createReferralVisits,
+  type ReferralVisit,
+  type ReferralVisits
+} from "./referral-visit-receipts.js";
 
 export interface OfferManagement {
   enabled: boolean;
+  referralVisits?: ReferralVisits;
   store: OfferProgrammeStore;
   operators: ReturnType<typeof createOfferOperatorStore>;
   benefits: ReturnType<typeof createOfferBenefitStore>;
@@ -95,6 +101,7 @@ export function createOfferManagement(input: {
   ): Promise<{ coupon_id: string; livemode: boolean }>;
   publicBaseUrl: string;
   apiBaseUrl: string;
+  visitTracking?: { secret: string; record(visit: ReferralVisit): Promise<boolean> };
   readEligibility(
     actor: OfferActor
   ): Promise<{ provider_customer_id_checked: string | null; provider_previously_paid: boolean }>;
@@ -109,6 +116,15 @@ export function createOfferManagement(input: {
   ): Promise<import("./programme-policy.js").PublicOfferPreview | null> => {
     return readPresentedOffer({ ...input, legacy: input.legacy }, code);
   };
+  const referralVisits =
+    input.visitTracking &&
+    createReferralVisits({
+      ...input.visitTracking,
+      async available(code) {
+        const offer = await rawPreview(code);
+        return offer?.available === true && offer.version.policy.kind === "referral";
+      }
+    });
   const best = async (
     origin: import("./programme-policy.js").PublicOfferPreview | null,
     selection?: OfferPriceSelection
@@ -380,6 +396,7 @@ export function createOfferManagement(input: {
       await input.verifyCoupon(request.coupon_id, version.policy, request.livemode);
       return input.store.bindProvider(request);
     },
+    ...(referralVisits ? { referralVisits } : {}),
     publicOrigin,
     publicLandingUrl: input.publicBaseUrl,
     shareLink(code: string) {

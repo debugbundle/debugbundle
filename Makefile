@@ -432,6 +432,10 @@ referral-programme-disclosure-coverage:
 referral-programmes-coverage:
 	REFERRAL_COVERAGE=1 TEST_FILES='tests/integration/offer-*.integration.test.ts tests/packages/referrals/*.test.ts tests/apps/api/api-offers.test.ts tests/apps/cli/cli-offers.test.ts tests/apps/web/web-*offer*.test.tsx tests/apps/web/web-creator-programmes.test.tsx tests/apps/worker/referral-processing-lane.test.ts tests/contracts/referral-site-projection.test.ts' sh scripts/test-referral-programmes-integration.sh
 
+.PHONY: creator-kit
+creator-kit:
+	python3 scripts/prepare-creator-kit.py
+
 .PHONY: referral-ui-component-docs
 referral-ui-component-docs:
 	$(NODE_RUN) "corepack enable && cd apps/web && corepack pnpm dlx shadcn@latest docs card input field alert alert-dialog table checkbox select"

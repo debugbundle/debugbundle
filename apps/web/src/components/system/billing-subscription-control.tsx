@@ -478,7 +478,7 @@ export function BillingSubscriptionControl(props: Props): JSX.Element {
               <>
                 <MetadataSeparator />
                 {formatBillingAmount(subscription.base_amount_minor)}/
-                {subscription.interval === "year" ? "year" : "month"} base
+                {subscription.interval === "year" ? "year" : "month"} base (USD)
               </>
             )}
           </p>
@@ -522,8 +522,7 @@ export function BillingSubscriptionControl(props: Props): JSX.Element {
           <DialogHeader>
             <DialogTitle>Change subscription</DialogTitle>
             <DialogDescription>
-              Choose a plan and payment interval. Monthly allowances stay the same with yearly
-              billing.
+              Prices are in USD. Monthly allowances stay the same with yearly billing.
             </DialogDescription>
           </DialogHeader>
           {pendingNotice ?? (

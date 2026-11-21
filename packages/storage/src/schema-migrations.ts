@@ -4,6 +4,7 @@ import {
   offerProgrammeSchemaAvailable
 } from "./offer-programme-schema.js";
 import { CREATOR_EMAIL_MIGRATION, creatorEmailSchemaAvailable } from "./creator-email-schema.js";
+import { REFERRAL_VISIT_MIGRATION, referralVisitSchemaAvailable } from "./referral-visit-schema.js";
 import {
   PAYOUT_PREFERENCE_MIGRATION,
   payoutPreferenceSchemaAvailable
@@ -174,7 +175,8 @@ export const STORAGE_SCHEMA_MIGRATIONS: readonly StorageSchemaMigration[] = [
   OFFER_PROGRAMME_MIGRATION,
   PAYOUT_PREFERENCE_MIGRATION,
   CREATOR_EMAIL_MIGRATION,
-  OFFER_PUBLICATION_MIGRATION
+  OFFER_PUBLICATION_MIGRATION,
+  REFERRAL_VISIT_MIGRATION
 ].sort((left, right) => left.id.localeCompare(right.id));
 
 function validateStorageSchemaMigrations(migrations: readonly StorageSchemaMigration[]): void {
@@ -264,10 +266,12 @@ async function reconcileMigrationLedgerInTransaction(
   const offerProgrammeReady = await offerProgrammeSchemaAvailable(db);
   const payoutPreferenceReady = await payoutPreferenceSchemaAvailable(db);
   const creatorEmailReady = await creatorEmailSchemaAvailable(db);
+  const referralVisitReady = await referralVisitSchemaAvailable(db);
   const verifiedBaseline = STORAGE_SCHEMA_MIGRATIONS.filter(
     (migration) =>
       // Publication reconciliation is data-only; schema shape cannot prove it ran.
       migration.id !== OFFER_PUBLICATION_MIGRATION.id &&
+      (migration.id !== REFERRAL_VISIT_MIGRATION.id || referralVisitReady) &&
       (migration.id !== CREATOR_EMAIL_MIGRATION.id || creatorEmailReady) &&
       (migration.id !== PAYOUT_PREFERENCE_MIGRATION.id || payoutPreferenceReady) &&
       (migration.id !== OFFER_PROGRAMME_MIGRATION.id || offerProgrammeReady) &&
@@ -477,6 +481,8 @@ export async function assertStorageSchemaMigrationsApplied(db: Queryable): Promi
   if (!(await payoutPreferenceSchemaAvailable(db)))
     throw new Error("payout_preference_schema_incomplete");
   if (!(await creatorEmailSchemaAvailable(db))) throw new Error("creator_email_schema_incomplete");
+  if (!(await referralVisitSchemaAvailable(db)))
+    throw new Error("referral_visit_schema_incomplete");
   if (!(await referralSchemaAvailable(db))) throw new Error("referral_schema_incomplete");
   if (!(await referralLedgerSchemaAvailable(db)))
     throw new Error("referral_ledger_schema_incomplete");

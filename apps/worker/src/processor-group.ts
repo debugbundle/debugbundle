@@ -76,7 +76,12 @@ export async function processNextGroupIncidentJob(
   const alertCoalescing =
     job.alert_coalescing_window_seconds === undefined
       ? {}
-      : { coalescing_window_seconds: job.alert_coalescing_window_seconds, ...(job.alert_coalescing_key === undefined ? {} : { coalescing_key: job.alert_coalescing_key }) };
+      : {
+          coalescing_window_seconds: job.alert_coalescing_window_seconds,
+          ...(job.alert_coalescing_key === undefined
+            ? {}
+            : { coalescing_key: job.alert_coalescing_key })
+        };
 
   const incident = await dependencies.incidentStore.upsertIncident({
     event_id: job.event_id,
@@ -201,6 +206,7 @@ export async function processNextGroupIncidentJob(
   const shouldEnqueueBundleBuild =
     incident.duplicate_event !== true &&
     (reachedBundleThreshold ||
+      incident.severity_escalated === true ||
       incident.regressed_now ||
       job.deploy_metadata !== undefined ||
       incident.new_context_type_added === true ||
@@ -215,7 +221,9 @@ export async function processNextGroupIncidentJob(
           ? "reproduction_confidence_change"
           : incident.new_context_type_added === true
             ? "new_context_type"
-            : "occurrence_threshold";
+            : incident.severity_escalated === true && !reachedBundleThreshold
+              ? "regeneration"
+              : "occurrence_threshold";
 
     await dependencies.queue.enqueue("build-bundle", {
       project_id: job.project_id,

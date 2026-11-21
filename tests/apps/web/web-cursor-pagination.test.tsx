@@ -47,6 +47,9 @@ function PaginationHarness(input: {
       <button type="button" onClick={() => void refreshPage()}>
         Refresh
       </button>
+      <button type="button" onClick={() => void refreshPage("background")}>
+        Check for updates
+      </button>
     </div>
   );
 }
@@ -56,6 +59,31 @@ afterEach(() => {
 });
 
 describe("useCursorPagination", () => {
+  it("keeps a newer navigation choice when a background refresh finishes late", async () => {
+    const user = userEvent.setup();
+    let finishRefresh!: (page: CursorPageResult<string>) => void;
+    const background = new Promise<CursorPageResult<string>>((resolve) => {
+      finishRefresh = resolve;
+    });
+    const loadPage = vi
+      .fn<(cursor: string | null) => Promise<CursorPageResult<string>>>()
+      .mockResolvedValueOnce({ items: ["First"], nextCursor: "next", totalCount: 2 })
+      .mockReturnValueOnce(background)
+      .mockResolvedValueOnce({ items: ["Second"], nextCursor: null });
+    render(<PaginationHarness loadPage={loadPage} />);
+    await screen.findByText("First");
+    await user.click(screen.getByRole("button", { name: "Check for updates" }));
+    expect(screen.getByTestId("loading-state")).toHaveTextContent("idle");
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await screen.findByText("Second");
+    await act(async () => {
+      finishRefresh({ items: ["New first"], nextCursor: "different", totalCount: 3 });
+    });
+    expect(screen.getByTestId("page-number")).toHaveTextContent("2");
+    expect(screen.getByTestId("total-count")).toHaveTextContent("2");
+    expect(screen.getByText("Second")).toBeInTheDocument();
+  });
+
   it("leaves session-expiry feedback to the session owner", async () => {
     const showErrorToast = vi.spyOn(notify, "showErrorToast").mockImplementation(() => undefined);
     const loadPage = vi

@@ -31,6 +31,7 @@ function setup(allowed = false) {
       listPartnerBalances
     }),
     isOperator: vi.fn().mockResolvedValue(allowed),
+    readAnalytics: vi.fn().mockResolvedValue(null),
     now: () => "2026-12-10T00:00:00.000Z"
   });
   return {

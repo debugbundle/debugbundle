@@ -1,4 +1,10 @@
-import { API_BASE, buildBrowserSessionHeaders, readJson } from "./api-client.js";
+import {
+  API_BASE,
+  buildBrowserSessionHeaders,
+  invalidateDashboardReads,
+  readDashboardJson,
+  readJson
+} from "./api-client.js";
 import { shouldRetryWithoutAlertScope } from "../../../../packages/alert-client/src/index.js";
 import { AlertScopeSchema } from "../../../../packages/shared-types/src/alert-scope.js";
 import type {
@@ -18,23 +24,28 @@ export async function listProjectAlerts(
     limit: String(limit)
   });
 
-  if (options.includeScope === true) searchParams.set("include_scope", "true");
-  let response = await fetch(`${API_BASE}/v1/alerts?${searchParams.toString()}`, {
-    credentials: "include"
-  });
-  if (options.includeScope === true && response.status === 400) {
-    const error: unknown = await response
-      .clone()
-      .json()
-      .catch(() => null);
-    if (shouldRetryWithoutAlertScope(response.status, error)) {
-      searchParams.delete("include_scope");
-      response = await fetch(`${API_BASE}/v1/alerts?${searchParams.toString()}`, {
-        credentials: "include"
-      });
+  let body: { alerts: AlertRecord[] };
+  if (options.includeScope !== true) {
+    body = await readDashboardJson(`/v1/alerts?${searchParams}`, "configuration");
+  } else {
+    searchParams.set("include_scope", "true");
+    let response = await fetch(`${API_BASE}/v1/alerts?${searchParams.toString()}`, {
+      credentials: "include"
+    });
+    if (response.status === 400) {
+      const error: unknown = await response
+        .clone()
+        .json()
+        .catch(() => null);
+      if (shouldRetryWithoutAlertScope(response.status, error)) {
+        searchParams.delete("include_scope");
+        response = await fetch(`${API_BASE}/v1/alerts?${searchParams.toString()}`, {
+          credentials: "include"
+        });
+      }
     }
+    body = await readJson(response);
   }
-  const body = await readJson<{ alerts: AlertRecord[] }>(response);
 
   return body.alerts.map((alert) => {
     if (alert.scope === undefined) return alert;
@@ -75,6 +86,7 @@ export async function createProjectAlert(payload: {
     })
   );
 
+  invalidateDashboardReads("/v1/alerts");
   return body.alert;
 }
 
@@ -102,6 +114,7 @@ export async function updateProjectAlert(
     })
   );
 
+  invalidateDashboardReads("/v1/alerts");
   return body.alert;
 }
 
@@ -118,4 +131,5 @@ export async function deleteAlert(alertId: string, projectId: string): Promise<v
   if (!response.ok) {
     await readJson(response);
   }
+  invalidateDashboardReads("/v1/alerts");
 }

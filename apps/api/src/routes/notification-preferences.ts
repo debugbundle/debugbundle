@@ -11,6 +11,7 @@ import type { NotificationScope } from "../../../../packages/storage/src/notific
 import type { ApiDependencies } from "../api-types.js";
 import { requireRateLimitedMemberAuth, requireRateLimitedProjectAccess } from "../api-helpers.js";
 import { recordAuditLog, resolveAuditActorType } from "../audit-logging.js";
+import { isProjectConsolidationDatabaseError } from "../project-consolidation-http.js";
 
 const querySchema = z.object({ audience: NotificationAudienceSchema.default("personal") }).strict();
 export function registerNotificationPreferencesRoutes(
@@ -98,6 +99,7 @@ export function registerNotificationPreferencesRoutes(
             });
             return reply.send(response);
           } catch (error) {
+            if (isProjectConsolidationDatabaseError(error)) throw error;
             if (
               error instanceof Error &&
               [

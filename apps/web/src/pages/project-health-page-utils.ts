@@ -318,7 +318,7 @@ export async function refreshProjectAvailabilityChecks(input: {
   preferredCheckId: string | null;
   setSelectedCheckId: (value: string | null) => void;
 }): Promise<AvailabilityChecksRefreshState> {
-  const response = await listProjectAvailabilityChecks(input.projectId, 50);
+  const response = await listProjectAvailabilityChecks(input.projectId, 50, { refresh: true });
   input.setChecks(response.checks);
   input.setLimits(response.limits);
   input.setLoadErrorMessage(null);

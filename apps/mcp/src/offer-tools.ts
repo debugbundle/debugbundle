@@ -19,6 +19,8 @@ const mappings = [
   ["get_creator_programme", "creator"],
   ["join_creator_programme", "join"],
   ["claim_creator_code", "code"],
+  ["get_creator_code_status", "creator_code_status"],
+  ["get_creator_referral_analytics", "creator_analytics"],
   ["get_customer_offer", "customer"],
   ["apply_customer_offer", "apply"],
   ["remove_customer_offer", "remove"],
@@ -65,7 +67,10 @@ const descriptions: Record<OfferOperation, string> = {
     "Start or reconcile the exact signed quoted offer only after explicit human purchase confirmation. May create the confirmed introductory claim and a provider Checkout Session; never call merely to inspect pricing.",
   creator: "Read your own creator programme, branded code, legacy code and share link.",
   join: "Join a versioned referral programme only after the human accepts its exact terms version.",
-  code: "Reserve your one memorable creator code. Codes are public and cannot be reassigned to another creator.",
+  code: "Reserve a branded creator code after an explicit request. For a one-time replacement supply the expected current code. Earlier links stay with the same creator.",
+  creator_code_status: "Check whether your preferred branded creator code can be replaced.",
+  creator_analytics:
+    "Read your aggregate link visits, attributed accounts, first paid referrals and net commission over 7, 30 or 90 UTC days. Returns no customer records.",
   customer: "Read the verified Owner's current workspace offer and pending public hint.",
   apply:
     "Apply a code to the expected workspace before Checkout. Replacement needs explicit human confirmation; prior paying customers are ineligible.",

@@ -15,6 +15,31 @@ function preview() {
   });
   return { mock, client };
 }
+it("keeps the active creator card and code editing in sync with programme pauses", async () => {
+  const { client } = preview();
+  const [programme] = (await client.execute("programmes", {})).programmes;
+  const version_id = programme!.version_id;
+  await client.execute("join", { version_id, terms_version: programme!.policy.terms_version });
+  const pause = {
+    version_id,
+    expected_state: "active",
+    state: "paused",
+    acknowledge_unlimited: false
+  };
+  await client.execute("state", pause);
+  expect((await client.execute("creator", {})).creator?.accepting_new_referrals).toBe(false);
+  await expect(client.execute("code", { code: "FIRST20" })).rejects.toMatchObject({
+    code: "programme_unavailable"
+  });
+  await client.execute("state", { ...pause, expected_state: "paused", state: "active" });
+  await client.execute("code", { code: "FIRST20" });
+  expect(await client.execute("creator_code_status", {})).toEqual({ can_replace: true });
+  await client.execute("state", pause);
+  expect(await client.execute("creator_code_status", {})).toEqual({ can_replace: false });
+  await expect(
+    client.execute("code", { code: "SECOND20", expected_code: "FIRST20" })
+  ).rejects.toMatchObject({ code: "programme_unavailable" });
+});
 it("keeps chosen draft codes and version-filtered inventory aligned with the real creation flow", async () => {
   const { client } = preview();
   const before = (await client.execute("operator_programmes", {})).programmes.length;
@@ -205,8 +230,10 @@ it("loads referral balances, clients and payments plus the internal analytics pr
     terms_version: first.policy.terms_version
   });
   expect(joined.creator?.legacy_code).toBe("REVIEWABCD");
-  expect(joined.share_url).toBe("http://localhost:5292/affiliates/?offer=REVIEWABCD");
-  expect((await client.execute("code", { code: "MYREVIEW20" })).creator?.code).toBe("MYREVIEW20");
+  expect(joined.share_url).toBe("http://localhost:5292/r/REVIEWABCD");
+  const branded = await client.execute("code", { code: "MYREVIEW20" });
+  expect(branded.creator?.code).toBe("MYREVIEW20");
+  expect(branded.share_url).toBe("http://localhost:5292/r/MYREVIEW20");
   expect(mock.handle("GET", "/v1/admin/analytics/summary")).toMatchObject({
     status: 200,
     body: {

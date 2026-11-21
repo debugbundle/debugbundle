@@ -2,7 +2,7 @@
   "id": "debugbundle",
   "name": "DebugBundle",
   "description": "Use DebugBundle for runtime error reporting, incident response, live app monitoring, health checks, debug bundles, and product analytics.",
-  "version": "1.28.0",
+  "version": "1.29.0",
   "configSchema": {
     "type": "object",
     "properties": {
@@ -65,6 +65,8 @@
       "debugbundle_get_creator_programme",
       "debugbundle_join_creator_programme",
       "debugbundle_claim_creator_code",
+      "debugbundle_get_creator_code_status",
+      "debugbundle_get_creator_referral_analytics",
       "debugbundle_get_customer_offer",
       "debugbundle_apply_customer_offer",
       "debugbundle_remove_customer_offer",
@@ -392,6 +394,12 @@
       "optional": true
     },
     "debugbundle_claim_creator_code": {
+      "optional": true
+    },
+    "debugbundle_get_creator_code_status": {
+      "optional": true
+    },
+    "debugbundle_get_creator_referral_analytics": {
       "optional": true
     },
     "debugbundle_get_customer_offer": {

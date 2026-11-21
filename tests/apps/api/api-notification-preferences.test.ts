@@ -45,6 +45,32 @@ function server(
 }
 const headers = { authorization: "Bearer dbundle_mem_test" };
 afterEach(() => vi.clearAllMocks());
+it("keeps configuration conflicts distinguishable from unexpected save failures", async () => {
+  const app = server();
+  try {
+    const save = () =>
+      app.inject({
+        method: "PATCH",
+        url: `/v1/projects/${projectId}/notification-preferences?audience=shared`,
+        headers,
+        payload: { channels: { slack: "off" } }
+      });
+    update.mockRejectedValueOnce(
+      Object.assign(new Error("project_configuration_busy"), { code: "40001" })
+    );
+    const blocked = await save();
+    expect(blocked.statusCode).toBe(409);
+    expect(blocked.json()).toEqual({ error: "project_configuration_busy", retryable: true });
+
+    update.mockRejectedValueOnce(new Error("private storage error"));
+    const failure = await save();
+    expect(failure.statusCode).toBe(500);
+    expect(failure.json()).toEqual({ error: "notification_preferences_failed" });
+  } finally {
+    await app.close();
+  }
+});
+
 it("scopes personal preferences to the authenticated user and shared project settings to the project account", async () => {
   const app = server("admin");
   try {

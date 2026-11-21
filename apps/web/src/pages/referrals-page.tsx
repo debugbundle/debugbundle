@@ -4,6 +4,8 @@ import { WalletIcon } from "lucide-react";
 import { Tabs, TabsList, TabsScrollArea, TabsTrigger, TabsContent } from "../components/ui/tabs.js";
 import { Notice } from "../components/ui/notice.js";
 import { CreatorProgrammeControl } from "../components/system/creator-programme-control.js";
+import { CreatorReferralAnalytics } from "../components/system/creator-referral-analytics.js";
+import { CreatorReferralResources } from "../components/system/creator-referral-resources.js";
 import { offerApi } from "../lib/offer-api.js";
 import { OfferApiError } from "../../../../packages/referral-client/src/offer-api.js";
 import { ReferralApiError } from "../../../../packages/referral-client/src/index.js";
@@ -35,6 +37,7 @@ export function ReferralsPage(): JSX.Element {
   const { session } = useSession(),
     identity = session?.user_id;
   const [activeTab, setActiveTab] = useState("programme");
+  const paymentsTab = useRef<HTMLButtonElement>(null);
   const [payoutRevision, setPayoutRevision] = useState(0);
   const [payoutSetupComplete, setPayoutSetupComplete] = useState(false);
   const [offersEnabled, setOffersEnabled] = useState<boolean | null>(null);
@@ -159,9 +162,13 @@ export function ReferralsPage(): JSX.Element {
         <TabsScrollArea>
           <TabsList aria-label="Referral sections">
             <TabsTrigger value="programme">Programme</TabsTrigger>
+            <TabsTrigger value="analytics">Analytics</TabsTrigger>
             <TabsTrigger value="earnings">Earnings</TabsTrigger>
             <TabsTrigger value="clients">Referred clients</TabsTrigger>
-            <TabsTrigger value="payments">Payments</TabsTrigger>
+            <TabsTrigger value="payments" ref={paymentsTab}>
+              Payments
+            </TabsTrigger>
+            <TabsTrigger value="resources">Creator resources</TabsTrigger>
           </TabsList>
         </TabsScrollArea>
         {/* Keep forms mounted while hidden so a tab change cannot discard a draft.
@@ -196,6 +203,10 @@ export function ReferralsPage(): JSX.Element {
           ) : offersEnabled ? (
             <CreatorProgrammeControl
               identity={identity ?? ""}
+              onPayments={() => {
+                setActiveTab("payments");
+                paymentsTab.current?.focus();
+              }}
               onJoined={() => {
                 setPayoutSetupComplete(false);
                 setPayoutRevision((value) => value + 1);
@@ -269,6 +280,14 @@ export function ReferralsPage(): JSX.Element {
           )}
         </TabsContent>
         <TabsContent
+          value="analytics"
+          forceMount
+          hidden={activeTab !== "analytics"}
+          className="min-w-0 data-[state=inactive]:hidden"
+        >
+          <CreatorReferralAnalytics active={activeTab === "analytics"} />
+        </TabsContent>
+        <TabsContent
           value="earnings"
           forceMount
           hidden={activeTab !== "earnings"}
@@ -332,6 +351,9 @@ export function ReferralsPage(): JSX.Element {
           {payoutSetupComplete
             ? [paymentHistory, payoutPreferences]
             : [payoutPreferences, paymentHistory]}
+        </TabsContent>
+        <TabsContent value="resources" className="min-w-0">
+          <CreatorReferralResources />
         </TabsContent>
       </Tabs>
     </div>

@@ -6,8 +6,9 @@ import {
   type OfferDefinitionSchema
 } from "../../../../../packages/referrals/src/programme-policy.js";
 import { getBillingCatalogPrice } from "../../../../../packages/shared-types/src/index.js";
-import { formatBillingAmount } from "./billing-offer-summary.js";
+import { formatReferralAmount } from "../../lib/referral-api.js";
 import { OfferPolicyDetails } from "./offer-policy-details.js";
+import { TitleBadgeRow } from "./title-badge-row.js";
 import {
   Card,
   CardHeader,
@@ -33,9 +34,11 @@ import {
  * Enrolment/consent stays with the caller; inspecting terms never joins a programme. */
 export function ReferralProgrammeCard({
   programme,
+  badge,
   children
 }: {
   programme: z.infer<typeof OfferDefinitionSchema>;
+  badge?: ReactNode;
   children?: ReactNode;
 }): JSX.Element {
   const { policy, name, public_description, version_id } = programme;
@@ -48,26 +51,24 @@ export function ReferralProgrammeCard({
     : null;
   const titleId = `referral-programme-${version_id}`;
   return (
-    <Card role="article" aria-labelledby={titleId} className="h-full">
+    <Card role="article" aria-labelledby={titleId} className="h-full min-w-0">
       <CardHeader className="gap-3">
         <div className="flex items-center gap-3">
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-muted text-primary">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-muted text-referral-accent">
             <UsersIcon aria-hidden="true" className="size-5" />
           </span>
-          <CardTitle id={titleId} className="min-w-0 break-words">
-            {name}
-          </CardTitle>
+          <TitleBadgeRow title={<CardTitle id={titleId}>{name}</CardTitle>} badges={badge} />
         </div>
         <CardDescription>{public_description}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
         <div className="flex flex-col gap-2 rounded-xl bg-muted p-4">
           <p className="text-sm font-medium">{maximum === null ? "Earn" : "Earn up to"}</p>
-          <p className="flex flex-wrap items-baseline gap-2 text-primary">
+          <p className="flex flex-wrap items-baseline gap-2 text-referral-accent">
             <strong className="text-4xl font-semibold tracking-tight tabular-nums">
               {maximum === null
                 ? `${policy.commission_basis_points / 100}%`
-                : formatBillingAmount(maximum)}
+                : formatReferralAmount(maximum)}
             </strong>
             {maximum !== null ? <span className="text-xs font-semibold">USD</span> : null}
           </p>

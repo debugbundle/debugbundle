@@ -41,7 +41,10 @@ describe("expired browser sessions", () => {
       expired = true;
       if (trigger === "protected request") {
         await act(async () => {
-          await expect(listProjects()).rejects.toThrow("invalid_session");
+          // Exercise a server-confirmed failure even when the dashboard list is warm.
+          await expect(listProjects(undefined, { refresh: true })).rejects.toThrow(
+            "invalid_session"
+          );
         });
       } else {
         fireEvent(trigger === "focus" ? window : document, new Event(trigger));

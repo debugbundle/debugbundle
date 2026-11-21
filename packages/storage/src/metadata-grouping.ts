@@ -55,10 +55,11 @@ export function createMetadataGrouping(
           : ["normalized_message"];
       const existingIncidentResult = await db.query<{
         id: string;
+        severity: UpsertIncidentInput["severity"];
         status: "open" | "resolved" | "regressed";
       }>(
         `
-          SELECT id, status
+          SELECT id, status, severity
           FROM incidents
           WHERE project_id = $1
             AND environment = $2
@@ -147,6 +148,15 @@ export function createMetadataGrouping(
           })
         : null;
 
+      // Expired reviewer reminders arrive as critical backend exceptions. Ordinary
+      // repeats, unrelated signals and retries keep their existing bundle cadence.
+      const severityEscalated =
+        existingIncident !== null &&
+        existingIncident.severity !== "critical" &&
+        input.event_type === "backend_exception" &&
+        input.severity === "critical" &&
+        !duplicateEvent;
+
       const result = await db.query<{
         incident_id: string;
         matched_fields: string[] | null;
@@ -201,6 +211,10 @@ export function createMetadataGrouping(
               WHEN $12::boolean THEN 0
               ELSE 1
             END,
+            severity = CASE
+              WHEN $13::boolean THEN 'critical'
+              ELSE incidents.severity
+            END,
             status = CASE
               WHEN incidents.status = 'resolved' AND NOT $12::boolean THEN 'regressed'
               ELSE incidents.status
@@ -233,7 +247,8 @@ export function createMetadataGrouping(
           input.occurred_at,
           regressionDeploy?.deployment_id ?? null,
           matchedFields,
-          duplicateEvent
+          duplicateEvent,
+          severityEscalated
         ]
       );
 
@@ -249,6 +264,7 @@ export function createMetadataGrouping(
         regressed_now: regressedNow,
         occurrence_count: row.occurrence_count,
         duplicate_event: duplicateEvent,
+        ...(severityEscalated ? { severity_escalated: true } : {}),
         ...(newContextTypeAdded ? { new_context_type_added: true } : {}),
         ...(reproductionConfidenceChanged ? { reproduction_confidence_changed: true } : {}),
         regression_deploy: regressionDeploy

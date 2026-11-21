@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import Fastify from "fastify";
 import { afterAll, afterEach, beforeAll, expect, it, vi } from "vitest";
 import { bootstrapStorageSchema } from "../../packages/storage/src/migrations.js";
 import { migrateStorageSchema } from "../../packages/storage/src/schema-migrations.js";
@@ -8,6 +9,10 @@ import { createNotificationDailyStore } from "../../packages/storage/src/notific
 import { deliverNextDailyNotification } from "../../packages/storage/src/notification-delivery-service.js";
 import { filterNotificationDigest } from "../../packages/storage/src/notification-legacy-delivery.js";
 import { createPostgresAlertDeliveryStore } from "../../packages/storage/src/alert-delivery-store.js";
+import { createPostgresMetadataStore } from "../../packages/storage/src/metadata-store.js";
+import { registerNotificationPreferencesRoutes } from "../../apps/api/src/routes/notification-preferences.js";
+import type { ApiDependencies } from "../../apps/api/src/api-types.js";
+import { mockedObject } from "../helpers/vitest.js";
 import { seedExternalProjectCollaborator } from "../helpers/shared-project-collaborator.js";
 import { seedConsolidationProjects } from "../helpers/consolidation-projects.js";
 import {
@@ -38,6 +43,54 @@ runIntegration("canonical notification and improvement settings", () => {
       [...recipients]
     ]);
     recipients.clear();
+  });
+  it("saves notification preferences through the canonical PATCH and reads them through the retained view", async () => {
+    const f = await seedConsolidationProjects(pool, db);
+    await f.consolidate();
+    const app = Fastify();
+    registerNotificationPreferencesRoutes(
+      app,
+      mockedObject<ApiDependencies>({
+        projectManagement: createPostgresMetadataStore(db),
+        notificationPreferences: preferences,
+        memberAuth: {
+          resolveMemberByTokenHash: vi.fn().mockResolvedValue({
+            member_id: f.userId,
+            organization_id: f.organizationId,
+            role: "owner"
+          })
+        }
+      })
+    );
+    const headers = { authorization: "Bearer dbundle_mem_test" };
+    const path = (project: string): string =>
+      `/v1/projects/${project}/notification-preferences?audience=shared`;
+    try {
+      const saved = await app.inject({
+        method: "PATCH",
+        url: path(f.target),
+        headers,
+        payload: { channels: { email: "daily" }, daily: schedule }
+      });
+      expect(saved.statusCode).toBe(200);
+      expect(saved.json()).toMatchObject({ settings: { channels: { email: "daily" } } });
+      const retained = await app.inject({ url: path(f.source), headers });
+      expect(retained.statusCode).toBe(200);
+      expect(retained.json()).toMatchObject({ settings: { channels: { email: "daily" } } });
+      const rejected = await app.inject({
+        method: "PATCH",
+        url: path(f.source),
+        headers,
+        payload: { channels: { email: "off" } }
+      });
+      expect(rejected.statusCode).toBe(409);
+      expect(rejected.json()).toMatchObject({
+        error: "project_consolidated",
+        canonical_project_id: f.target
+      });
+    } finally {
+      await app.close();
+    }
   });
   async function dailyFixture() {
     const f = await seedConsolidationProjects(pool, db),

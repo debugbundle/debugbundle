@@ -1,7 +1,7 @@
 import type { OfferPolicy } from "../../../../../packages/referrals/src/programme-policy.js";
 import { programmeEarningsExamples } from "../../../../../packages/referrals/src/programme-policy.js";
 import { getBillingCatalogPrice } from "../../../../../packages/shared-types/src/index.js";
-import { formatBillingAmount } from "./billing-offer-summary.js";
+import { formatReferralAmount } from "../../lib/referral-api.js";
 import {
   Table,
   TableHeader,
@@ -64,7 +64,7 @@ export function OfferPolicyDetails({
         </li>
         {referral ? (
           <li>
-            Payments are manually reviewed, normally monthly from a US$50 available balance, after
+            Payments are manually reviewed, normally monthly from a $50 USD available balance, after
             at least 30 days, cleared funds and dispute checks. Smaller balances carry forward;
             contact support for a final balance.
           </li>
@@ -105,14 +105,14 @@ export function OfferPolicyDetails({
                   {interval === "year" ? "yearly" : "monthly"}
                 </TableCell>
                 <TableCell>
-                  {formatBillingAmount(baseMinor)}/{interval === "year" ? "year" : "month"}
+                  {formatReferralAmount(baseMinor)}/{interval === "year" ? "year" : "month"}
                 </TableCell>
-                <TableCell>{formatBillingAmount(payableMinor)}</TableCell>
+                <TableCell>{formatReferralAmount(payableMinor)}</TableCell>
                 {referral ? (
                   <TableCell>
                     {commissionMinor === null
                       ? `Prorated to ${policy.commission_months} ${policy.commission_months === 1 ? "month" : "months"}`
-                      : formatBillingAmount(commissionMinor)}
+                      : formatReferralAmount(commissionMinor)}
                   </TableCell>
                 ) : null}
               </TableRow>

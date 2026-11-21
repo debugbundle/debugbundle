@@ -60,7 +60,9 @@ describe("web app - theme bootstrap", () => {
 
     render(<App initialEntries={["/login"]} />);
 
-    expect(await screen.findByRole("heading", { name: /continue to debugbundle/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: /continue to debugbundle/i })
+    ).toBeInTheDocument();
     expect(document.documentElement).toHaveClass("dark");
     expect(document.documentElement.style.colorScheme).toBe("dark");
   });
@@ -81,7 +83,7 @@ describe("web app - theme bootstrap", () => {
 
     render(<App initialEntries={["/signup"]} />);
 
-    expect(await screen.findByRole("heading", { name: /create your debugbundle account/i })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Create your account" })).toBeInTheDocument();
     expect(document.documentElement).not.toHaveClass("dark");
     expect(document.documentElement.style.colorScheme).toBe("light");
   });

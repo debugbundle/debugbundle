@@ -110,7 +110,7 @@ function GithubLink({
       : `${GITHUB_START_HREF}?trial=${trialPlan}`;
 
   return (
-    <Button asChild variant="outline" className="w-full justify-center">
+    <Button asChild variant="outline" size="lg" className="w-full justify-center">
       <a
         href={href}
         aria-disabled={disabled}
@@ -173,7 +173,6 @@ function appendAuthPath(
 
 function EmailAuthPage({
   title,
-  heading,
   description,
   alternateLinkHref,
   alternateLinkLabel,
@@ -181,7 +180,6 @@ function EmailAuthPage({
   showTrialIntentPanel = false
 }: {
   title: string;
-  heading: string;
   description: string;
   alternateLinkHref: string;
   alternateLinkLabel: string;
@@ -369,13 +367,12 @@ function EmailAuthPage({
   const requestErrorId = requestError === null ? undefined : "email-auth-request-error";
 
   const layoutTitle = isVerifyStep ? "Check your inbox" : title;
-  const layoutHeading = isVerifyStep ? "Check your inbox" : heading;
   const layoutDescription = isVerifyStep
     ? `Enter the six-digit code we sent to ${email}.`
     : description;
 
   return (
-    <AuthLayout title={layoutTitle} heading={layoutHeading} description={layoutDescription}>
+    <AuthLayout title={layoutTitle} description={layoutDescription} className="px-4 sm:px-6">
       <SignupOfferControl
         autoLoad={showTrialIntentPanel || searchParams.has("offer")}
         presentedCode={searchParams.get("offer")}
@@ -480,6 +477,7 @@ function EmailAuthPage({
           <Field>
             <Button
               type="submit"
+              size="lg"
               className="w-full"
               disabled={isSubmitting || offerLoading}
               aria-describedby={requestErrorId}
@@ -530,7 +528,6 @@ export function LoginPage(): JSX.Element {
   return (
     <EmailAuthPage
       title="Continue to DebugBundle"
-      heading="Continue to DebugBundle"
       description="Choose a login option below to access your account."
       alternatePrompt="Don't have an account?"
       alternateLinkHref="/signup"
@@ -542,9 +539,8 @@ export function LoginPage(): JSX.Element {
 export function SignupPage(): JSX.Element {
   return (
     <EmailAuthPage
-      title="Create your DebugBundle account"
-      heading="Create your DebugBundle account"
-      description="Choose a sign up option below to create your account."
+      title="Create your account"
+      description="Sign up with GitHub or email."
       alternatePrompt="Already have an account?"
       alternateLinkHref="/login"
       alternateLinkLabel="Login here"

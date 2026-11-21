@@ -559,6 +559,7 @@ export interface UpsertIncidentResult {
   regressed_now: boolean;
   occurrence_count: number;
   duplicate_event?: boolean;
+  severity_escalated?: boolean;
   new_context_type_added?: boolean;
   reproduction_confidence_changed?: boolean;
   regression_deploy?: RegressionDeployCorrelation | null;

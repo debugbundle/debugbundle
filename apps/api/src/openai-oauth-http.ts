@@ -1,3 +1,4 @@
+import { createReviewerExpirySchedule } from "../../../packages/auth/src/reviewer-expiry.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { PassThrough } from "node:stream";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -193,29 +194,34 @@ function registerReviewerExpiryMonitor(
   expiresAt: string,
   monitor?: OpenAiOperationalMonitor
 ): void {
+  const schedule = createReviewerExpirySchedule(expiresAt);
+  let timer: ReturnType<typeof setTimeout> | undefined;
   const emit = (): void => {
-    const remainingMs = new Date(expiresAt).getTime() - Date.now();
-    const remainingDays = Math.floor(remainingMs / (24 * 60 * 60 * 1_000));
-    if (remainingDays <= 14) {
-      app.log.warn(
+    const now = Date.now();
+    const { reminder, nextAt } = schedule(now);
+    if (reminder) {
+      app.log[reminder.expired ? "error" : "warn"](
         {
           event: "openai_reviewer_credential_expiring",
-          remaining_days: remainingDays,
-          expired: remainingMs <= 0
+          remaining_days: reminder.remainingDays,
+          milestone: reminder.milestone,
+          expired: reminder.expired
         },
         "openai_reviewer_credential_expiring"
       );
       reportOpenAiOperationalSignal(monitor, {
         category: "reviewer_credential_expiring",
-        remainingDays,
-        expired: remainingMs <= 0
+        ...reminder
       });
     }
+    if (nextAt !== undefined) {
+      // Recheck long waits periodically to tolerate wall-clock adjustments.
+      timer = setTimeout(emit, Math.min(nextAt - now, 6 * 60 * 60 * 1_000));
+      timer.unref();
+    }
   };
-  const timer = setInterval(emit, 6 * 60 * 60 * 1_000);
-  timer.unref();
   app.addHook("onReady", () => emit());
-  app.addHook("onClose", () => clearInterval(timer));
+  app.addHook("onClose", () => clearTimeout(timer));
 }
 
 function oauthRateLimitClaims(request: FastifyRequest): Array<{

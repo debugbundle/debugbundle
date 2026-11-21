@@ -235,9 +235,13 @@ it("keeps restricted project credentials away from personal financial data", asy
       projects: [{ project_id: org, origin_project_ids: [org] }]
     }
   });
-  expect(
-    (await f.app.inject({ method: "GET", url: "/v1/referrals/partner", headers })).statusCode
-  ).toBe(403);
+  for (const url of [
+    "/v1/referrals/partner",
+    "/v2/referrals/analytics?days=90",
+    "/v2/offers/creator/code"
+  ]) {
+    expect((await f.app.inject({ method: "GET", url, headers })).statusCode).toBe(403);
+  }
   expect(f.service.partner).not.toHaveBeenCalled();
   await f.app.close();
 });

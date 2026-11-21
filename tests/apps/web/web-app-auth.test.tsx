@@ -120,7 +120,7 @@ describe("web app - auth routes", () => {
 
   it.each([
     ["/login", /continue to debugbundle/i],
-    ["/signup", /create your debugbundle account/i]
+    ["/signup", /^create your account$/i]
   ])("renders the public auth route %s", async (path, heading) => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       if (requestUrl(input).endsWith("/v1/auth/session")) {
@@ -134,8 +134,13 @@ describe("web app - auth routes", () => {
 
     render(<App initialEntries={[path]} />);
 
-    expect(await screen.findByRole("heading", { name: heading })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /continue with github/i })).toBeInTheDocument();
+    const title = await screen.findByRole("heading", { name: heading });
+    expect(title.closest(".min-h-screen")).toHaveClass("px-4", "sm:px-6");
+    expect(screen.getByRole("link", { name: /continue with github/i })).toHaveAttribute(
+      "data-size",
+      "lg"
+    );
+    expect(screen.getByRole("button", { name: "Send code" })).toHaveAttribute("data-size", "lg");
     expect(screen.getByText(/continue with email/i)).toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: /allow this signup to be linked/i })).toBeNull();
   });

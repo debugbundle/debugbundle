@@ -830,6 +830,10 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: ApiDepend
     "/v1/auth/project-invite/accept",
     { bodyLimit: SMALL_REQUEST_BODY_LIMIT_BYTES },
     async (request, reply) => {
+      if (!(await enforceAuthRateLimit(request, reply, dependencies))) {
+        return;
+      }
+
       if (dependencies.webAuth === undefined) {
         return reply.status(503).send({
           error: "auth_not_configured"

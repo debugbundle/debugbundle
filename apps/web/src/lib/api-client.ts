@@ -43,6 +43,124 @@ let browserSessionRevision = 0;
 let browserSessionInvalidated = false;
 const browserSessionInvalidationListeners = new Set<() => void>();
 
+const DASHBOARD_READ_FRESHNESS = {
+  live: 30_000,
+  configuration: 60_000,
+  history: 300_000
+} as const;
+const MAX_DASHBOARD_READS = 256;
+const MAX_CONCURRENT_DASHBOARD_READS = 4;
+interface DashboardRead {
+  pending?: Promise<unknown>;
+  result?: { value: unknown; freshUntil: number };
+}
+const dashboardReads = new Map<string, DashboardRead>();
+let dashboardReadScope = 0;
+let dashboardRateLimitedUntil = 0;
+let dashboardReadSlots: { active: number; waiting: Array<() => void> } = { active: 0, waiting: [] };
+
+/** A successful write invalidates all query variants of the affected resource. */
+export function invalidateDashboardReads(
+  path: string,
+  scope: "resource" | "subtree" = "subtree"
+): void {
+  for (const key of dashboardReads.keys()) {
+    if (
+      key === path ||
+      key.startsWith(`${path}?`) ||
+      (scope === "subtree" && key.startsWith(`${path}/`))
+    ) {
+      dashboardReads.delete(key);
+    }
+  }
+}
+
+/** A change in project access fences every cached resource, including in-flight reads. */
+export function clearDashboardReads(): void {
+  dashboardReadScope += 1;
+  dashboardReadSlots = { active: 0, waiting: [] };
+  dashboardReads.clear();
+}
+
+function resetDashboardReads(): void {
+  clearDashboardReads();
+  dashboardRateLimitedUntil = 0;
+}
+
+/** Opt in only for cookie-authenticated, repeatable dashboard GETs. */
+export async function readDashboardJson<T>(
+  path: string,
+  freshness: keyof typeof DASHBOARD_READ_FRESHNESS,
+  options: { refresh?: boolean } = {}
+): Promise<T> {
+  const load = (): Promise<Response> =>
+    fetch(`${API_BASE}${path}`, { credentials: "include", cache: "no-store" });
+  const snapshot = getBrowserSessionSnapshot();
+  if (snapshot.session === null) return readJson<T>(await load(), snapshot.revision);
+
+  const requestScope = dashboardReadScope;
+  const entry = dashboardReads.get(path);
+  const now = Date.now();
+  if (entry?.pending) return entry.pending as Promise<T>;
+  if (!options.refresh && entry?.result && entry.result.freshUntil > now)
+    return entry.result.value as T;
+  const slots = dashboardReadSlots;
+  const next: DashboardRead = {};
+  dashboardReads.set(path, next);
+  const pending = (async (): Promise<T> => {
+    // A cold overview can request many distinct resources. Hand each released slot
+    // to one waiter, which rechecks its authorization and backoff before fetching.
+    if (slots.active >= MAX_CONCURRENT_DASHBOARD_READS) {
+      await new Promise<void>((resume) => slots.waiting.push(resume));
+    } else {
+      slots.active += 1;
+    }
+    try {
+      if (requestScope !== dashboardReadScope) throw new InvalidSessionError();
+      const retryAfter = dashboardRateLimitedUntil - Date.now();
+      if (retryAfter > 0) throw new ApiRequestError("rate_limited", 429, retryAfter);
+      if (dashboardReads.get(path) !== next) return readDashboardJson<T>(path, freshness);
+      const response = await load();
+      if (requestScope !== dashboardReadScope) throw new InvalidSessionError();
+      const value = await readJson<T>(response, snapshot.revision);
+      if (requestScope !== dashboardReadScope) throw new InvalidSessionError();
+      // A save may have invalidated this GET while its response was in flight.
+      if (dashboardReads.get(path) !== next) return readDashboardJson<T>(path, freshness);
+      next.result = { value, freshUntil: Date.now() + DASHBOARD_READ_FRESHNESS[freshness] };
+      return value;
+    } catch (error) {
+      if (
+        requestScope === dashboardReadScope &&
+        error instanceof ApiRequestError &&
+        error.status === 429 &&
+        error.code === "rate_limited"
+      ) {
+        dashboardRateLimitedUntil = Math.max(
+          dashboardRateLimitedUntil,
+          Date.now() + (error.retryAfterMs ?? 5_000)
+        );
+      }
+      throw error;
+    } finally {
+      const resume = slots.waiting.shift();
+      if (resume) resume();
+      else slots.active -= 1;
+      if (dashboardReads.get(path) === next) {
+        delete next.pending;
+        if (!next.result) dashboardReads.delete(path);
+        else if (dashboardReads.size > MAX_DASHBOARD_READS) {
+          for (const [cachedPath, cached] of dashboardReads) {
+            if (!cached.pending) dashboardReads.delete(cachedPath);
+            if (dashboardReads.size <= MAX_DASHBOARD_READS) break;
+          }
+        }
+      }
+    }
+  })();
+  next.pending = pending;
+  return pending;
+}
+
 export class InvalidSessionError extends Error {
   constructor() {
     super("invalid_session");
@@ -72,6 +190,7 @@ export function isInvalidSessionError(error: unknown): error is InvalidSessionEr
 }
 
 export function clearBrowserSessionState(): void {
+  resetDashboardReads();
   browserSession = null;
   browserSessionRevision += 1;
 }
@@ -208,6 +327,15 @@ export async function readJson<T>(response: Response, sessionRevision?: number):
 }
 
 export function rememberSession<T extends SessionRecord | null>(session: T): T {
+  if (
+    browserSession?.session_id !== session?.session_id ||
+    browserSession?.user_id !== session?.user_id ||
+    browserSession?.organization_id !== session?.organization_id ||
+    browserSession?.organization_plan !== session?.organization_plan ||
+    browserSession?.role !== session?.role
+  ) {
+    resetDashboardReads();
+  }
   if (session !== null) {
     browserSessionInvalidated = false;
   }

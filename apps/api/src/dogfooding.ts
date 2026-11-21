@@ -1,3 +1,4 @@
+import { createHash, createHmac } from "node:crypto";
 import { REFERRAL_PAYOUT_REDACT_FIELDS } from "../../../packages/referrals/src/payout-privacy.js";
 import type { FastifyBaseLogger, FastifyInstance } from "fastify";
 
@@ -57,7 +58,50 @@ const OPENAI_OPERATIONAL_EVENT_NAMES = new Set([
   "openai_reviewer_credential_expiring"
 ]);
 
-export function sanitizeApiDogfoodingEvent(event: EventEnvelope): EventEnvelope | null {
+const REVIEWER_REMINDER =
+  /^openai_reviewer_credential_expiring deadline=(\S+) milestone=(fourteen_days|seven_days|one_day|expired)$/;
+
+function projectReviewerReminder(
+  message: string,
+  service: EventEnvelope["service"],
+  projectNamespace: string
+): { message: string; eventId: string; extras: Record<string, string> } | null {
+  const match = REVIEWER_REMINDER.exec(message);
+  if (!match) return null;
+  const deadlineMs = Date.parse(match[1]!);
+  if (!Number.isFinite(deadlineMs)) return null;
+
+  const deadline = new Date(deadlineMs).toISOString();
+  const milestone = match[2]!;
+  // Use letters so message normalization preserves the identity across reminders.
+  const rotation = Array.from(
+    createHash("sha256").update(deadline).digest("hex").slice(0, 16),
+    (digit) => String.fromCharCode(103 + Number.parseInt(digit, 16))
+  ).join("");
+  const identity = createHmac("sha256", projectNamespace)
+    .update(
+      JSON.stringify([
+        "openai-reviewer-reminder",
+        service.name,
+        service.environment,
+        deadline,
+        milestone
+      ])
+    )
+    .digest("hex");
+  // Retries, API restarts and overlapping slots use one event ID per reminder.
+  const eventId = `${identity.slice(0, 8)}-${identity.slice(8, 12)}-5${identity.slice(13, 16)}-a${identity.slice(17, 20)}-${identity.slice(20, 32)}`;
+  return {
+    message: `openai_reviewer_credential_expiring rotation=${rotation}`,
+    eventId,
+    extras: { reviewer_deadline: deadline, reviewer_milestone: milestone }
+  };
+}
+
+export function sanitizeApiDogfoodingEvent(
+  event: EventEnvelope,
+  projectToken?: string | null
+): EventEnvelope | null {
   // These routes have a dedicated metadata-only monitor. Generic HTTP capture
   // duplicates failures and can retain OAuth/MCP arguments and caller metadata.
   if (
@@ -73,9 +117,15 @@ export function sanitizeApiDogfoodingEvent(event: EventEnvelope): EventEnvelope 
     return event;
   }
 
-  const message = event.payload.message;
+  const reviewer = projectReviewerReminder(
+    event.payload.message,
+    event.service,
+    projectToken ?? event.project_id ?? "local"
+  );
+  const message = reviewer?.message ?? event.payload.message;
   return {
     ...event,
+    ...(reviewer ? { event_id: reviewer.eventId } : {}),
     correlation: {
       request_id: null,
       trace_id: null,
@@ -95,7 +145,10 @@ export function sanitizeApiDogfoodingEvent(event: EventEnvelope): EventEnvelope 
         body: null
       },
       response: { status_code: 0 },
-      runtime: { version: event.payload.runtime.version }
+      runtime: {
+        version: event.payload.runtime.version,
+        ...(reviewer ? { framework_extras: reviewer.extras } : {})
+      }
     }
   };
 }
@@ -104,8 +157,8 @@ function formatOpenAiOperationalSignal(signal: OpenAiOperationalSignal): string 
   if (signal.category === "reviewer_credential_expiring") {
     return [
       "openai_reviewer_credential_expiring",
-      `remaining_days=${Math.floor(signal.remainingDays)}`,
-      `expired=${signal.expired ? "true" : "false"}`
+      `deadline=${signal.expiresAt}`,
+      `milestone=${signal.milestone}`
     ].join(" ");
   }
   if (signal.category === "oauth_request_failure") {
@@ -267,7 +320,7 @@ export function registerApiDogfooding(
         framework: "fastify",
         captureConsole: config.captureConsole,
         projectMode: config.deliveryMode,
-        beforeSend: sanitizeApiDogfoodingEvent,
+        beforeSend: (event) => sanitizeApiDogfoodingEvent(event, config.projectToken),
         transport: createHostedDogfoodingTransport(config.projectToken)
       });
       sdk.fastify()(app, {}, () => undefined);

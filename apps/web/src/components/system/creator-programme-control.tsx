@@ -4,27 +4,28 @@ import type {
   OfferDefinitionSchema
 } from "../../../../../packages/referrals/src/programme-policy.js";
 import type { z } from "zod";
-import { CreatorCodeSchema } from "../../../../../packages/referrals/src/programme-policy.js";
 import { offerApi, offerErrorMessage } from "../../lib/offer-api.js";
 import { usePendingAction } from "../../lib/use-pending-action.js";
 import { ReferralProgrammeCard } from "./referral-programme-card.js";
 import { Badge } from "../ui/badge.js";
 import { ReadOnlyCopyInput } from "./read-only-copy-input.js";
 import { PendingButton } from "./pending-button.js";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../ui/card.js";
-import { Field, FieldLabel, FieldGroup, FieldDescription, FieldError } from "../ui/field.js";
+import { Field, FieldLabel, FieldError } from "../ui/field.js";
 import { Checkbox } from "../ui/checkbox.js";
-import { Input } from "../ui/input.js";
+import { CreatorProgrammeManagement } from "./creator-programme-management.js";
+import { showSuccessToast } from "../../lib/notify.js";
 import { Button } from "../ui/button.js";
 import { Notice } from "../ui/notice.js";
 import { Skeleton } from "../ui/skeleton.js";
 
 export function CreatorProgrammeControl({
   identity,
-  onJoined
+  onJoined,
+  onPayments
 }: {
   identity: string;
   onJoined?: () => void;
+  onPayments?: () => void;
 }): JSX.Element {
   const [creator, setCreator] = useState<CreatorProgramme | null>(null),
     [programmes, setProgrammes] = useState<z.infer<typeof OfferDefinitionSchema>[]>([]),
@@ -32,7 +33,6 @@ export function CreatorProgrammeControl({
     [loading, setLoading] = useState(true),
     [loadError, setLoadError] = useState(false),
     [error, setError] = useState<string | null>(null),
-    [code, setCode] = useState(""),
     [accepted, setAccepted] = useState<string | null>(null);
   const generation = useRef(0),
     { pending, run } = usePendingAction();
@@ -62,7 +62,6 @@ export function CreatorProgrammeControl({
   useEffect(() => {
     setCreator(null);
     setAccepted(null);
-    setCode("");
     setError(null);
     load();
     return () => {
@@ -87,27 +86,6 @@ export function CreatorProgrammeControl({
         if (current === generation.current) setError(offerErrorMessage(reason));
       }
     });
-  const reserve = (): void =>
-    void run(async () => {
-      const current = generation.current;
-      setError(null);
-      const parsed = CreatorCodeSchema.safeParse(code);
-      if (!parsed.success) {
-        setError(
-          "Use 3–24 letters or digits with optional internal hyphens. Official and generated codes are reserved."
-        );
-        return;
-      }
-      try {
-        const result = await offerApi.execute("code", { code: parsed.data });
-        if (current !== generation.current) return;
-        setCreator(result.creator);
-        setShare(result.share_url);
-        setCode("");
-      } catch (reason) {
-        if (current === generation.current) setError(offerErrorMessage(reason));
-      }
-    });
   if (loading) return <Skeleton className="h-40 w-full" />;
   if (loadError)
     return (
@@ -117,82 +95,11 @@ export function CreatorProgrammeControl({
         </Button>
       </Notice>
     );
+  const profileGeneration = generation.current;
   const current = creator?.version,
     choices = programmes.filter((version) => version.version_id !== current?.version_id);
   return (
     <div className="flex flex-col gap-6">
-      {creator ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Your creator code</CardTitle>
-            <CardDescription>
-              Share your code directly or use your referral link. Neither grants access to a
-              customer workspace.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            {!creator.accepting_new_referrals ||
-            !programmes.some((version) => version.version_id === creator.version.version_id) ? (
-              <Notice title="New referrals are unavailable">
-                Saved customer offers and your earnings keep their accepted terms. Review any
-                available programme below before promoting a new offer, or contact support about an
-                unavailable code.
-              </Notice>
-            ) : null}
-            <ReadOnlyCopyInput id="creator-code" label="Referral code" value={creator.code} />
-            <ReadOnlyCopyInput id="creator-link" label="Referral link" value={share ?? ""} />
-            {creator.code === creator.legacy_code ? (
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  reserve();
-                }}
-              >
-                <FieldGroup>
-                  <Field data-invalid={error !== null} data-disabled={pending}>
-                    <FieldLabel htmlFor="branded-creator-code">Choose your branded code</FieldLabel>
-                    <Input
-                      id="branded-creator-code"
-                      value={code}
-                      maxLength={24}
-                      disabled={pending}
-                      autoComplete="off"
-                      autoCapitalize="characters"
-                      spellCheck={false}
-                      aria-invalid={error !== null}
-                      aria-describedby={
-                        error ? "creator-code-help creator-code-error" : "creator-code-help"
-                      }
-                      onChange={(event) => setCode(event.target.value)}
-                    />
-                    <FieldDescription id="creator-code-help">
-                      You can reserve one code. Later corrections go through support, and old
-                      aliases stay linked to you.
-                    </FieldDescription>
-                  </Field>
-                  <PendingButton
-                    type="submit"
-                    pending={pending}
-                    pendingLabel="Reserving code"
-                    disabled={!code.trim()}
-                  >
-                    Reserve code
-                  </PendingButton>
-                </FieldGroup>
-              </form>
-            ) : null}
-            {error ? (
-              <FieldError id="creator-code-error" role="alert">
-                {error}
-              </FieldError>
-            ) : null}
-            <p className="text-sm text-muted-foreground">
-              Your legacy code {creator.legacy_code} remains assigned to you; availability follows
-              your active agreement.
-            </p>
-          </CardContent>
-        </Card>
-      ) : null}
       {!creator && !choices.length ? (
         <Notice title="New enrolment is paused">
           No referral programme is accepting enrolment right now. Existing earnings remain
@@ -200,15 +107,41 @@ export function CreatorProgrammeControl({
         </Notice>
       ) : null}
       <div className="grid items-stretch gap-6 md:grid-cols-2 xl:grid-cols-3">
-        {current ? (
-          <ReferralProgrammeCard key={current.version_id} programme={current}>
-            <Badge variant="secondary" className="self-start">
-              Your current programme
-            </Badge>
-            <p className="text-sm text-muted-foreground">
-              Accepted terms {current.policy.terms_version}. Existing customer agreements and earned
-              balances keep their original policy.
-            </p>
+        {creator && current ? (
+          <ReferralProgrammeCard
+            key={current.version_id}
+            programme={current}
+            badge={
+              <Badge variant={creator.accepting_new_referrals ? "success" : "secondary"}>
+                {creator.accepting_new_referrals ? "Active" : "New referrals unavailable"}
+              </Badge>
+            }
+          >
+            {creator.accepting_new_referrals ? null : (
+              <Notice>Saved customer offers and earnings keep their accepted terms.</Notice>
+            )}
+            <ReadOnlyCopyInput
+              id="creator-code"
+              label="Referral code"
+              copyLabel="Copy referral code"
+              value={creator.code}
+            />
+            <ReadOnlyCopyInput
+              id="creator-link"
+              label="Referral link"
+              copyLabel="Copy referral link"
+              value={share ?? ""}
+            />
+            <CreatorProgrammeManagement
+              creator={creator}
+              onPayments={onPayments}
+              onSaved={(updated, shareUrl) => {
+                if (profileGeneration !== generation.current) return;
+                setCreator(updated);
+                setShare(shareUrl);
+                showSuccessToast("Creator code saved.");
+              }}
+            />
           </ReferralProgrammeCard>
         ) : null}
         {choices.map((version) => (

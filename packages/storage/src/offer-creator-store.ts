@@ -1,4 +1,4 @@
-import { registerLegacyOfferCode } from "./offer-code-registry.js";
+import { lockOfferCodeForClaim, registerLegacyOfferCode } from "./offer-code-registry.js";
 import { lockCreatorEmailEpoch, queueCreatorJoinEmail } from "./creator-email-events.js";
 import { randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -23,6 +23,7 @@ import {
 
 export interface OfferCreatorStore {
   read(userId: string): Promise<CreatorProgramme | null>;
+  canReplaceCode(userId: string): Promise<boolean>;
   correctCode(raw: {
     operator_user_id: string;
     partner_id: string;
@@ -40,7 +41,26 @@ export interface OfferCreatorStore {
     version_id: string;
     terms_version: string;
   }): Promise<CreatorProgramme>;
-  claimCode(raw: { user_id: string; code: string }): Promise<CreatorProgramme>;
+  claimCode(raw: {
+    user_id: string;
+    code: string;
+    expected_code?: string | undefined;
+  }): Promise<CreatorProgramme>;
+}
+const claimCodeInput = z
+  .object({
+    user_id: z.uuid(),
+    code: CreatorCodeSchema,
+    expected_code: CreatorCodeSchema.optional()
+  })
+  .strict();
+
+async function hasSingleBrandedAlias(tx: Queryable, partnerId: string): Promise<boolean> {
+  const result = await tx.query<{ single_alias: boolean }>(
+    "SELECT count(*)=1 AS single_alias FROM offer_codes WHERE partner_id=$1 AND kind='creator'",
+    [partnerId]
+  );
+  return result.rows[0]?.single_alias === true;
 }
 export function createOfferCreatorStore(
   db: Queryable,
@@ -94,6 +114,15 @@ export function createOfferCreatorStore(
   };
   return {
     read: (userId: string) => read(db, userId),
+    async canReplaceCode(userId) {
+      const creator = await read(db, z.uuid().parse(userId));
+      return (
+        creator !== null &&
+        creator.accepting_new_referrals &&
+        creator.code !== creator.legacy_code &&
+        (await hasSingleBrandedAlias(db, creator.partner_id))
+      );
+    },
     async correctCode(raw: {
       operator_user_id: string;
       partner_id: string;
@@ -266,8 +295,8 @@ export function createOfferCreatorStore(
         return creator;
       });
     },
-    async claimCode(raw: { user_id: string; code: string }): Promise<CreatorProgramme> {
-      const input = z.object({ user_id: z.uuid(), code: CreatorCodeSchema }).strict().parse(raw);
+    async claimCode(raw): Promise<CreatorProgramme> {
+      const input = claimCodeInput.parse(raw);
       return runInTransaction(db, async (tx) => {
         await verifiedOfferUser(tx, input.user_id, true);
         const creator = await read(tx, input.user_id);
@@ -278,13 +307,27 @@ export function createOfferCreatorStore(
         ]);
         const old = (
           await tx.query<{ code: string }>(
-            "SELECT code FROM offer_codes WHERE partner_id=$1 AND kind='creator' AND preferred",
+            "SELECT code FROM offer_codes WHERE partner_id=$1 AND kind='creator' AND preferred FOR UPDATE",
             [creator.partner_id]
           )
         ).rows[0];
-        if (old) {
-          if (old.code === input.code) return (await read(tx, input.user_id))!;
+        if (old?.code === input.code) return (await read(tx, input.user_id))!;
+        if (input.expected_code !== undefined && old?.code !== input.expected_code)
+          throw new ProgrammeError("creator_code_changed");
+        if (
+          old &&
+          (input.expected_code === undefined ||
+            !(await hasSingleBrandedAlias(tx, creator.partner_id)))
+        )
           throw new ProgrammeError("creator_code_already_claimed");
+        // On the first reservation, the generated code still controls admission.
+        if (!old) await lockOfferCodeForClaim(tx, creator.legacy_code);
+        const current = await read(tx, input.user_id);
+        if (!current?.accepting_new_referrals) throw new ProgrammeError("programme_unavailable");
+        if (old) {
+          // The old code remains resolvable. A collision below rolls back
+          // the preferred flag as part of the same partner-locked transaction.
+          await tx.query("UPDATE offer_codes SET preferred=false WHERE code=$1", [old.code]);
         }
         const result = await tx.query(
           "INSERT INTO offer_codes(id,code,kind,partner_id,preferred) VALUES($1,$2,'creator',$3,true) ON CONFLICT(code) DO NOTHING RETURNING id",

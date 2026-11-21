@@ -156,14 +156,14 @@ describe("web page helper coverage", () => {
   });
 
   it("shows dashboard projects in the same name order as the Projects page", async () => {
-    vi.spyOn(api, "listProjects").mockResolvedValue([
+    const projects = [
       createProject({ project_id: "proj_zeta", name: "Zeta" }),
       createProject({ project_id: "proj_alpha", name: "Alpha" })
-    ]);
+    ];
 
     render(
       <MemoryRouter>
-        <RecentProjectsTable />
+        <RecentProjectsTable projects={projects} />
       </MemoryRouter>
     );
 

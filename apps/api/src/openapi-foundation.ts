@@ -299,6 +299,16 @@ export function foundationOperations(): OperationSpec[] {
           description: "Invite email does not match the signed-in account.",
           schema: apiError
         },
+        "429": {
+          description: "This IP exceeded the shared hosted auth rate limit.",
+          schema: apiError,
+          headers: {
+            "Retry-After": {
+              description: "Seconds until the caller should retry.",
+              schema: z.string()
+            }
+          }
+        },
         "503": { description: "Auth is not configured.", schema: apiError }
       }
     },
@@ -372,6 +382,16 @@ export function foundationOperations(): OperationSpec[] {
         },
         "401": { description: "Browser session is missing or invalid.", schema: apiError },
         "404": { description: "No Gravatar image was found.", schema: apiError },
+        "429": {
+          description: "This user exceeded the hosted avatar import rate limit.",
+          schema: apiError,
+          headers: {
+            "Retry-After": {
+              description: "Seconds until the caller should retry.",
+              schema: z.string()
+            }
+          }
+        },
         "502": { description: "Avatar import failed.", schema: apiError },
         "503": { description: "Account management is not configured.", schema: apiError }
       }

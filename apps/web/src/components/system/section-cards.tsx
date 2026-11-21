@@ -1,5 +1,5 @@
 import { BellRingIcon, HeartPulseIcon, RotateCcwIcon, SirenIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card.js";
@@ -10,8 +10,10 @@ import {
   type AvailabilityCheckDailyRollupRecord,
   type ProjectRecord
 } from "../../lib/api.js";
-import { countDashboardAttentionIncidents } from "../../lib/dashboard-incidents-today-data.js";
-import { summarizeHealthStatusToday, type HealthStatusTodaySummary } from "../../lib/health-status-summary.js";
+import {
+  summarizeHealthStatusToday,
+  type HealthStatusTodaySummary
+} from "../../lib/health-status-summary.js";
 import { getActiveIncidentCount } from "../../lib/project-metrics.js";
 import { isSharedProjectAccessSuspended } from "../../lib/project-access.js";
 
@@ -24,12 +26,17 @@ interface DashboardMetrics {
   healthStatusToday: HealthStatusTodaySummary;
 }
 
-async function aggregateProjectMetrics(projects: ProjectRecord[]): Promise<DashboardMetrics> {
+async function aggregateProjectMetrics(
+  projects: ProjectRecord[],
+  isCurrent: () => boolean,
+  refresh: boolean
+): Promise<{ metrics: DashboardMetrics; healthComplete: boolean }> {
   const incidentMetrics = projects.reduce<Omit<DashboardMetrics, "healthStatusToday">>(
     (totals, project) => ({
       activeIncidents: totals.activeIncidents + getActiveIncidentCount(project.metrics),
       regressedIncidents: totals.regressedIncidents + project.metrics.regressed_incidents,
-      attentionIncidentsToday: totals.attentionIncidentsToday + project.metrics.attention_incidents_today
+      attentionIncidentsToday:
+        totals.attentionIncidentsToday + project.metrics.attention_incidents_today
     }),
     {
       activeIncidents: 0,
@@ -37,15 +44,20 @@ async function aggregateProjectMetrics(projects: ProjectRecord[]): Promise<Dashb
       attentionIncidentsToday: 0
     }
   );
-  const attentionIncidentsToday = await countDashboardAttentionIncidents().catch(
-    () => incidentMetrics.attentionIncidentsToday
-  );
+  let healthComplete = true;
   const availabilityResponses = await Promise.all(
     projects
       .filter((project) => !isSharedProjectAccessSuspended(project))
       .map(async (project) => {
         try {
-          const response = await listProjectAvailabilityChecks(project.project_id, 100);
+          const response = await listProjectAvailabilityChecks(project.project_id, 100, {
+            refresh
+          });
+          if (!isCurrent())
+            return {
+              checks: [],
+              rollupsByCheckId: new Map<string, AvailabilityCheckDailyRollupRecord[]>()
+            };
           const rollupEntries = await Promise.all(
             response.checks.map(async (check) => {
               try {
@@ -58,6 +70,7 @@ async function aggregateProjectMetrics(projects: ProjectRecord[]): Promise<Dashb
                   )
                 ] as const;
               } catch {
+                // Missing history affects uptime. The live check still determines current status.
                 return [check.check_id, [] as AvailabilityCheckDailyRollupRecord[]] as const;
               }
             })
@@ -68,7 +81,11 @@ async function aggregateProjectMetrics(projects: ProjectRecord[]): Promise<Dashb
             rollupsByCheckId: new Map<string, AvailabilityCheckDailyRollupRecord[]>(rollupEntries)
           };
         } catch {
-          return { checks: [], rollupsByCheckId: new Map<string, AvailabilityCheckDailyRollupRecord[]>() };
+          healthComplete = false;
+          return {
+            checks: [],
+            rollupsByCheckId: new Map<string, AvailabilityCheckDailyRollupRecord[]>()
+          };
         }
       })
   );
@@ -80,25 +97,52 @@ async function aggregateProjectMetrics(projects: ProjectRecord[]): Promise<Dashb
   }
 
   return {
-    ...incidentMetrics,
-    attentionIncidentsToday,
-    healthStatusToday: summarizeHealthStatusToday(
-      availabilityResponses.flatMap((response) => response.checks),
-      rollupsByCheckId,
-      "workspace"
-    )
+    healthComplete,
+    metrics: {
+      ...incidentMetrics,
+      healthStatusToday: summarizeHealthStatusToday(
+        availabilityResponses.flatMap((response) => response.checks),
+        rollupsByCheckId,
+        "workspace"
+      )
+    }
   };
 }
 
-export function SectionCards(): JSX.Element {
+export function useDashboardMetrics(): {
+  projects: ProjectRecord[] | null;
+  metrics: DashboardMetrics | null;
+  refreshMetrics: (background?: boolean) => Promise<void>;
+} {
+  const [projects, setProjects] = useState<ProjectRecord[] | null>(null);
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+  const pending = useRef<symbol | null>(null);
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        const projects = await listProjects();
-        setMetrics(await aggregateProjectMetrics(projects));
-      } catch {
+  const refreshMetrics = useCallback(async (background = false): Promise<void> => {
+    if (pending.current !== null) return;
+    const request = Symbol();
+    pending.current = request;
+    const isCurrent = (): boolean => pending.current === request;
+
+    try {
+      const projects = await listProjects(undefined, { refresh: background });
+      if (!isCurrent()) return;
+      setProjects(projects);
+      const next = await aggregateProjectMetrics(projects, isCurrent, background);
+      if (!isCurrent()) return;
+      setMetrics((previous) => ({
+        ...next.metrics,
+        healthStatusToday:
+          background &&
+          !next.healthComplete &&
+          next.metrics.healthStatusToday.state !== "down" &&
+          previous !== null
+            ? previous.healthStatusToday
+            : next.metrics.healthStatusToday
+      }));
+    } catch {
+      if (isCurrent() && !background) {
+        setProjects([]);
         setMetrics({
           activeIncidents: 0,
           regressedIncidents: 0,
@@ -106,11 +150,29 @@ export function SectionCards(): JSX.Element {
           healthStatusToday: summarizeHealthStatusToday([], new Map(), "workspace")
         });
       }
-    })();
+    } finally {
+      if (isCurrent()) pending.current = null;
+    }
   }, []);
 
+  useEffect(() => {
+    void refreshMetrics();
+    return () => {
+      pending.current = null;
+    };
+  }, [refreshMetrics]);
+
+  return { projects, metrics, refreshMetrics };
+}
+
+export function SectionCards({
+  metrics,
+  attentionToday
+}: {
+  metrics: DashboardMetrics | null;
+  attentionToday: number | undefined;
+}): JSX.Element {
   const activeIncidents = metrics?.activeIncidents;
-  const attentionToday = metrics?.attentionIncidentsToday;
   const healthStatusToday = metrics?.healthStatusToday;
   const regressedIncidents = metrics?.regressedIncidents;
 
@@ -137,7 +199,9 @@ export function SectionCards(): JSX.Element {
               {activeIncidents !== undefined ? activeIncidents.toLocaleString() : "\u2014"}
             </CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">
-              {activeIncidents !== undefined ? "Open or regressed incidents across all projects" : "Loading\u2026"}
+              {activeIncidents !== undefined
+                ? "Open or regressed incidents across all projects"
+                : "Loading\u2026"}
             </p>
           </CardContent>
         </Card>
@@ -158,7 +222,9 @@ export function SectionCards(): JSX.Element {
               {attentionToday !== undefined ? attentionToday.toLocaleString() : "\u2014"}
             </CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">
-              {attentionToday !== undefined ? "Opened or regressed today across all projects" : "Loading\u2026"}
+              {attentionToday !== undefined
+                ? "Opened or regressed today across all projects"
+                : "Loading\u2026"}
             </p>
           </CardContent>
         </Card>
@@ -194,7 +260,9 @@ export function SectionCards(): JSX.Element {
             {regressedIncidents !== undefined ? regressedIncidents.toLocaleString() : "\u2014"}
           </CardTitle>
           <p className="mt-1 text-xs text-muted-foreground">
-            {regressedIncidents !== undefined ? "Current regressed incidents across all projects" : "Loading\u2026"}
+            {regressedIncidents !== undefined
+              ? "Current regressed incidents across all projects"
+              : "Loading\u2026"}
           </p>
         </CardContent>
       </Card>

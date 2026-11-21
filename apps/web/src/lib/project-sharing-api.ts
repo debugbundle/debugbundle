@@ -1,6 +1,7 @@
 import {
   buildApiUrl,
   buildBrowserSessionHeaders,
+  clearDashboardReads,
   readJson as readProjectSharingJson
 } from "./api-client.js";
 
@@ -82,6 +83,7 @@ export async function updateProjectMemberRole(
     })
   );
 
+  clearDashboardReads();
   return body.member;
 }
 
@@ -93,6 +95,7 @@ export async function removeProjectMember(projectId: string, userId: string): Pr
       headers: buildBrowserSessionHeaders()
     })
   );
+  clearDashboardReads();
 }
 
 export async function leaveProjectMembership(projectId: string): Promise<void> {
@@ -103,6 +106,7 @@ export async function leaveProjectMembership(projectId: string): Promise<void> {
       headers: buildBrowserSessionHeaders()
     })
   );
+  clearDashboardReads();
 }
 
 export async function cancelProjectInvite(projectId: string, inviteId: string): Promise<void> {
@@ -125,5 +129,6 @@ export async function acceptProjectInvite(token: string): Promise<AcceptedProjec
     })
   );
 
+  clearDashboardReads();
   return body.membership;
 }

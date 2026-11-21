@@ -82,7 +82,7 @@ export function renderCreatorReferralEmail(
     }
   }
   const caveat =
-    "Earnings remain pending until the 30-day hold, cleared-funds and dispute checks complete. Refunds and payment adjustments can change these amounts. Routine payout review starts at US$50; smaller balances carry forward.";
+    "Earnings remain pending until the 30-day hold, cleared-funds and dispute checks complete. Refunds and payment adjustments can change these amounts. Routine payout review starts at $50 USD. Smaller balances carry forward.";
   paragraphs.push(caveat, `Open your referrals: ${settings}`);
   body +=
     renderEmailParagraph(escapeHtml(caveat)) +

@@ -73,6 +73,34 @@ function setup(billing?: NonNullable<ApiDependencies["billingManagement"]>) {
   });
   return { app, offers, member, resolveSession, preview, apply, list, authorize };
 }
+it("uses the authenticated creator and explicitly expected code for replacement", async () => {
+  const { app, offers } = setup();
+  const canReplaceCode = vi.fn().mockResolvedValue(true);
+  const claimCode = vi.fn().mockResolvedValue({ code: "NEW20" });
+  offers.store.creators = mockedObject<typeof offers.store.creators>({ canReplaceCode, claimCode });
+  offers.shareLink = vi.fn().mockReturnValue("https://debugbundle.test/r/NEW20");
+  const url = "/v2/offers/creator/code";
+  try {
+    const status = await app.inject({ method: "GET", url, headers: bearer });
+    expect(status.json()).toEqual({ can_replace: true });
+    expect(status.headers["cache-control"]).toBe("private, no-store");
+    expect(canReplaceCode).toHaveBeenCalledExactlyOnceWith(user);
+    const cookie = `${SESSION_COOKIE_NAME}=creator-session`;
+    const payload = { code: "new20", expected_code: "old20" };
+    expect(
+      (await app.inject({ method: "POST", url, payload, headers: { cookie } })).statusCode
+    ).toBe(403);
+    const headers = { cookie, "x-csrf-token": buildCsrfToken("creator-session") };
+    expect((await app.inject({ method: "POST", url, payload, headers })).statusCode).toBe(200);
+    expect(claimCode).toHaveBeenCalledExactlyOnceWith({
+      user_id: user,
+      code: "NEW20",
+      expected_code: "OLD20"
+    });
+  } finally {
+    await app.close();
+  }
+});
 it("saves an operator's promotional code in the draft request while retaining CSRF and strict actor boundaries", async () => {
   const f = setup(),
     createDraft = vi

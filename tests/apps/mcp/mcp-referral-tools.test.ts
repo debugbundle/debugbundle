@@ -4,6 +4,8 @@ import {
   REFERRAL_MCP_TOOL_CATALOG
 } from "../../../apps/mcp/src/referral-tools.js";
 import { ReferralApiError, type ReferralApi } from "../../../packages/referral-client/src/index.js";
+import { createOfferMcpTools } from "../../../apps/mcp/src/offer-tools.js";
+import { createOfferApi } from "../../../packages/referral-client/src/offer-api.js";
 import { mockedObject } from "../../helpers/vitest.js";
 it("requires explicit partner terms and rejects client-supplied eligibility", async () => {
   const join = vi.fn(),
@@ -79,4 +81,37 @@ it("requires explicit externally-paid confirmation and cannot forward an operato
     externalReference: "bank-001",
     confirmedExternalPayment: true
   });
+});
+it("forwards creator analytics and guarded code replacement with the supplied member credential", async () => {
+  const counts = { referred_accounts: 0, first_paid_referrals: 0, net_commission_minor: 0 };
+  const request = vi
+    .fn()
+    .mockResolvedValueOnce({
+      status: 200,
+      body: {
+        as_of: "2026-11-20T12:00:00Z",
+        currency: "usd",
+        totals: counts,
+        daily: Array.from({ length: 7 }, (_, day) => ({ date: `2026-11-${14 + day}`, ...counts }))
+      }
+    })
+    .mockResolvedValueOnce({ status: 409, body: { error: "creator_code_changed" } });
+  const tools = createOfferMcpTools(createOfferApi({ request }));
+  await expect(
+    tools.get_creator_referral_analytics({ bearerToken: "member", days: "7" })
+  ).resolves.toMatchObject({ totals: counts });
+  await expect(
+    tools.claim_creator_code({ bearerToken: "member", code: "new20", expected_code: "old20" })
+  ).rejects.toThrow("creator_code_changed");
+  expect(request.mock.calls).toEqual([
+    [{ bearerToken: "member", method: "GET", path: "/v2/referrals/analytics?days=7" }],
+    [
+      {
+        bearerToken: "member",
+        method: "POST",
+        path: "/v2/offers/creator/code",
+        body: { code: "NEW20", expected_code: "OLD20" }
+      }
+    ]
+  ]);
 });

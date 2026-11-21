@@ -130,13 +130,10 @@ export function SignupOfferControl({
         <Notice
           title={`${offer.code}: ${offer.version.policy.discount_basis_points / 100}% introductory offer available`}
         >
-          Eligibility is checked when your new account is verified. Your trial does not consume the
-          offer. Once saved, the discount stays with your workspace for its first eligible paid
-          invoice.{" "}
-          {offer.version.policy.redeem_by
-            ? "Campaign claims include a recorded redemption deadline."
-            : ""}{" "}
-          Existing accounts can apply a code explicitly in Billing.
+          We check eligibility when you verify your account. Your trial does not consume the offer.
+          Once saved, the discount stays with your workspace for its first eligible paid invoice.{" "}
+          {offer.version.policy.redeem_by ? "Campaign claims have a redemption deadline. " : null}
+          Already have an account? Apply your code in Billing.
         </Notice>
       ) : offer ? (
         <Notice title="This code is unavailable for new claims">

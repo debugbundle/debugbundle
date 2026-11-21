@@ -15,6 +15,7 @@ import {
   type DashboardSetupPreferences
 } from "../../../../../packages/shared-types/src/dashboard-setup.js";
 import type { SessionRecord } from "../../lib/api.js";
+import { invalidateDashboardReads } from "../../lib/api-client.js";
 import {
   emptyDashboardSetupFacts,
   loadDashboardSetupFacts
@@ -143,9 +144,13 @@ function DashboardSetupController({
       requestId.current += 1;
     };
   }, []);
+  const setupRoute =
+    location.pathname === "/dashboard" || location.pathname === "/access-tokens"
+      ? location.pathname
+      : null;
   useEffect(() => {
     void refresh();
-  }, [refresh, location.pathname]);
+  }, [refresh, setupRoute]);
   useEffect(() => {
     if (facts === null) return;
     // Replay only in the opt-in local simulator; real setup observations remain intact.
@@ -228,7 +233,11 @@ function DashboardSetupController({
           setMode("guide");
           void refresh(true);
         }}
-        onRefresh={() => void refresh()}
+        onRefresh={() => {
+          invalidateDashboardReads("/v1/projects");
+          invalidateDashboardReads("/v1/member/tokens");
+          void refresh();
+        }}
         onCloseAutoFocus={(event) => {
           event.preventDefault();
           if (returnFocus.current?.isConnected && returnFocus.current !== document.body)

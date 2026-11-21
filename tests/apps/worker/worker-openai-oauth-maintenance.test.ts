@@ -63,8 +63,8 @@ describe("OpenAI OAuth worker maintenance", () => {
     expect(logged).not.toContain("token_hash");
   });
 
-  it("emits the reviewer expiry signal inside the monitored horizon", async () => {
-    const now = Date.parse("2026-08-30T12:00:00.000Z");
+  it("logs each reviewer milestone once while continuing scheduled cleanup", async () => {
+    let now = Date.parse("2026-08-30T12:00:00.000Z");
     const runtimeLogger = logger();
     const maintenance = createOpenAiOAuthMaintenance({
       cleanupExpiredCredentials: vi.fn(async () => ({
@@ -89,5 +89,19 @@ describe("OpenAI OAuth worker maintenance", () => {
       }),
       "openai_reviewer_credential_expiring"
     );
+
+    now += 60_000;
+    await expect(maintenance.runIfDue()).resolves.toBe(true);
+    expect(runtimeLogger.warn).toHaveBeenCalledTimes(1);
+    now = Date.parse("2026-09-10T12:00:00.000Z");
+    await expect(maintenance.runIfDue()).resolves.toBe(true);
+    now += 60_000;
+    await expect(maintenance.runIfDue()).resolves.toBe(true);
+    expect(runtimeLogger.error).toHaveBeenCalledTimes(1);
+    expect(runtimeLogger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ milestone: "expired", expired: true }),
+      "openai_reviewer_credential_expiring"
+    );
+    expect(runtimeLogger.info).toHaveBeenCalledTimes(4);
   });
 });

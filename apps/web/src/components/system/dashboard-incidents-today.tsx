@@ -1,12 +1,10 @@
 import { SirenIcon } from "lucide-react";
-import { useState, type MouseEvent } from "react";
+import type { MouseEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { formatIncidentMatchedFields } from "../../lib/incident-copy.js";
 import type { IncidentRecord } from "../../lib/api.js";
-import { loadDashboardAttentionIncidentPage } from "../../lib/dashboard-incidents-today-data.js";
-import { getLocalDayWindow } from "../../lib/incidents-today.js";
-import { useCursorPagination } from "../../lib/use-cursor-pagination.js";
+import type { useCursorPagination } from "../../lib/use-cursor-pagination.js";
 import { shouldIgnoreTableRowActivation } from "./selectable-table-actions.js";
 import { CursorPaginationControls } from "./cursor-pagination-controls.js";
 import { TableListFooter } from "./table-list-footer.js";
@@ -29,10 +27,16 @@ import { ResourceListState } from "./resource-list-state.js";
 import { Skeleton } from "../ui/skeleton.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table.js";
 
-export function DashboardIncidentsToday(): JSX.Element {
+export function DashboardIncidentsToday({
+  pageSize,
+  setPageSize,
+  pagination
+}: {
+  pageSize: number;
+  setPageSize: (size: number) => void;
+  pagination: ReturnType<typeof useCursorPagination<IncidentRecord>>;
+}): JSX.Element {
   const navigate = useNavigate();
-  const [pageSize, setPageSize] = useState(10);
-  const todayWindow = getLocalDayWindow();
   const {
     items: incidents,
     isLoading,
@@ -43,10 +47,7 @@ export function DashboardIncidentsToday(): JSX.Element {
     goToNextPage,
     goToPreviousPage,
     refreshPage
-  } = useCursorPagination(
-    async (cursor) => await loadDashboardAttentionIncidentPage(todayWindow, cursor, pageSize),
-    [todayWindow.startsAtIso, pageSize]
-  );
+  } = pagination;
 
   return (
     <Card id="dashboard-incidents-today" className="min-w-0">

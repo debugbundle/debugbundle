@@ -118,7 +118,8 @@ fixtures if prices change; do not hard-code these marketing amounts separately.
 
 ### Creator-chosen codes
 
-- A verified enrolled creator can reserve one branded code, for example `OWEN20`.
+- A verified enrolled creator can reserve a branded code and replace it once
+  while the active programme can accept new referrals.
   It aliases the permanent partner ID; it is not identity or authentication.
 - Proposed syntax: 3–24 ASCII letters/digits with optional internal hyphens;
   first/last characters alphanumeric. Trim surrounding whitespace and match
@@ -130,9 +131,11 @@ fixtures if prices change; do not hard-code these marketing amounts separately.
 - Enforce uniqueness atomically in PostgreSQL. Availability feedback is advisory;
   only successful reservation establishes ownership. Rate-limit authenticated
   availability/claim requests and reveal no private creator information.
-- Existing generated codes remain valid. One creator cannot reserve speculative
-  aliases. Subsequent renaming is an audited operator correction in this phase;
-  previous aliases continue to resolve to the same creator.
+- Existing generated codes and earlier branded aliases retain their owner and
+  resolve under the creator's current agreement. The replacement requires the
+  expected preferred branded code and an atomic partner lock. An existing second
+  branded alias, including one issued by support, exhausts self-service
+  replacement. Further changes go through audited operator correction.
 - Never recycle an alias to another creator/campaign, including after account
   deletion. Block abusive aliases for new claims without transferring ownership
   or changing already-earned obligations.

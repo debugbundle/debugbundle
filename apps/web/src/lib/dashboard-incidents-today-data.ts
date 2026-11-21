@@ -1,9 +1,5 @@
 import { listIncidents, type IncidentRecord } from "./api.js";
-import {
-  getLocalDayWindow,
-  isIncidentAttentionToday,
-  type LocalDayWindow
-} from "./incidents-today.js";
+import { isIncidentAttentionToday, type LocalDayWindow } from "./incidents-today.js";
 
 const DASHBOARD_INCIDENTS_TODAY_PAGE_SIZE = 10;
 const DASHBOARD_INCIDENTS_TODAY_SCAN_LIMIT = 100;
@@ -46,12 +42,10 @@ export async function loadDashboardAttentionIncidentPage(
 
     const nextMatchOffset = currentCursor.matchOffset + incidentsToTake.length;
     if (nextMatchOffset < response.matchedIncidents.length) {
-      return finishPage(
-        encodeDashboardIncidentsTodayCursor({
-          sourceCursor: currentCursor.sourceCursor,
-          matchOffset: nextMatchOffset
-        })
-      );
+      return finishPage({
+        sourceCursor: currentCursor.sourceCursor,
+        matchOffset: nextMatchOffset
+      });
     }
 
     if (
@@ -68,14 +62,24 @@ export async function loadDashboardAttentionIncidentPage(
     };
   }
 
-  return finishPage(encodeDashboardIncidentsTodayCursor(currentCursor));
+  return finishPage(currentCursor);
 
-  async function finishPage(nextCursor: string | null): Promise<{
+  async function finishPage(continuation: DashboardIncidentsTodayCursor | null): Promise<{
     items: IncidentRecord[];
     nextCursor: string | null;
     totalPages?: number;
     totalCount?: number;
   }> {
+    // The same offset can point to different incidents after an insertion or
+    // local-day rollover. Make that boundary visible to cursor refresh.
+    const nextCursor =
+      continuation === null
+        ? null
+        : JSON.stringify({
+            ...continuation,
+            boundary: items.at(-1)?.incident_id,
+            localDay: todayWindow.startsAtIso
+          });
     if (cursor !== null) return { items, nextCursor };
     // Continue counting after the source pages already read for this display page.
     const remainingMatches =
@@ -91,9 +95,9 @@ export async function loadDashboardAttentionIncidentPage(
   }
 }
 
-export async function countDashboardAttentionIncidents(
-  todayWindow = getLocalDayWindow(),
-  sourceCursor: string | null = null
+async function countDashboardAttentionIncidents(
+  todayWindow: LocalDayWindow,
+  sourceCursor: string | null
 ): Promise<number> {
   let total = 0;
 
@@ -111,10 +115,6 @@ export async function countDashboardAttentionIncidents(
 
     sourceCursor = response.nextSourceCursor;
   }
-}
-
-function encodeDashboardIncidentsTodayCursor(cursor: DashboardIncidentsTodayCursor): string {
-  return JSON.stringify(cursor);
 }
 
 function decodeDashboardIncidentsTodayCursor(value: string | null): DashboardIncidentsTodayCursor {
