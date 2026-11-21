@@ -98,12 +98,14 @@ it("requires acceptance of the exact terms and shows a branded code only after s
   expect(writes).toEqual([
     { version_id: offerVersion.version_id, terms_version: offerVersion.policy.terms_version }
   ]);
-  const code = await screen.findByLabelText("Choose your branded code");
   expect(joined).toHaveBeenCalledOnce();
+  await screen.findByLabelText("Referral code");
   expect(screen.getByRole("button", { name: "View programme terms for Creators" })).toHaveAttribute(
     "aria-expanded",
     "false"
   );
+  await user.click(screen.getByRole("button", { name: "Manage programme" }));
+  const code = await screen.findByLabelText("Choose your branded code");
   await user.type(code, "OWEN20");
   await user.click(screen.getByRole("button", { name: "Reserve code" }));
   expect(screen.getByLabelText("Referral code")).toHaveValue("ABCD234567");
@@ -117,6 +119,57 @@ it("requires acceptance of the exact terms and shows a branded code only after s
   await waitFor(() => expect(screen.getByLabelText("Referral code")).toHaveValue("OWEN20"));
   expect(screen.getByLabelText("Referral link")).toHaveValue("https://debugbundle.com/r/OWEN20");
   expect(screen.queryByLabelText("Choose your branded code")).toBeNull();
+});
+it("keeps an active creator's code and link on the programme card and replaces the code once", async () => {
+  const user = userEvent.setup();
+  const writes: unknown[] = [];
+  const branded = { ...profile, code: "FIRST20" };
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = requestUrl(input);
+      if (path.includes("/programmes?"))
+        return jsonResponse(200, { programmes: [offerDefinition] });
+      if (path.endsWith("/creator/code")) {
+        if (init?.method !== "POST") return jsonResponse(200, { can_replace: true });
+        writes.push(JSON.parse(typeof init.body === "string" ? init.body : "{}"));
+        return writes.length === 1
+          ? jsonResponse(409, { error: "creator_code_unavailable" })
+          : jsonResponse(200, {
+              creator: { ...branded, code: "SECOND20" },
+              share_url: "https://debugbundle.com/r/SECOND20"
+            });
+      }
+      return jsonResponse(200, {
+        creator: branded,
+        share_url: "https://debugbundle.com/r/FIRST20"
+      });
+    })
+  );
+  render(<CreatorProgrammeControl identity="creator" />);
+  const card = await screen.findByRole("article", { name: "Creators" });
+  expect(within(card).getByText("Active")).toHaveAttribute("data-variant", "success");
+  expect(within(card).getByLabelText("Referral code")).toHaveValue("FIRST20");
+  expect(within(card).getByLabelText("Referral link")).toHaveValue(
+    "https://debugbundle.com/r/FIRST20"
+  );
+  expect(within(card).getByRole("button", { name: "Copy referral link" })).toBeVisible();
+  await user.click(within(card).getByRole("button", { name: "Manage programme" }));
+  const dialog = await screen.findByRole("dialog", { name: "Manage Creators" });
+  const code = await within(dialog).findByLabelText("New creator code");
+  expect(dialog).toHaveTextContent(`Your original code ${profile.legacy_code}`);
+  await user.type(code, "SUPPORT");
+  await user.click(within(dialog).getByRole("button", { name: "Save code" }));
+  expect(await within(dialog).findByRole("alert")).toHaveTextContent(/reserved/i);
+  expect(writes).toHaveLength(0);
+  await user.clear(code);
+  await user.type(code, "SECOND20");
+  await user.click(within(dialog).getByRole("button", { name: "Save code" }));
+  expect(await within(dialog).findByRole("alert")).toHaveTextContent(/already in use/);
+  expect(code).toHaveValue("SECOND20");
+  await user.click(within(dialog).getByRole("button", { name: "Save code" }));
+  await waitFor(() => expect(within(card).getByLabelText("Referral code")).toHaveValue("SECOND20"));
+  expect(writes).toEqual(Array(2).fill({ code: "SECOND20", expected_code: "FIRST20" }));
 });
 it("shows the saved and available programme values separately without fixed rates or automatic consent", async () => {
   const user = userEvent.setup();
@@ -146,7 +199,7 @@ it("shows the saved and available programme values separately without fixed rate
   const choice = await screen.findByRole("article", { name: "Flexible creators" });
   expect(within(choice).getByText("75.25%")).toBeVisible();
   expect(within(choice).getByText("15.5%")).toBeVisible();
-  expect(within(choice).getByText(/12\.08/)).toBeVisible();
+  expect(within(choice).getByText("$12.08")).toBeVisible();
   expect(within(choice).getByText(/up to 3 months/)).toBeVisible();
   expect(within(choice).getByRole("list", { name: "Eligible plans" })).toHaveTextContent("Team");
   expect(choice).not.toHaveTextContent(/50%|20%|10%|Business/);

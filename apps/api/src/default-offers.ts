@@ -15,6 +15,7 @@ import { createOfferLinkCodec } from "../../../packages/referrals/src/offer-link
 import { createReferralEligibilityReader, type ReferralConfig } from "./default-referrals.js";
 import type { Queryable } from "../../../packages/storage/src/types.js";
 import type { StripeConfig } from "./stripe-config.js";
+import { recordReferralVisit } from "../../../packages/storage/src/referral-visit-store.js";
 
 export function createDefaultOffers(input: {
   db: Queryable;
@@ -26,6 +27,10 @@ export function createDefaultOffers(input: {
 }): OfferManagement {
   return createOfferManagement({
     enabled: input.enabled,
+    visitTracking: {
+      secret: input.config.secret,
+      record: (visit) => recordReferralVisit(input.db, visit)
+    },
     legacy: createLegacyOfferAdapter({
       db: input.db,
       secret: input.config.secret,

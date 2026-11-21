@@ -1165,7 +1165,9 @@ If CLI says something is healthy and MCP says something different, that is a pro
 
 - **Given** API dogfooding is connected for the hosted OpenAI runtime
 - **When** an alert-worthy MCP request fails or times out, MCP admission pressure crosses the bounded reporting threshold, OAuth fails, or the reviewer credential enters its warning horizon
-- **Then** DebugBundle receives a handled incident whose request-derived dimensions contain only bounded endpoint/method/tool/status/admission/expiry metadata and constant pressure threshold/window fields; its delivery sanitizer empties request/response placeholders, clears correlation, removes probe data and executable stack frames, and retains only Node version from runtime context, while credentials, request arguments, tool results, customer content, customer IDs, and pseudonymous grant/client keys never appear
+- **Then** DebugBundle receives a handled incident whose request-derived dimensions contain only bounded endpoint/method/tool/status/admission/expiry metadata and constant pressure threshold/window fields; its delivery sanitizer empties request/response placeholders, clears correlation, removes probe data and executable stack frames, and retains Node version plus the deadline and milestone for reviewer reminders, while credentials, request arguments, tool results, customer content, customer IDs, and pseudonymous grant/client keys never appear
+- **And** the 14-day, 7-day, 1-day and expiry reminders share a fingerprint within one reviewer deadline, use independent stable milestone event IDs and escalate to critical at expiry
+- **And** a restart inside the warning window reports the current milestone, and processing its repeated event ID does not create a separate incident or notification
 - **And** normal unauthenticated MCP discovery and rejected bearer tokens remain metadata logs without creating incidents
 - **And** an independently operated free-tier monitor checks `https://mcp.debugbundle.com/ready` at five-minute intervals and alerts the account's existing email contact without rebooting the shared host or bypassing the MCP-only gate
 - **And** the existing AWS baseline remains intact, while its installer proves that no dedicated OpenAI CloudWatch custom metric or alarm can be added accidentally
@@ -1364,6 +1366,11 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Then** the user, project, incident, bundle, reproduction, token, and retained debugging payload data are deleted as before
 - **And** anonymized aggregate account metrics remain stored without a join path back to deleted users or projects
 - **And** required payment/provider retention records remain stored outside the normal user export surface
+
+### AC-AUTH-12: Avatar Import And Invite Acceptance Rate Limits
+
+- Hosted Gravatar imports use the management-write limit of 30 requests per minute per signed-in user. A throttled request returns `429 rate_limited` with `Retry-After` before fetching or storing an avatar.
+- Hosted project invite acceptance shares the auth limit of 10 requests per minute per IP. A throttled request returns `429 rate_limited` with `Retry-After` before invite processing.
 
 ---
 
@@ -1568,6 +1575,14 @@ the requested list limit, and expose an incomplete-list error until a read succe
 - **And** private/reserved literal or DNS answers, unsafe ports, embedded credentials, and webhook redirects never reach a remote socket; availability redirects are revalidated and pinned before each connection
 
 ---
+
+### AC-ALT-11: Inspection After Project Consolidation
+
+The main view lists authorized direct and digest groups from its origins.
+Retained reads expose their own groups and members, including deliveries made by
+a canonical rule. Alert identifiers outside the view are hidden, and sibling
+groups and other organizations remain inaccessible. Existing response fields,
+legacy root membership and cursor behavior are preserved.
 
 ## 14. Email Acceptance
 
@@ -2634,6 +2649,25 @@ Mapped requirements: FR-PJS-01/04. Explicit roots, secret-free manifest/diff, re
 
 ### AC-WEB-09: List Pagination and Action Alignment
 
+- Returning to a visible dashboard refreshes its summary cards and incident
+  table without loading indicators or a toast on transient failure. Focus and
+  visibility events from the same return share one refresh. The incident card
+  and table use the same count and recalculate the local day. A changed cursor
+  boundary returns the incident table to the first page. User navigation takes
+  precedence over pending background updates.
+
+- Repeated dashboard reads within their freshness window share results and
+  in-flight requests. A warm tab change avoids duplicate reads, a confirmed
+  save invalidates the affected data, and responses from a replaced workspace
+  cannot update the current cache. A management 429 keeps further opted-in
+  requests off the network for the advised retry window. The trusted dashboard
+  origin can read the retry header. Cold navigation runs at most four concurrent
+  management reads per tab and rechecks backoff before sending queued reads.
+  Project rows agree with fresh summary counts,
+  and a missing uptime rollup cannot hide a confirmed failing check. Incident
+  lifecycle actions invalidate project counts, and access changes discard reads
+  obtained under the previous permissions.
+
 - Access-token navigation, setup links and both dashboard routers use `/access-tokens`; there is no legacy `/member-tokens` route or dedicated redirect.
 - Page actions sit in the PageHeader description row rather than the shell header, align right/centre on desktop, wrap on mobile and use the shared default button size.
 - Incident inventory, Improvement inventory, Project inventory and Analytics opportunities show exact filtered totals inline as `(x)`. The total remains stable across cursor navigation and updates on refresh/filter changes; missing/failed reads do not invent a count, while known empty lists show `(0)`.
@@ -3170,6 +3204,9 @@ wait remains the default, with only the audited grant described below.
 
 - **AC-REF-01:** Test normalization, malformed/reserved aliases, creator/promotion/legacy collisions and concurrent reservation. Renames/deletion cannot reassign codes. Old clients/links still work.
   Operator code blocking serialises with both legacy and versioned claim admission; existing saved promises survive the block.
+  One explicit self-service replacement wins under concurrency. A collision or
+  stale expected code preserves the preferred code; retries of the saved value
+  are idempotent. Earlier links and saved attribution retain their owner.
 - **AC-REF-02:** Lifecycle/revision/cap races preserve frozen offers, terms and balances. Preview visits consume no claim slots; promised claims cannot lose their slot later.
   Competing activations leave one current live revision; saving/discarding a draft
   preserves the live offer. One programme groups drafts/history; ended mistakes
@@ -3243,8 +3280,8 @@ wait remains the default, with only the audited grant described below.
   version, examples, keyboard dismissal and focus return without changing consent.
   General terms contain no fixed discount/commission or earning period.
 - **AC-REF-10:** Test clean and installed upgrade, missing/corrupt migration readiness, old-checksum/record preservation, mixed-version readers, safe rollback, financial retention and bounded account export.
-- **AC-REF-11:** Verify all five currencies and three methods; IBAN/tag validation, supported countries, personal ownership, CSRF, identity switching and stale edits. Prove encryption/masked reads and audit secrecy, exact atomic instruction snapshots, concurrent/idempotent preparation, cross-programme refund offsets, held earnings, missing/wrong keys, old-writer rejection and preserved legacy payments. The creator can earn before setup; below-US$50 balances carry forward and manual exceptions remain possible. API, CLI and ordinary MCP share policy and finance authority; restricted tools gain no access.
-  Creator sections use Programme, Earnings, Referred clients and Payments tabs;
+- **AC-REF-11:** Verify all five currencies and three methods; IBAN/tag validation, supported countries, personal ownership, CSRF, identity switching and stale edits. Prove encryption/masked reads and audit secrecy, exact atomic instruction snapshots, concurrent/idempotent preparation, cross-programme refund offsets, held earnings, missing/wrong keys, old-writer rejection and preserved legacy payments. The creator can earn before setup; balances below $50 USD carry forward and manual exceptions remain possible. API, CLI and ordinary MCP share policy and finance authority; restricted tools gain no access.
+  Creator sections include Programme, Analytics, Earnings, Referred clients, Payments and Creator resources;
   payment preferences and history share Payments. Verify keyboard selection,
   inactive-panel hiding, draft preservation across tabs, refresh after enrolment,
   neutral unavailable states and compatibility with legacy creator accounts.
@@ -3252,3 +3289,27 @@ wait remains the default, with only the audited grant described below.
   preferences. Verify saved-on-load and successful-save ordering, failed-save
   stability, incomplete programmes and retained drafts/history after reordering.
 - **AC-REF-12:** Verify idempotent and concurrent programme joins, accepted revisions, one celebration per permanent programme across revisions, and one event per new paying customer despite duplicate receipts and renewals. Exclude zero/trial, pre-rollout, refunded-before-confirmation, disputed and ineligible activity. Prove UTC window boundaries, writer/scheduler fencing, multi-programme grouping, quiet days, late/expired notifications, bounded retries and lost-provider/database acknowledgements. Delivery rechecks the original verified creator; unlinking or verification loss suppresses it. Email templates escape names, validate all values, retain plain-text/HTML parity and distinguish pending earnings from available payouts. Installed migrations, schema readiness, existing email/payment flows and private account exports remain covered.
+- **AC-REF-13:** Show sharing, active status and management on the joined card.
+  Match the public affiliate card's accent on the signed-in cards' icon and
+  earnings highlight, and on the Link visits chart series and legend.
+  Use the shared success badge for active programmes. Copy a single `/r/<code>`
+  link and verify the local public preview carries the code to the homepage.
+  A paused programme or blocked current code prevents both the initial branded
+  reservation and a replacement. Retrying a confirmed reservation against the
+  enabled service returns the preferred code without consuming another change.
+  Verify keyboard access, draft preservation and identity changes. Validate
+  the kit download and public sample assets, consistent dollar labels, and the
+  private no-store analytics route. Verify allowed ranges, UTC day boundaries,
+  cross-creator isolation, signed ledger deltas, empty and failed reads, and
+  API/CLI/MCP parity. Load analytics only while its tab is visible.
+  Verify that a redirect alone records nothing, only the public Origin can
+  capture and confirm, bots and prefetches record nothing, and concurrent or
+  retried confirmations record one visit. Verify receipt expiry, creator
+  isolation, retention cleanup, pre-tracking gaps and chart/table parity.
+  Simultaneous tabs for the same link share one receipt, and opening the link
+  again never extends expiry. Device clock changes cannot shorten the server's
+  24-hour window. Project consolidation preserves recorded visits.
+  When browser coordination or storage is blocked,
+  the landing can still apply the offer without recording a visit.
+  A failed telemetry request cannot block offer selection or signup. On an
+  installed database, readiness requires the additive visit migration.

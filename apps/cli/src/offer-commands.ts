@@ -88,6 +88,8 @@ export async function handleOfferCommand(
   expectNoUnknownOptions(parsed, [
     "input",
     "code",
+    "expected-code",
+    "days",
     "version",
     "accept-terms-version",
     "organization",
@@ -123,6 +125,8 @@ export async function handleOfferCommand(
   }
   const fields = {
     code: "code",
+    "expected-code": "expected_code",
+    days: "days",
     version: "version_id",
     "accept-terms-version": "terms_version",
     organization: action === "operator_claims" ? "organization_id" : "expected_organization_id",

@@ -1,34 +1,37 @@
 import { FolderIcon, PlusIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card.js";
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../ui/empty.js";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle
+} from "../ui/empty.js";
 import { Skeleton } from "../ui/skeleton.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table.js";
 import { CreateProjectDialog } from "./create-project-dialog.js";
 import { ProjectNameWithAccessIndicator } from "./project-name-with-access-indicator.js";
-import { listProjects, type ProjectRecord } from "../../lib/api.js";
+import type { ProjectRecord } from "../../lib/api.js";
 import { getActiveIncidentCount } from "../../lib/project-metrics.js";
 import { useDelayedVisibility } from "../../lib/use-delayed-visibility.js";
 
-export function RecentProjectsTable(): JSX.Element {
+export function RecentProjectsTable({
+  projects
+}: {
+  projects: ProjectRecord[] | null;
+}): JSX.Element {
   const navigate = useNavigate();
-  const [projects, setProjects] = useState<ProjectRecord[] | null>(null);
-  const showProjectsLoading = useDelayedVisibility(projects === null);
-
-  useEffect(() => {
-    void (async () => {
-      try {
-        const data = await listProjects();
-        setProjects([...data].sort((left, right) => left.name.localeCompare(right.name)));
-      } catch {
-        setProjects([]);
-      }
-    })();
-  }, []);
+  const sortedProjects = useMemo(
+    () => projects && [...projects].sort((left, right) => left.name.localeCompare(right.name)),
+    [projects]
+  );
+  const showProjectsLoading = useDelayedVisibility(sortedProjects === null);
 
   return (
     <div>
@@ -37,7 +40,7 @@ export function RecentProjectsTable(): JSX.Element {
           <CardTitle>Projects</CardTitle>
         </CardHeader>
         <CardContent>
-          {projects === null ? (
+          {sortedProjects === null ? (
             showProjectsLoading ? (
               <div className="flex flex-col gap-3">
                 <Skeleton className="h-10 w-full" />
@@ -45,7 +48,7 @@ export function RecentProjectsTable(): JSX.Element {
                 <Skeleton className="h-10 w-full" />
               </div>
             ) : null
-          ) : projects.length === 0 ? (
+          ) : sortedProjects.length === 0 ? (
             <Empty>
               <EmptyHeader>
                 <EmptyMedia variant="icon">
@@ -80,7 +83,7 @@ export function RecentProjectsTable(): JSX.Element {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {projects.map((project) => (
+                {sortedProjects.map((project) => (
                   <TableRow
                     key={project.project_id}
                     className="cursor-pointer"
@@ -95,9 +98,15 @@ export function RecentProjectsTable(): JSX.Element {
                     <TableCell>
                       <Badge variant="outline">{project.environment_default}</Badge>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{getActiveIncidentCount(project.metrics).toLocaleString()}</TableCell>
-                    <TableCell className="text-muted-foreground">{project.metrics.attention_incidents_today.toLocaleString()}</TableCell>
-                    <TableCell className="text-muted-foreground">{project.metrics.opened_incidents_month.toLocaleString()}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {getActiveIncidentCount(project.metrics).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {project.metrics.attention_incidents_today.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {project.metrics.opened_incidents_month.toLocaleString()}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

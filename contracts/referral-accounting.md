@@ -127,7 +127,7 @@ permanent programme ID survives revisions. Product-wide policy permits IBAN,
 Wisetag or Revtag, a bounded supported-country list, and USD (default), EUR, GBP,
 CAD and AUD. IBAN format/checksum and tag shape are validated, not account
 ownership or payment-route availability. Routine monthly payout review starts
-at US$50 available; smaller balances carry forward and may be settled manually.
+at $50 USD available; smaller balances carry forward and may be settled manually.
 
 The additive `202611160002_add_referral_payout_preferences` migration adds
 encrypted current preferences and immutable batch instruction snapshots.

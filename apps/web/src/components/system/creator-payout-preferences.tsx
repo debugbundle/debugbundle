@@ -141,7 +141,7 @@ export function CreatorPayoutPreferences({
           />
         ) : null}
         <p className="text-sm text-muted-foreground">
-          Payouts are normally reviewed monthly once your available balance reaches US$50. Smaller
+          Payouts are normally reviewed monthly once your available balance reaches $50 USD. Smaller
           balances carry forward. Contact us to arrange final settlement or another payment
           arrangement.
         </p>

@@ -4,16 +4,17 @@ import { offerAuditDetails } from "../offer-audit.js";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { z } from "zod";
 import {
-  CreatorCodeSchema,
   ProgrammeError,
   PublicOfferCodeSchema,
   publicOfferDefinition
 } from "../../../../packages/referrals/src/programme-policy.js";
+import { OFFER_OPERATIONS } from "../../../../packages/referral-client/src/offer-api.js";
 import type { ApiDependencies } from "../api-types.js";
 import { enforceRequestRateLimit, requireRateLimitedMemberAuth } from "../api-helpers.js";
 import { requireOwnerBillingPrincipal } from "./billing-principal.js";
 import { recordAuditLog } from "../audit-logging.js";
 import { registerOfferOperatorRoutes } from "./offer-operator.js";
+import { isAutomatedReferralVisit, registerReferralVisitRoutes } from "./referral-visits.js";
 import { OfferQuoteRequestSchema } from "../../../../packages/referrals/src/offer-quote-contracts.js";
 import { canCheckoutToBillingPlan } from "../../../../packages/billing/src/billing-offer-admission.js";
 
@@ -80,6 +81,7 @@ export function registerOfferRoutes(app: FastifyInstance, dependencies: ApiDepen
       metadata: offerAuditDetails(request).metadata
     });
   registerOfferOperatorRoutes(app, dependencies, { audit, guard: offerRouteGuard });
+  registerReferralVisitRoutes(app, dependencies, offerRouteGuard);
   app.get(
     "/v2/offers/capabilities",
     offerRouteGuard(async (_request, reply) =>
@@ -149,7 +151,11 @@ export function registerOfferRoutes(app: FastifyInstance, dependencies: ApiDepen
       const { code } = z.object({ code: PublicOfferCodeSchema }).parse(request.params);
       const cookie = service ? await service.visit(code, request.headers.cookie) : null;
       if (cookie) reply.header("Set-Cookie", [...service!.clearCookies(), cookie]);
-      return reply.redirect(service?.publicLandingUrl ?? "https://debugbundle.com/");
+      if (!service?.referralVisits || request.method !== "GET" || isAutomatedReferralVisit(request))
+        return reply.redirect(service?.publicLandingUrl ?? "https://debugbundle.com/");
+      const destination = new URL(service.publicLandingUrl);
+      destination.searchParams.set("referral_visit", code);
+      return reply.redirect(destination.toString());
     })
   );
   for (const method of ["POST", "DELETE"] as const)
@@ -241,6 +247,26 @@ export function registerOfferRoutes(app: FastifyInstance, dependencies: ApiDepen
         }
       })
     });
+  app.get(
+    "/v2/offers/creator/code",
+    offerRouteGuard(async (request, reply) => {
+      const member = await requireRateLimitedMemberAuth(
+        request,
+        reply,
+        dependencies,
+        "management-read"
+      );
+      if (!member) return;
+      if (member.token_policy !== undefined) return reply.status(403).send({ error: "forbidden" });
+      OFFER_OPERATIONS.creator_code_status.input.parse(request.query);
+      const service = dependencies.offers;
+      return reply.send({
+        can_replace:
+          service?.enabled === true &&
+          (await service.store.creators.canReplaceCode(member.member_id))
+      });
+    })
+  );
   app.post(
     "/v2/offers/creator/code",
     offerRouteGuard(async (request, reply) => {
@@ -254,14 +280,18 @@ export function registerOfferRoutes(app: FastifyInstance, dependencies: ApiDepen
       if (member.token_policy !== undefined) return reply.status(403).send({ error: "forbidden" });
       const service = dependencies.offers;
       if (!service?.enabled) throw new ProgrammeError("programme_unavailable");
-      const { code } = z.object({ code: CreatorCodeSchema }).strict().parse(request.body);
+      const body = OFFER_OPERATIONS.code.input.parse(request.body);
       const actor = {
         organization_id: member.organization_id,
         user_id: member.member_id,
-        action: "offer.creator.code"
+        action:
+          body.expected_code === undefined ? "offer.creator.code" : "offer.creator.code.replace"
       };
       try {
-        const creator = await service.store.creators.claimCode({ user_id: member.member_id, code });
+        const creator = await service.store.creators.claimCode({
+          ...body,
+          user_id: member.member_id
+        });
         await audit(request, actor, true);
         return reply.send({ creator, share_url: service.shareLink(creator.code) });
       } catch (error) {

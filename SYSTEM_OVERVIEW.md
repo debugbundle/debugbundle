@@ -62,6 +62,14 @@ without requiring a fresh remaining lifetime. The original expiry remains enforc
 at authorization; expired access cannot create a grant or block unrelated API/MCP
 startup. This runtime correction is released independently as core 1.28.1.
 
+The joined referral programme card provides a single preferred code and link,
+plus one guarded self-service code replacement. Earlier aliases retain their
+owner. Creator resources provide a downloadable kit. Personal referral analytics
+derive daily totals from anonymous confirmed short-link visits, attribution
+and verified accounting records. Browser tabs share a signed receipt per link
+that expires after 24 hours.
+The analytics chart leaves gaps before visit tracking began.
+
 Creator payout preferences are released for FR/AC-REF-11. Verified creators
 save per-programme IBAN/Wise/Revolut setup in five currencies. Dedicated encrypted
 storage and immutable manual-payment instructions require forward migration
@@ -69,7 +77,7 @@ storage and immutable manual-payment instructions require forward migration
 `REFERRAL_PAYOUT_ENCRYPTION_KEY`. Personal reads are masked; only the separate
 billing payout allowlist can reveal frozen instructions. Programme preparation
 preserves partner-wide negative offsets, holds and idempotent legacy finance.
-Routine review wording is US$50. The dedicated hosted key matches its protected
+Routine review wording is $50 USD. The dedicated hosted key matches its protected
 recovery copy and is cleared from workers; transfers remain manually controlled.
 Current encrypted preferences remain retained after account unlinking; destructive
 cleanup is pending explicit approval. See `spec/referral-payout-preferences-plan.md`.
@@ -86,8 +94,8 @@ windows show the rate instead of quoting full-year earnings. This replaces the
 unpublished `/referrals/` marketing route; account settings and API names stay Referrals.
 Both frontends use the canonical programme example projection. General terms and
 guides describe configurable rates and scope; each programme shows its exact values.
-Creator Referrals uses the existing internal tab pattern: Programme (code and
-agreement), Earnings, Referred clients and Payments (setup and history). Hidden
+Creator Referrals groups the joined card and agreement under Programme, alongside
+Analytics, Earnings, Referred clients, Payments (setup and history) and Creator resources. Hidden
 panels preserve drafts and pagination; changing the signed-in person clears them.
 Saved payout preferences follow payment history; incomplete setup remains first.
 Creator programme email updates are released for FR/AC-REF-12: one
@@ -202,6 +210,16 @@ Analytics inventories. Weekly reviews pages its complete authorised metadata
 history locally after a bounded read; settings/generation remain explicit. The
 original workspace Improvements selection hint is restored. No migration or
 release is part of this change; API rollout must precede assets.
+
+Returning to a visible Dashboard refreshes the summary cards and today's
+incident table in the background. The card and table share one local-day count
+and preserve loaded values on transient errors.
+
+Dashboard management reads share an in-memory cache within the signed-in
+workspace. Configuration and historical health data can be reused across tabs.
+Returning to the visible Dashboard refreshes current project counts and check
+status, while the rollup cache keeps that refresh bounded. Saves invalidate the
+affected reads and rate-limited requests respect the server retry time.
 
 Dashboard health navigation: a red `!` badge at the right of Health Status reflects
 any accessible enabled, unpaused check's recorded current failure. A protected-shell
@@ -851,6 +869,10 @@ Signed-in Settings
 
 The resource origin is permanent; OAuth issuer is exactly `https://api.debugbundle.com`, with frozen JWKS path `/oauth/jwks.json`. `get_incident_context` requires incident and artifact scopes and excludes raw logs. Health URLs are sanitized before projection. The same Lightsail API image/process is protected by a Redis-coordinated, database-aware MCP bulkhead, atomic dual-host Caddy promotion, and an independently operable MCP-only no-deploy Caddy gate. The runtime, forward migration, projection, owner-approved existing-app consent/reviewer/revocation UI, opt-in development-only synthetic UI preview, package, private-cloud deployment source, and automated local evidence are implemented. Production migration, managed Caddy, DNS/TLS, OAuth/reviewer configuration, and MCP activation are deployed for owner-approved Developer Mode validation; the observed empty binary ChatGPT discovery probe has a bounded compatibility parser and live `401` challenge evidence. The owner reconnect, Developer Mode connection mapping, three bounded ChatGPT cases, a fresh-thread Codex aggregate-analytics case, and an owner-client endpoint-health case are captured. The health case proved the primary sanitized read-only sequence and then exposed an order-sensitive strict-input comparison on second-page requests. The owner confirmed the exact server cursor and unchanged query fields; a red public-handler regression reproduced the defect, and source now validates JSON objects independent of member order. Hosted run `33868241338` deployed that correction on the shared Lightsail API/worker service with all 48 migrations already applied; external API/MCP/OAuth boundary checks pass, and none of the currently installed baseline DebugBundle alarms is active. The owner then completed the exact authenticated two-page continuation: both calls returned two HTTP `200` results, advanced the opaque cursor from offset two to four, and were independently corroborated by successful metadata-only production telemetry. A project-scoped open-improvement request also returned the exact empty result without broadening scope, inspecting artifacts, or mutating state. Subsequent negative mutation, secret-exfiltration, individual-analytics-journey, and generic-infrastructure requests were refused without any MCP call or claimed state change. The secret case exposed only public contract identifiers and the sanitized health display URL, not credentials, storage internals, database-only IDs, signed URLs, or raw URLs. The analytics case refused identity/private-journey access and funnel mutation while explaining the aggregate-only surface, and the infrastructure case refused unsupported Kubernetes telemetry rather than fabricating it; bounded production telemetry independently recorded no request in all four negative-test windows. The controlled immutable-image rollback and roll-forward rehearsal passes on the shared runtime. Engineering privacy/security reconciliation, reconciled policy deployment, automated keyboard interaction checks, and the owner-approved deployed keyboard/screen-reader spot check pass; remaining owner legal attestations stay separate gates. The five uninstalled OpenAI CloudWatch filters/alarms are superseded by the owner-approved hybrid monitoring boundary and are not a launch gate. The rotated reviewer credential and outside-network fixed-tenant isolation smoke pass. The remaining retained synthetic reviewer corpus, representative load evidence, portal review, publication, and directory evidence remain separate gates.
 
+The reviewer monitor schedules reminders at 14, 7 and 1 days and at expiry.
+The deadline determines the incident fingerprint and each milestone has a
+deduplicated event ID. Expiry is critical and follows the existing alert policy.
+
 The 2026-09-07 monitoring decision supersedes the uninstalled five-alarm plan described above. Alert-worthy MCP request failures/timeouts/admission rejections, OAuth failures, and reviewer expiry now flow through fail-safe metadata-only handled DebugBundle incidents; normal MCP discovery and rejected bearer tokens remain logs. Independent `https://mcp.debugbundle.com/ready` monitoring runs in the existing free UptimeRobot account, while the installed AWS baseline remains unchanged and its installer is prevented from creating the superseded OpenAI custom metrics. Monitor `803934645` reports `Up` on the free five-minute interval. Hosted run `34157207153` deployed the incident adapter on the same Lightsail API process at immutable API/worker digest `sha256:e4ef737bfe1b892a6cf713abe823f69d9100db43b886e0bf35ff35b5610b38b9`; one credential-free invalid-token request created exactly one sanitized handled incident and retained no request body, credentials, identity, headers, correlation, or customer content. The intentional incident was resolved after verification.
 
 On 2026-09-08 the owner supplied and approved Owen Far as the Malta-based operator/controller, the concise controller/processor and international-transfer policy boundary, and every country supported by the OpenAI portal as intended availability. This supersedes the earlier pending-owner-legal wording above. The corresponding updated privacy/terms source still requires a separate site release and rendered verification; OpenAI publisher-identity verification remains a manual portal gate.
@@ -1233,7 +1255,7 @@ Automatic SDK error/log hooks respect caller suppression: PHP's current non-fata
 5. **Interface parity** — API = CLI = MCP capabilities
 6. **Tokens hashed at rest** — plaintext shown once, stored as SHA-256
 7. **Webhook signing** — lifecycle webhooks use HMAC-SHA256; all custom direct alert webhooks use per-rule HMAC-SHA256. Legacy JSON remains version 0; explicit creation opt-in or key rotation reveals the key once and selects version 1 group references.
-8. **Auth split by client type** — SPA uses cookie sessions, ordinary CLI/stdio MCP/OpenClaw use member tokens, SDKs use project tokens, restricted agent CLI/MCP uses expiring single-project `dbundle_agent_` credentials for five existing minimized read operations, and the official OpenAI-hosted MCP resource uses audience-bound OAuth access tokens; none are interchangeable. Member-authorized routes may accept either browser sessions or member tokens, but project-scoped actions must converge on the same explicit per-project access checks. Project invite acceptance is browser-session-authenticated against the signed-in user's email and creates `project_members` access without adding the invitee to the owner's billing/account container. GitHub auth now has two additive tracks: browser redirect auth through `GET /v1/auth/github/start` and `GET /v1/auth/github/callback`, plus CLI bootstrap through `POST /v1/auth/github/device/start|poll|claim` and `POST /v1/auth/github/token/exchange`, both of which ultimately issue the same member-token auth state used by CLI and stdio MCP. Google sign-in remains deferred (see `/spec/auth-architecture.md`)
+8. **Auth split by client type** — SPA uses cookie sessions, ordinary CLI/stdio MCP/OpenClaw use member tokens, SDKs use project tokens, restricted agent CLI/MCP uses expiring single-project `dbundle_agent_` credentials for five existing minimized read operations, and the official OpenAI-hosted MCP resource uses audience-bound OAuth access tokens; none are interchangeable. Member-authorized routes may accept either browser sessions or member tokens, but project-scoped actions must converge on the same explicit per-project access checks. Project invite acceptance is browser-session-authenticated against the signed-in user's email and creates `project_members` access without adding the invitee to the owner's billing/account container. Hosted invite acceptance shares the per-IP auth limit, and hosted Gravatar imports use the per-user management-write limit. GitHub auth now has two additive tracks: browser redirect auth through `GET /v1/auth/github/start` and `GET /v1/auth/github/callback`, plus CLI bootstrap through `POST /v1/auth/github/device/start|poll|claim` and `POST /v1/auth/github/token/exchange`, both of which ultimately issue the same member-token auth state used by CLI and stdio MCP. Google sign-in remains deferred (see `/spec/auth-architecture.md`)
 9. **Event class billing integrity** — Free counts only `incident_signal`, paid counts `incident_signal` + `context_signal`, `operational_signal` excluded all tiers; `event_class` immutable after normalization (INV-15)
 10. **Capture policy and capture-rule server-side enforcement** — ingestion API rejects events violating project capture policy with `capture_policy_rejected`, and applies project capture rules before persistence so matching events can be dropped, sampled out, or demoted deterministically (INV-16)
 11. **Relay wire format alignment** — browser relay output uses the same file format as server SDK file transport; `debugbundle process` consumes relay-written files without special-casing (INV-17)

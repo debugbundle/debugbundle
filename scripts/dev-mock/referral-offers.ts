@@ -72,6 +72,7 @@ export function createReferralOfferMocks(isSignedIn: () => boolean) {
     ]
   ]);
   let creator: CreatorProgramme | null = null;
+  const creatorAliases = new Set<string>();
   const accepted = new Map<string, ProgrammeVersion>();
   const payoutPreferences = createPayoutPreferenceMocks(() => [...accepted.values()]);
   let pending: string | null = null;
@@ -89,9 +90,11 @@ export function createReferralOfferMocks(isSignedIn: () => boolean) {
         }
       : null;
   };
+  const creatorAcceptsReferrals = () =>
+    creator !== null && context(creator.code)?.available === true;
   const creatorResult = () => ({
-    creator,
-    share_url: creator ? `http://localhost:5292/affiliates/?offer=${creator.code}` : null
+    creator: creator && { ...creator, accepting_new_referrals: creatorAcceptsReferrals() },
+    share_url: creator ? `http://localhost:5292/r/${creator.code}` : null
   });
   const selectedContext = (
     code: string | null,
@@ -224,6 +227,44 @@ export function createReferralOfferMocks(isSignedIn: () => boolean) {
           }
           case "creator":
             return respond(creatorResult());
+          case "creator_code_status":
+            return respond({
+              can_replace: creatorAcceptsReferrals() && creatorAliases.size === 1
+            });
+          case "creator_analytics": {
+            if (!creator) return error("creator_membership_required", 404);
+            const asOf = now();
+            const day = new Date(asOf);
+            const totals = {
+              visits: 0,
+              referred_accounts: 0,
+              first_paid_referrals: 0,
+              net_commission_minor: 0
+            };
+            const daily = Array.from({ length: Number(input["days"]) }, (_, index) => {
+              const date = new Date(day);
+              date.setUTCDate(day.getUTCDate() - Number(input["days"]) + index + 1);
+              const visits = (Math.floor(date.getTime() / 86_400_000) * 7) % 13;
+              return {
+                date: date.toISOString().slice(0, 10),
+                visits,
+                referred_accounts: 0,
+                first_paid_referrals: 0,
+                net_commission_minor: 0
+              };
+            });
+            totals.visits = daily.reduce((sum, item) => sum + item.visits, 0);
+            const trackingStart = new Date(day);
+            trackingStart.setUTCHours(0, 0, 0, 0);
+            trackingStart.setUTCDate(trackingStart.getUTCDate() - 89);
+            return respond({
+              as_of: asOf,
+              visit_tracking_started_at: trackingStart.toISOString(),
+              currency: "usd",
+              totals,
+              daily
+            });
+          }
           case "join": {
             const version = find(input["version_id"]);
             if (
@@ -248,19 +289,30 @@ export function createReferralOfferMocks(isSignedIn: () => boolean) {
               accepted_at: now()
             };
             accepted.set(version.programme_id, structuredClone(version));
-            codes.set(creator.code, {
-              code_id: randomUUID(),
-              version_id: version.version_id,
-              blocked: false,
-              created_at: now()
-            });
+            for (const alias of [creator.legacy_code, ...creatorAliases]) {
+              const record = codes.get(alias);
+              if (record) record.version_id = version.version_id;
+              else
+                codes.set(alias, {
+                  code_id: randomUUID(),
+                  version_id: version.version_id,
+                  blocked: false,
+                  created_at: now()
+                });
+            }
             return respond(creatorResult());
           }
           case "code": {
             if (!creator) return error("programme_unavailable");
             const code = String(input["code"]);
+            const expected = input["expected_code"];
+            if (creator.code === code) return respond(creatorResult());
+            if (expected !== undefined && expected !== creator.code)
+              return error("creator_code_changed");
+            if (creatorAliases.size > 0 && (expected === undefined || creatorAliases.size > 1))
+              return error("creator_code_already_claimed");
+            if (!creatorAcceptsReferrals()) return error("programme_unavailable", 503);
             if (codes.has(code)) return error("creator_code_unavailable");
-            if (creator.code !== creator.legacy_code) return error("creator_code_already_claimed");
             codes.set(code, {
               code_id: randomUUID(),
               version_id: creator.version.version_id,
@@ -268,6 +320,7 @@ export function createReferralOfferMocks(isSignedIn: () => boolean) {
               created_at: now()
             });
             creator = { ...creator, code };
+            creatorAliases.add(code);
             return respond(creatorResult());
           }
           case "customer":
@@ -398,7 +451,7 @@ export function createReferralOfferMocks(isSignedIn: () => boolean) {
                   kind:
                     find(record.version_id)?.policy.kind === "promotion" ? "promotion" : "creator",
                   partner_id: null,
-                  preferred: true
+                  preferred: creatorAliases.has(code) ? creator?.code === code : true
                 }))
                 .slice(0, Number(input["limit"]))
             });

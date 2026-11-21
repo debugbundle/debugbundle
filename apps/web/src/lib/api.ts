@@ -1,6 +1,9 @@
 import {
   API_BASE,
   buildBrowserSessionHeaders,
+  clearDashboardReads,
+  invalidateDashboardReads,
+  readDashboardJson,
   readJson,
   resetBrowserSessionClientState
 } from "./api-client.js";
@@ -172,10 +175,9 @@ export async function sendSystemEmailPreview(
 }
 
 export async function listMemberTokens(includeScope = false): Promise<MemberTokenRecord[]> {
-  const body = await readJson<{ tokens: MemberTokenRecord[] }>(
-    await fetch(`${API_BASE}/v1/member/tokens${includeScope ? "?include_scope=true" : ""}`, {
-      credentials: "include"
-    })
+  const body = await readDashboardJson<{ tokens: MemberTokenRecord[] }>(
+    `/v1/member/tokens${includeScope ? "?include_scope=true" : ""}`,
+    "configuration"
   );
 
   return body.tokens;
@@ -209,18 +211,18 @@ export async function getAdminAnalyticsAccessStatus(): Promise<AdminAnalyticsAcc
   );
 }
 
-export async function listProjects(projectId?: string): Promise<ProjectRecord[]> {
-  const body = await readJson<{
+export async function listProjects(
+  projectId?: string,
+  options: { refresh?: boolean } = {}
+): Promise<ProjectRecord[]> {
+  const body = await readDashboardJson<{
     projects: Array<
       Omit<ProjectRecord, "metrics"> & { metrics?: Partial<ProjectRecord["metrics"]> }
     >;
   }>(
-    await fetch(
-      `${API_BASE}/v1/projects${projectId === undefined ? "" : `?${new URLSearchParams({ project_id: projectId })}`}`,
-      {
-        credentials: "include"
-      }
-    )
+    `/v1/projects${projectId === undefined ? "" : `?${new URLSearchParams({ project_id: projectId })}`}`,
+    "live",
+    options
   );
 
   return body.projects.map(normalizeProjectRecord);
@@ -266,6 +268,7 @@ export async function createProject(payload: {
     })
   );
 
+  invalidateDashboardReads("/v1/projects");
   const project = normalizeProjectRecord(body.project);
   void observeWebActivationStep("project_created");
   return project;
@@ -291,6 +294,7 @@ export async function updateProject(
     })
   );
 
+  invalidateDashboardReads("/v1/projects");
   return normalizeProjectRecord(body.project);
 }
 
@@ -303,16 +307,16 @@ export async function deleteProject(projectId: string): Promise<DeletedProjectRe
     })
   );
 
+  clearDashboardReads();
   return body.project;
 }
 
 export async function getProjectCapturePolicy(
   projectId: string
 ): Promise<ProjectCapturePolicyResponse> {
-  return readJson<ProjectCapturePolicyResponse>(
-    await fetch(`${API_BASE}/v1/projects/${projectId}/capture-policy`, {
-      credentials: "include"
-    })
+  return readDashboardJson<ProjectCapturePolicyResponse>(
+    `/v1/projects/${projectId}/capture-policy`,
+    "configuration"
   );
 }
 
@@ -320,7 +324,7 @@ export async function updateProjectCapturePolicy(
   projectId: string,
   payload: ProjectCapturePolicyUpdate
 ): Promise<ProjectCapturePolicyResponse> {
-  return readJson<ProjectCapturePolicyResponse>(
+  const updated = await readJson<ProjectCapturePolicyResponse>(
     await fetch(`${API_BASE}/v1/projects/${projectId}/capture-policy`, {
       method: "PATCH",
       credentials: "include",
@@ -328,15 +332,16 @@ export async function updateProjectCapturePolicy(
       body: JSON.stringify(payload)
     })
   );
+  invalidateDashboardReads(`/v1/projects/${projectId}/capture-policy`);
+  return updated;
 }
 
 export async function getProjectImprovementSettings(
   projectId: string
 ): Promise<ProjectImprovementSettingsResponse> {
-  return readJson<ProjectImprovementSettingsResponse>(
-    await fetch(`${API_BASE}/v1/projects/${projectId}/improvement-settings`, {
-      credentials: "include"
-    })
+  return readDashboardJson<ProjectImprovementSettingsResponse>(
+    `/v1/projects/${projectId}/improvement-settings`,
+    "configuration"
   );
 }
 
@@ -344,7 +349,7 @@ export async function updateProjectImprovementSettings(
   projectId: string,
   payload: ProjectImprovementSettingsUpdate
 ): Promise<ProjectImprovementSettingsResponse> {
-  return readJson<ProjectImprovementSettingsResponse>(
+  const updated = await readJson<ProjectImprovementSettingsResponse>(
     await fetch(`${API_BASE}/v1/projects/${projectId}/improvement-settings`, {
       method: "PATCH",
       credentials: "include",
@@ -352,6 +357,8 @@ export async function updateProjectImprovementSettings(
       body: JSON.stringify(payload)
     })
   );
+  invalidateDashboardReads(`/v1/projects/${projectId}/improvement-settings`);
+  return updated;
 }
 
 export async function listProjectTokens(projectId: string): Promise<ProjectTokenRecord[]> {
@@ -373,10 +380,9 @@ export async function listProjectWeeklyReportChannels(
     limit: String(limit)
   });
 
-  const body = await readJson<{ channels: WeeklyReportChannelRecord[] }>(
-    await fetch(`${API_BASE}/v1/weekly-report-channels?${searchParams.toString()}`, {
-      credentials: "include"
-    })
+  const body = await readDashboardJson<{ channels: WeeklyReportChannelRecord[] }>(
+    `/v1/weekly-report-channels?${searchParams.toString()}`,
+    "configuration"
   );
 
   return body.channels;
@@ -404,6 +410,7 @@ export async function createProjectWeeklyReportChannel(payload: {
     })
   );
 
+  invalidateDashboardReads("/v1/weekly-report-channels");
   return body.channel;
 }
 
@@ -424,6 +431,7 @@ export async function updateProjectWeeklyReportChannel(
     })
   );
 
+  invalidateDashboardReads("/v1/weekly-report-channels");
   return body.channel;
 }
 
@@ -437,6 +445,7 @@ export async function deleteProjectWeeklyReportChannel(channelId: string): Promi
   if (!response.ok) {
     await readJson(response);
   }
+  invalidateDashboardReads("/v1/weekly-report-channels");
 }
 
 export async function createProjectToken(
@@ -468,10 +477,9 @@ export async function revokeProjectToken(projectId: string, tokenId: string): Pr
 export async function listProjectProbeActivations(
   projectId: string
 ): Promise<ProbeActivationRecord[]> {
-  const body = await readJson<{ activations: ProbeActivationRecord[] }>(
-    await fetch(`${API_BASE}/v1/projects/${projectId}/probes`, {
-      credentials: "include"
-    })
+  const body = await readDashboardJson<{ activations: ProbeActivationRecord[] }>(
+    `/v1/projects/${projectId}/probes`,
+    "live"
   );
 
   return body.activations;
@@ -487,7 +495,7 @@ export async function createProjectProbeActivation(
     trigger_ttl_seconds: number;
   }
 ): Promise<CreatedProbeActivation> {
-  return readJson<CreatedProbeActivation>(
+  const updated = await readJson<CreatedProbeActivation>(
     await fetch(`${API_BASE}/v1/projects/${projectId}/probes/activate`, {
       method: "POST",
       credentials: "include",
@@ -495,22 +503,22 @@ export async function createProjectProbeActivation(
       body: JSON.stringify(payload)
     })
   );
+  invalidateDashboardReads(`/v1/projects/${projectId}/probes`);
+  return updated;
 }
 
 export async function listProjectAvailabilityChecks(
   projectId: string,
-  limit = 20
+  limit = 20,
+  options: { refresh?: boolean } = {}
 ): Promise<{ checks: AvailabilityCheckRecord[]; limits: AvailabilityCheckLimits }> {
-  const body = await readJson<{
+  const body = await readDashboardJson<{
     checks: AvailabilityCheckRecord[];
     limits: AvailabilityCheckLimits;
   }>(
-    await fetch(
-      `${API_BASE}/v1/projects/${projectId}/availability-checks?limit=${encodeURIComponent(String(limit))}`,
-      {
-        credentials: "include"
-      }
-    )
+    `/v1/projects/${projectId}/availability-checks?limit=${encodeURIComponent(String(limit))}`,
+    "live",
+    options
   );
 
   return body;
@@ -520,11 +528,10 @@ export async function getProjectAvailabilityCheck(
   projectId: string,
   checkId: string
 ): Promise<{ check: AvailabilityCheckRecord; limits: AvailabilityCheckLimits }> {
-  return await readJson<{ check: AvailabilityCheckRecord; limits: AvailabilityCheckLimits }>(
-    await fetch(`${API_BASE}/v1/projects/${projectId}/availability-checks/${checkId}`, {
-      credentials: "include"
-    })
-  );
+  return await readDashboardJson<{
+    check: AvailabilityCheckRecord;
+    limits: AvailabilityCheckLimits;
+  }>(`/v1/projects/${projectId}/availability-checks/${checkId}`, "live");
 }
 
 export async function createProjectAvailabilityCheck(
@@ -553,6 +560,7 @@ export async function createProjectAvailabilityCheck(
     })
   );
 
+  invalidateDashboardReads(`/v1/projects/${projectId}/availability-checks`);
   return body.check;
 }
 
@@ -583,6 +591,7 @@ export async function updateProjectAvailabilityCheck(
     })
   );
 
+  invalidateDashboardReads(`/v1/projects/${projectId}/availability-checks`);
   return body.check;
 }
 
@@ -597,6 +606,7 @@ export async function deleteProjectAvailabilityCheck(
       headers: buildBrowserSessionHeaders()
     })
   );
+  invalidateDashboardReads(`/v1/projects/${projectId}/availability-checks`);
 }
 
 export async function testProjectAvailabilityCheck(
@@ -639,15 +649,13 @@ export async function listProjectAvailabilityCheckResults(
 export async function listProjectAvailabilityCheckDailyRollups(
   projectId: string,
   checkId: string,
-  limit = 30
+  limit = 30,
+  options: { refresh?: boolean } = {}
 ): Promise<AvailabilityCheckDailyRollupRecord[]> {
-  const body = await readJson<{ rollups: AvailabilityCheckDailyRollupRecord[] }>(
-    await fetch(
-      `${API_BASE}/v1/projects/${projectId}/availability-checks/${checkId}/daily-rollups?limit=${encodeURIComponent(String(limit))}`,
-      {
-        credentials: "include"
-      }
-    )
+  const body = await readDashboardJson<{ rollups: AvailabilityCheckDailyRollupRecord[] }>(
+    `/v1/projects/${projectId}/availability-checks/${checkId}/daily-rollups?limit=${encodeURIComponent(String(limit))}`,
+    "history",
+    options
   );
 
   return body.rollups;
@@ -666,6 +674,7 @@ export async function deactivateProjectProbeActivation(
     })
   );
 
+  invalidateDashboardReads(`/v1/projects/${projectId}/probes`);
   return body.deactivated;
 }
 
@@ -683,6 +692,7 @@ export async function createMemberToken(payload: {
     })
   );
 
+  invalidateDashboardReads("/v1/member/tokens");
   return body.token;
 }
 
@@ -694,6 +704,7 @@ export async function revokeMemberToken(tokenId: string): Promise<void> {
       headers: buildBrowserSessionHeaders()
     })
   );
+  invalidateDashboardReads("/v1/member/tokens");
 }
 
 export {

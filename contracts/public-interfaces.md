@@ -360,6 +360,7 @@ unavailable export processing returns a fixed 503 error.
 
 - `200 { "avatar": { "source": "gravatar", "avatar_url": "/v1/account/avatar", "updated_at": "ISO8601" } }`
 - `404 { "error": "gravatar_not_found" }` when no Gravatar image exists
+- `429 { "error": "rate_limited" }` with `Retry-After` when the hosted limit of 30 import requests per minute per signed-in user is reached
 - `502 { "error": "avatar_import_failed" }` when the remote fetch fails or returns an unsupported image
 
 `POST /v1/account/delete/request-otp` requires an owner-scoped browser session plus the exact confirmation phrase:
@@ -419,6 +420,7 @@ Anonymized aggregate account-usage metrics are preserved after deletion for life
 - Missing, expired, or already-consumed invite token: `400 { "error": "invalid_token" }`
 - Signed-in user email does not match invite email: `403 { "error": "invite_email_mismatch" }`
 - Owner's current plan no longer allows project sharing, but the pending invite is preserved for later retry before expiry: `403 { "error": "shared_access_suspended" }`
+- `429 { "error": "rate_limited" }` with `Retry-After` when the shared hosted auth limit of 10 requests per minute per IP is reached
 
 ### 1.1 Ingestion
 
@@ -546,7 +548,7 @@ Analytics events use separate analytics allowances. Currently implemented analyt
 
 Completed AnalyticsBundle artifacts, generation metadata, opportunity list/detail, and aggregate analytics read responses apply the current bounded privacy policy to historical content and revalidate their response schemas. Successful projected responses identify the policy in `x-debugbundle-privacy-policy`; unavailable or unprojectable retained evidence returns a fixed failure rather than raw retained text. This read-time guard does not rewrite historical objects or account metrics.
 
-Rate-limited responses also include `Retry-After: <seconds>` so SDKs can back off without guessing.
+Rate-limited responses also include `Retry-After: <seconds>` so SDKs can back off without guessing. Credentialed CORS responses to the configured dashboard origin expose the retry header to the browser.
 
 Connected SDKs must reconcile the indexed acknowledgement as defined in `contracts/sdk-interface.md`: accepted events are removed exactly once; only events rejected for `rate_limited`, `monthly_quota_exceeded`, or `analytics_quota_exceeded` are retained for retry; other indexed rejections are terminal; and an all-rejected response does not advance delivery-success state. A malformed or inconsistent acknowledgement from the production HTTP endpoint is a retryable protocol failure for the whole submitted batch.
 
@@ -1693,6 +1695,8 @@ CLI: `debugbundle notifications get|set|pause|resume`, common flags `--audience 
 Ordinary MCP: `get_notification_preferences`, `update_notification_preferences`, `pause_notifications`, `resume_notifications`. Common input: `bearerToken`, optional `audience` and `projectId`; mutation payloads are respectively `update`, `pause`, `resume` with the same API schemas. Local-auth mode supplies the token through its existing mechanism. Hosted OpenAI and restricted-agent tool profiles do not gain these management operations. OpenClaw keeps new capabilities optional with its existing approval behavior.
 
 See `spec/notification-preferences.md` for inheritance, daily scheduling, suppression and delivery guarantees.
+Project notification writes return the standard `409` configuration conflict
+when consolidation or a concurrent settings update prevents the save.
 
 ### 1.4 Alerts
 
@@ -1725,7 +1729,11 @@ retry an access denial. Reads never widen scope. Mutation success is independent
 of a subsequent dashboard scope refresh; existing `project_scope` remains the
 separate explicit API/CLI/MCP widening option.
 
-**Alert group inspection:** Both routes require `project_id` (UUID) and accept `limit` (1–100, default 50) plus an opaque `cursor` returned as `next_cursor`. The detail path `kind` is `direct` or `email_digest`; `id` is a UUID from the list response. The list returns `{ groups, next_cursor }`; detail returns `{ group, members, next_cursor }`. Group fields are `group_id`, `kind`, `project_id`, nullable `alert_id` and `root_incident_id`, `channel`, `status`, `member_count`, `created_at`, and nullable `delivered_at`. Member fields are `incident_id`, `condition_type`, and `created_at`. The endpoints exclude recipient addresses, webhook URLs, stored payloads, raw log text, and provider errors. An unknown or cross-project group returns `404 group_not_found`; an invalid cursor returns `400 invalid_cursor`. Direct deliveries created before the membership migration show their root incident as a legacy single-member fallback. Member pages are ordered by creation time and UUID; each next cursor advances after the last returned row.
+**Alert group inspection:** Both routes require `project_id` (UUID) and accept `limit` (1–100, default 50) plus an opaque `cursor` returned as `next_cursor`. The detail path `kind` is `direct` or `email_digest`; `id` is a UUID from the list response. The list returns `{ groups, next_cursor }`; detail returns `{ group, members, next_cursor }`. Group fields are `group_id`, `kind`, `project_id`, nullable `alert_id` and `root_incident_id`, `channel`, `status`, `member_count`, `created_at`, and nullable `delivered_at`. Member fields are `incident_id`, `condition_type`, and `created_at`. The endpoints exclude recipient addresses, webhook URLs, stored payloads, raw log text, and provider errors. The main merged view includes groups from its authorized origins. A retained view
+keeps its original read scope. The response `project_id` identifies the delivery
+origin, which also bounds member IDs. A direct group's `alert_id` is null when
+its rule belongs to an origin outside the requested view. An absent or
+out-of-scope group returns `404 group_not_found`; an invalid cursor returns `400 invalid_cursor`. Direct deliveries created before the membership migration show their root incident as a legacy single-member fallback. Member pages are ordered by creation time and UUID; each next cursor advances after the last returned row.
 
 When the API base URL is configured, direct Discord notifications link to the authenticated direct-group inspection route. Custom alert-webhook payloads opted into version 1 add `alert_group_id` and, when the API base URL is configured, `alert_group_url`; these fields are included in the exact signed body. Legacy custom alert-webhook payloads retain their prior field set for strict recipients, while receiving a signature header. Group inspection reflects later accepted members even though the first provider message was already sent.
 
@@ -3892,7 +3900,16 @@ All results run existing DebugBundle redaction before the OpenAI allowlist. They
 
 Reviewer configuration must remain structurally valid at startup. Its remaining lifetime does not gate unrelated API/MCP readiness: the original deadline is preserved and reviewer authorization fails closed at and after expiry, before provider interaction or grant creation. Restarting the API neither rotates nor extends the credential.
 
-The hosted API dogfoods DebugBundle for alert-worthy MCP request failures, MCP timeouts, MCP admission rejections, OAuth failures, and reviewer-credential expiry. Request-derived incident dimensions contain only finite endpoint/method/tool/status/admission/expiry metadata. Before delivery, the adapter empties request/response placeholders, clears correlation, removes probe data and executable stack frames, and retains only Node version from runtime context. The normal event ID/time, service/environment/runtime, SDK name/version, and internal ingestion-authentication envelope remain. Incidents exclude request IDs, pseudonymous grant/client keys, OAuth credentials, interaction identifiers, tool arguments/results, exception detail, customer IDs, and customer content. Normal unauthenticated MCP discovery and rejected bearer tokens remain metadata logs rather than incidents. A monitoring adapter is fail-safe and runs outside the OAuth/MCP domain transaction, so reporting cannot change a customer-visible result.
+The hosted API dogfoods DebugBundle for alert-worthy MCP request failures, MCP timeouts, MCP admission rejections, OAuth failures, and reviewer-credential expiry. Request-derived incident dimensions contain only finite endpoint/method/tool/status/admission/expiry metadata. Before delivery, the adapter empties request/response placeholders, clears correlation, removes probe data and executable stack frames, and retains Node version from runtime context. Reviewer reminders also retain the
+configured deadline and milestone as bounded runtime metadata. One deadline has
+one incident fingerprint. Reminders occur at 14, 7, and 1 days remaining and at
+expiry. Each milestone has a stable event ID for incident-processing dedupe and
+expiry is critical. Startup reports the current milestone and schedules future
+ones. Worker cleanup logs each milestone once per running worker. New-incident
+rules notify on the first occurrence. While the incident stays open, warning
+milestones share the high-severity delivery key. Expiry can trigger a separate
+critical-severity delivery for a matching threshold rule. The
+normal event ID/time, service/environment/runtime, SDK name/version, and internal ingestion-authentication envelope remain. Incidents exclude request IDs, pseudonymous grant/client keys, OAuth credentials, interaction identifiers, tool arguments/results, exception detail, customer IDs, and customer content. Normal unauthenticated MCP discovery and rejected bearer tokens remain metadata logs rather than incidents. A monitoring adapter is fail-safe and runs outside the OAuth/MCP domain transaction, so reporting cannot change a customer-visible result.
 
 Independent reachability and TLS monitoring checks only `https://mcp.debugbundle.com/ready` from UptimeRobot at the free-tier five-minute interval and alerts the account's existing email contact. Monitor `803934645` was independently observed `Up` after creation on 2026-09-07. It never triggers shared-host recovery or bypasses the MCP-only Caddy gate. Existing AWS baseline alarms remain unchanged. The baseline AWS monitoring installer must not create the five superseded OpenAI-specific CloudWatch custom metrics or alarms.
 
@@ -4489,3 +4506,40 @@ Report content adds `/v1/organizations/{organizationId}/reports/{runId}/document
 for intentional factual `report_document.v2` (`not_requested` analysis). Default
 and `version=1` retain exact legacy v1 projection; existing strict clients and the
 fixed OpenAI report reader remain compatible. Other report routes are unchanged.
+
+### Creator programme management and analytics
+
+Verified creators can read `GET /v2/offers/creator/code` for
+`{ "can_replace": boolean }`. `POST /v2/offers/creator/code` continues to
+reserve the first branded code with `{ "code": "..." }` while the creator
+can accept new referrals, including when switching from the generated code. Add
+`expected_code` with the current preferred branded code to explicitly request
+one replacement. A stale code returns `409 creator_code_changed`. Earlier
+aliases retain their owner and accepted referrals retain their attribution.
+
+`GET /v2/referrals/analytics?days=30` accepts 7, 30 or 90 UTC calendar days
+including the current day through `as_of`. It returns aggregate totals and daily
+rows in ascending date order. Link visits count confirmed anonymous landings
+under the creator's aliases. `visit_tracking_started_at` marks the start of
+coverage. Earlier daily `visits` values are null. Referred accounts use attribution creation time,
+first paid referrals use the service start of each verified eligible commission period,
+and USD net commission uses the ledger recording time, including adjustments.
+A verified account with no creator membership receives
+`404 creator_membership_required`. Reads are private and uncached and require a
+browser session or unrestricted member credential.
+
+The public homepage uses `POST /v2/offers/visit-receipts` with a public
+`code` and optional previous `receipt` after a short link opens. A successful
+capture returns `{ visit: { receipt, expires_at } }` or `{ visit: null }`.
+The site shares one receipt per link across browser tabs for up to 24 hours and
+persists it before sending a confirmation.
+`POST /v2/offers/visits` confirms `{ receipt }` once and returns
+`{ recorded: boolean }`. Both endpoints require the configured public Origin
+and have a separate per-IP rate limit. Automation, expiry, unavailable codes
+and replays do not add counts. Visit records carry no account identity or
+payment authority and are pruned outside the 90-day UTC reporting window.
+
+The CLI uses `offers creator_code_status`, `offers code --code CODE
+--expected-code CURRENT`, and `offers creator_analytics --days 30`. Ordinary MCP
+uses `get_creator_code_status`, `claim_creator_code` with optional
+`expected_code`, and `get_creator_referral_analytics`.

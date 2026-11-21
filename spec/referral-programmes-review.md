@@ -95,12 +95,14 @@ review with a synthetic programme, use:
 make referral-public-review
 ```
 
-Open `http://localhost:5292/affiliates/`. This rebuilds the static preview with
+Open `http://localhost:5292/r/REVIEW20` to try a short share link. The homepage
+validates the code and clears the URL hint when the offer is accepted. This
+target rebuilds the static preview with
 `NEXT_PUBLIC_DEBUGBUNDLE_API_URL=http://localhost:3004` and runs the actual public
 offer routes against a dedicated tmpfs database. The clearly labelled **Local
 review referral programme** uses the approved 20% introductory discount and 50%
-commission for 12 months across Solo, Team and Business. Enter `REVIEW20` to
-review the pending-offer notice and pricing; its cookie is only a local hint.
+commission for 12 months across Solo, Team and Business. The offer cookie is
+only a local hint.
 
 This fixture supplies no real credentials, mail, account authentication, Checkout
 or provider transport. App/signup links retain their normal destinations; this
@@ -212,6 +214,15 @@ These steps are prepared for a separately authorised release; they have not run:
   API/worker pair before enabling new claims. `referral-offers-v1` is the reader
   floor; flag-off never authorises old binaries after versioned promises exist.
   Retain schema and reconciliation when pausing. Do not reverse-migrate.
+- Install `202611210001_add_referral_link_visits` through the existing ordered
+  `db:migrate` step before starting the API and worker. Readiness requires the
+  ledger entry, receipt primary key, creator-code foreign key and visit indexes.
+  Publish the public site before the API starts adding the visit marker to
+  homepage redirects. Visit collection starts at rollout, and anonymous
+  visit records expire after 90 UTC days.
+  Project consolidation preserves these receipts with their creator codes.
+  A previous API whose merge inventory predates the table will decline merges
+  after migration. Use an API with the updated inventory to resume them.
 - Configure the exact programme, cap or unlimited acknowledgement and accepted
   terms through the gated operator flow. Activation is explicit. Review the
   launch economics after 90 days; normally review payouts monthly from US$50

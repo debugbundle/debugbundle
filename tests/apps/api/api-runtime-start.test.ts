@@ -165,12 +165,13 @@ describe("api runtime start", () => {
       API_PORT: "3010"
     });
 
-    // The current runtime validates additive access, financial and report
+    // The current runtime validates additive access, financial and reporting
     // structures as well as the installed table/ledger and project-scope guards.
-    expect(queryMock).toHaveBeenCalledTimes(28);
+    expect(queryMock).toHaveBeenCalledTimes(29);
     for (const guard of [
       "referral_creator_email_deliveries",
       "referral_creator_email_state",
+      "referral_link_visits_code_date_idx",
       "report_identity_snapshots",
       "report_runs_factual_no_ai",
       "project_analytics_review_privacy_guard",
@@ -220,6 +221,21 @@ describe("api runtime start", () => {
         ANALYTICS_HASH_SECRET: "test-analytics-secret"
       })
     ).rejects.toThrow("report_model_diagnostic_schema_incomplete");
+    expect(listenMock).not.toHaveBeenCalled();
+  });
+
+  it("refuses to listen when referral visit storage is incomplete despite a complete ledger", async () => {
+    queryMock.mockImplementation(async (sql: string) =>
+      sql.includes("referral_link_visits_code_date_idx")
+        ? { rows: [{ ready: false }] }
+        : buildMigratedRuntimeSchemaRows(sql)
+    );
+    await expect(
+      startApiServerFromEnv({
+        DEBUGBUNDLE_PROBE_TRIGGER_SECRET: "test-probe-secret",
+        ANALYTICS_HASH_SECRET: "test-analytics-secret"
+      })
+    ).rejects.toThrow("referral_visit_schema_incomplete");
     expect(listenMock).not.toHaveBeenCalled();
   });
 

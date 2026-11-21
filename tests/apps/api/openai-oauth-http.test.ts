@@ -9,6 +9,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { createOpenAiOidcProvider } from "../../../packages/auth/src/index.js";
 import { createOpenAiConsentAuthorization } from "../../../apps/api/src/openai-consent-access.js";
 import { registerOpenAiOAuthHttpRoutes } from "../../../apps/api/src/openai-oauth-http.js";
+import type { OpenAiOperationalMonitor } from "../../../apps/api/src/openai-operational-monitoring.js";
 
 let provider: Provider;
 const apps: FastifyInstance[] = [];
@@ -530,9 +531,42 @@ describe("OpenAI OAuth HTTP boundary", () => {
     expect(operationalMonitor).toHaveBeenCalledWith(
       expect.objectContaining({
         category: "reviewer_credential_expiring",
+        milestone: "fourteen_days",
         expired: false
       })
     );
+  });
+
+  it("reports the next reviewer milestones without repeating a daily countdown", async () => {
+    const day = 86_400_000;
+    const expiry = new Date("2026-12-23T07:53:34.795Z").getTime();
+    vi.useFakeTimers({
+      toFake: ["Date", "setTimeout", "clearTimeout", "setInterval", "clearInterval"]
+    });
+    try {
+      vi.setSystemTime(expiry - 8 * day);
+      const monitor = vi.fn<OpenAiOperationalMonitor>();
+      const app = Fastify();
+      apps.push(app);
+      registerOpenAiOAuthHttpRoutes(app, {
+        expectedHost: "api.debugbundle.com",
+        provider,
+        operationalMonitor: monitor,
+        reviewerCredentialExpiresAt: new Date(expiry).toISOString()
+      });
+      await app.ready();
+      await vi.advanceTimersByTimeAsync(8 * day);
+      expect(
+        monitor.mock.calls.map(([signal]) =>
+          signal.category === "reviewer_credential_expiring" ? signal.milestone : signal.category
+        )
+      ).toEqual(["fourteen_days", "seven_days", "one_day", "expired"]);
+      await vi.advanceTimersByTimeAsync(day);
+      expect(monitor).toHaveBeenCalledTimes(4);
+      await app.close();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("keeps reviewer access POST-only and relays only the bounded body credential", async () => {

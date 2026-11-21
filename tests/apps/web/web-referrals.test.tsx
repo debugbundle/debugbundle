@@ -20,6 +20,8 @@ import { offerVersion, offerDefinition } from "../../helpers/offer-fixtures.js";
 import { PAYOUT_COUNTRIES } from "../../../packages/referrals/src/payout-preferences.js";
 import { SessionProvider, useSession } from "../../../apps/web/src/lib/session.js";
 import { ReferralsPage } from "../../../apps/web/src/pages/referrals-page.js";
+import { CountLineChart } from "../../../apps/web/src/components/system/count-line-chart.js";
+import { ThemeProvider } from "../../../apps/web/src/lib/theme.js";
 const org = "11111111-1111-4111-8111-111111111111",
   partner = "22222222-2222-4222-8222-222222222222";
 HTMLElement.prototype.hasPointerCapture ??= () => false;
@@ -77,7 +79,8 @@ function base(input: RequestInfo | URL): Response | null {
 function tabbedReferrals(versioned: boolean, initiallyJoined = true, savedPayout = false) {
   let enrolled = initiallyJoined,
     preferenceReads = 0,
-    payoutSaves = 0;
+    payoutSaves = 0,
+    analyticsRetries = 0;
   const session = createSession({ user_id: partner, organization_id: org });
   const payout = {
     programme_id: offerVersion.programme_id,
@@ -163,6 +166,29 @@ function tabbedReferrals(versioned: boolean, initiallyJoined = true, savedPayout
     }
     if (path.includes("/referrals/clients")) return jsonResponse(200, { clients: [] });
     if (path.includes("/referrals/payouts")) return jsonResponse(200, { payouts: [] });
+    if (path.includes("/referrals/analytics?")) {
+      const days = Number(new URL(path, "http://localhost").searchParams.get("days"));
+      if (days === 7 && analyticsRetries++ === 0)
+        return jsonResponse(503, { error: "referral_service_unavailable" });
+      const daily = Array.from({ length: days }, (_, index) => ({
+        date: new Date(Date.UTC(2026, 9, 31 + index)).toISOString().slice(0, 10),
+        referred_accounts: index === 0 ? 2 : 0,
+        visits: index === 0 ? 12 : null,
+        first_paid_referrals: index === 0 ? 1 : 0,
+        net_commission_minor: index === 0 ? 1825 : 0
+      }));
+      return jsonResponse(200, {
+        as_of: "2026-11-29T00:00:00Z",
+        currency: "usd",
+        daily,
+        totals: {
+          visits: 12,
+          referred_accounts: 2,
+          first_paid_referrals: 1,
+          net_commission_minor: 1825
+        }
+      });
+    }
     return jsonResponse(404, { error: "not_found" });
   });
   vi.stubGlobal("fetch", fetchMock);
@@ -178,16 +204,22 @@ it.each([true, false])(
     await screen.findByLabelText("Referral code");
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
       "Programme",
+      "Analytics",
       "Earnings",
       "Referred clients",
-      "Payments"
+      "Payments",
+      "Creator resources"
     ]);
     expect(screen.getByRole("tab", { name: "Programme" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getAllByRole("tabpanel")).toHaveLength(1);
-    expect(screen.queryByText("Your creator code") === null).toBe(!versioned);
+    expect(screen.queryByRole("button", { name: "Manage programme" }) === null).toBe(!versioned);
     expect(screen.queryByRole("textbox", { name: "IBAN" })).toBeNull();
-    if (versioned) await user.type(screen.getByLabelText("Choose your branded code"), "DRAFTCODE");
-    await user.click(screen.getByRole("tab", { name: "Payments" }));
+    if (versioned) {
+      await user.click(screen.getByRole("button", { name: "Manage programme" }));
+      await user.type(screen.getByLabelText("Choose your branded code"), "DRAFTCODE");
+      await user.click(screen.getByRole("button", { name: "Payout settings" }));
+      await waitFor(() => expect(screen.getByRole("tab", { name: "Payments" })).toHaveFocus());
+    } else await user.click(screen.getByRole("tab", { name: "Payments" }));
     expect(await screen.findByText("No payments yet")).toBeVisible();
     if (versioned) {
       await user.type(
@@ -207,8 +239,11 @@ it.each([true, false])(
     );
     expect(await screen.findByText("No referred clients yet")).toBeVisible();
     await user.click(screen.getByRole("tab", { name: "Programme" }));
-    if (versioned)
+    if (versioned) {
+      await user.click(screen.getByRole("button", { name: "Manage programme" }));
       expect(screen.getByLabelText("Choose your branded code")).toHaveValue("DRAFTCODE");
+      await user.click(screen.getByRole("button", { name: "Done" }));
+    }
     await user.click(screen.getByRole("tab", { name: "Payments" }));
     if (versioned) {
       expect(screen.getByLabelText("Account holder / recipient name")).toHaveValue("Private draft");
@@ -219,6 +254,72 @@ it.each([true, false])(
     );
   }
 );
+
+it("loads private daily analytics on demand and offers a downloadable starter kit", async () => {
+  const user = userEvent.setup();
+  const { fetchMock } = tabbedReferrals(true);
+  render(<App initialEntries={["/settings/referrals"]} />);
+  await screen.findByLabelText("Referral code");
+  expect(
+    fetchMock.mock.calls.some(([input]) => requestUrl(input).includes("/referrals/analytics"))
+  ).toBe(false);
+  await user.click(screen.getByRole("tab", { name: "Analytics" }));
+  expect(await screen.findByText("$18.25 USD")).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "Daily figures" }));
+  expect(screen.getByRole("table", { name: "Daily referral figures" })).toBeVisible();
+  const chart = screen.getByRole("img", { name: /daily link visits and first paid referrals/i });
+  expect(chart).toBeVisible();
+  expect(chart.closest("figure")).toHaveClass("[--chart-2:var(--referral-accent)]");
+  expect(screen.getByRole("columnheader", { name: "Link visits" })).toBeVisible();
+  await user.click(screen.getByRole("combobox", { name: "Date range" }));
+  await user.click(screen.getByRole("option", { name: "Last 7 days" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("could not be loaded");
+  await user.click(screen.getByRole("button", { name: "Retry" }));
+  expect(await screen.findByText("$18.25 USD")).toBeVisible();
+  await user.click(screen.getByRole("tab", { name: "Creator resources" }));
+  expect(screen.getByRole("link", { name: "Download kit" })).toHaveAttribute(
+    "href",
+    "/creator-kit.zip"
+  );
+  expect(screen.getByRole("button", { name: "Copy affiliate disclosure" })).toBeVisible();
+  expect(screen.getByText("Ideas for your first post")).toBeVisible();
+});
+
+it("draws a break in the visit line and keeps a single tracked day visible", () => {
+  const context = {
+    scale: vi.fn(),
+    measureText: () => ({ width: 7 }),
+    beginPath: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
+    stroke: vi.fn(),
+    fillText: vi.fn(),
+    setLineDash: vi.fn(),
+    arc: vi.fn(),
+    fill: vi.fn()
+  };
+  const canvas = HTMLCanvasElement.prototype;
+  vi.spyOn(canvas, "clientWidth", "get").mockReturnValue(400);
+  vi.spyOn(canvas, "clientHeight", "get").mockReturnValue(160);
+  vi.spyOn(canvas, "getContext").mockReturnValue(context as unknown as CanvasRenderingContext2D);
+  render(
+    <ThemeProvider forcedTheme="dark">
+      <CountLineChart
+        label="Daily referral activity"
+        dates={["Nov 18", "Nov 19", "Nov 20"]}
+        series={[
+          { label: "Link visits", values: [1, null, 2] },
+          { label: "First paid referrals", values: [0, 0, 1] }
+        ]}
+      />
+    </ThemeProvider>
+  );
+  expect(context.setLineDash.mock.calls).toEqual([[[]], [[5, 4]]]);
+  // The two isolated visits are points. Only the paid-referral series has
+  // segments, apart from the three horizontal grid lines.
+  expect(context.arc).toHaveBeenCalledTimes(2);
+  expect(context.lineTo).toHaveBeenCalledTimes(5);
+});
 
 it.each([false, true])(
   "shows payments first only after confirmed payout setup: saved=%s",
@@ -307,12 +408,16 @@ it("clears hidden creator drafts and resets the selected tab when the signed-in 
       <CreatorSession />
     </SessionProvider>
   );
-  await user.type(await screen.findByLabelText("Choose your branded code"), "PERSONALDRAFT");
+  await user.click(await screen.findByRole("button", { name: "Manage programme" }));
+  await user.type(screen.getByLabelText("Choose your branded code"), "PERSONALDRAFT");
+  await user.click(screen.getByRole("button", { name: "Done" }));
   await user.click(screen.getByRole("tab", { name: "Payments" }));
   await user.type(await screen.findByLabelText("Account holder / recipient name"), "Private draft");
   await user.click(screen.getByRole("button", { name: "Change creator" }));
   expect(screen.getByRole("tab", { name: "Programme" })).toHaveAttribute("aria-selected", "true");
-  expect(await screen.findByLabelText("Choose your branded code")).toHaveValue("");
+  await user.click(await screen.findByRole("button", { name: "Manage programme" }));
+  expect(screen.getByLabelText("Choose your branded code")).toHaveValue("");
+  await user.click(screen.getByRole("button", { name: "Done" }));
   await user.click(screen.getByRole("tab", { name: "Payments" }));
   expect(await screen.findByLabelText("Account holder / recipient name")).toHaveValue("");
 });

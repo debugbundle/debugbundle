@@ -206,8 +206,8 @@ describe("api server version context", () => {
     expect(response.statusCode).toBe(200);
     expect(response.headers["access-control-allow-origin"]).toBe("https://app.debugbundle.com");
     expect(response.headers["access-control-allow-credentials"]).toBe("true");
-    expect(response.headers["access-control-expose-headers"]).toBe(
-      "X-DebugBundle-Generation-Id"
+    expect(String(response.headers["access-control-expose-headers"]).split(/,\s*/)).toEqual(
+      expect.arrayContaining(["X-DebugBundle-Generation-Id", "Retry-After"])
     );
     expect(response.headers["vary"]).toContain("Origin");
   });
@@ -234,7 +234,9 @@ describe("api server version context", () => {
     expect(response.headers["access-control-allow-credentials"]).toBe("true");
     expect(response.headers["access-control-allow-methods"]).toContain("POST");
     expect(response.headers["access-control-allow-headers"]).toContain("X-CSRF-Token");
-    expect(response.headers["access-control-allow-headers"]).toContain("X-DebugBundle-Analytics-Config");
+    expect(response.headers["access-control-allow-headers"]).toContain(
+      "X-DebugBundle-Analytics-Config"
+    );
     expect(response.headers["access-control-allow-headers"]).toContain("X-Debugbundle-Trace-Id");
     expect(response.headers["vary"]).toContain("Origin");
     expect(response.headers["vary"]).toContain("Access-Control-Request-Method");

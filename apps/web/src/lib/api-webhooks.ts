@@ -1,5 +1,11 @@
 import { RetryWebhookDeliveryResponseSchema } from "../../../../packages/webhook-client/src/index.js";
-import { API_BASE, buildBrowserSessionHeaders, readJson } from "./api-client.js";
+import {
+  API_BASE,
+  buildBrowserSessionHeaders,
+  invalidateDashboardReads,
+  readDashboardJson,
+  readJson
+} from "./api-client.js";
 import type {
   CreatedWebhookRecord,
   WebhookDeliveryRecord,
@@ -13,10 +19,9 @@ export async function listProjectWebhooks(projectId: string, limit = 20): Promis
     limit: String(limit)
   });
 
-  const body = await readJson<{ webhooks: WebhookRecord[] }>(
-    await fetch(`${API_BASE}/v1/webhooks?${searchParams.toString()}`, {
-      credentials: "include"
-    })
+  const body = await readDashboardJson<{ webhooks: WebhookRecord[] }>(
+    `/v1/webhooks?${searchParams.toString()}`,
+    "configuration"
   );
 
   return body.webhooks;
@@ -44,6 +49,7 @@ export async function createProjectWebhook(payload: {
     })
   );
 
+  invalidateDashboardReads("/v1/webhooks");
   return body.webhook;
 }
 
@@ -106,6 +112,7 @@ export async function updateProjectWebhook(
       }
     )
   );
+  invalidateDashboardReads("/v1/webhooks");
   return body.webhook;
 }
 export async function deleteProjectWebhook(webhookId: string, projectId: string): Promise<void> {
@@ -114,6 +121,7 @@ export async function deleteProjectWebhook(webhookId: string, projectId: string)
     { method: "DELETE", credentials: "include", headers: buildBrowserSessionHeaders() }
   );
   if (!response.ok) await readJson(response);
+  invalidateDashboardReads("/v1/webhooks");
 }
 export async function retryProjectWebhookDelivery(
   webhookId: string,

@@ -68,6 +68,82 @@ runIntegration("retired legacy offers and permanent ownership", () => {
     });
     return version;
   };
+  it("allows one guarded self-service replacement and keeps the earlier link active", async () => {
+    await enroll();
+    const first = await store.creators.claimCode({ user_id: creator, code: "CREATOR20" });
+    await store.claims.apply({
+      organization_id: org,
+      actor_user_id: owner,
+      code: first.code,
+      source: "manual",
+      explicit_correction: false,
+      provider_customer_id_checked: null,
+      provider_previously_paid: false
+    });
+    expect(await store.creators.canReplaceCode(creator)).toBe(true);
+    await store.creators.join({
+      user_id: owner,
+      version_id: first.version.version_id,
+      terms_version: first.version.policy.terms_version
+    });
+    await store.creators.claimCode({ user_id: owner, code: "TAKEN20" });
+    await expect(
+      store.creators.claimCode({
+        user_id: creator,
+        code: "TAKEN20",
+        expected_code: first.code
+      })
+    ).rejects.toMatchObject({ code: "creator_code_unavailable" });
+    expect((await store.creators.read(creator))?.code).toBe(first.code);
+    const result = await Promise.allSettled(
+      ["FIRST-EDIT", "OTHER-EDIT"].map((code) =>
+        store.creators.claimCode({ user_id: creator, code, expected_code: first.code })
+      )
+    );
+    expect(result.filter((item) => item.status === "fulfilled")).toHaveLength(1);
+    expect(result.find((item) => item.status === "rejected")).toMatchObject({
+      reason: { code: "creator_code_changed" }
+    });
+    const current = (await store.creators.read(creator))!;
+    expect(current.code).not.toBe(first.code);
+    expect(await store.creators.canReplaceCode(creator)).toBe(false);
+    await expect(
+      store.creators.claimCode({ user_id: creator, code: current.code, expected_code: first.code })
+    ).resolves.toMatchObject({ code: current.code });
+    await expect(
+      store.creators.claimCode({
+        user_id: creator,
+        code: "THIRD-EDIT",
+        expected_code: current.code
+      })
+    ).rejects.toMatchObject({ code: "creator_code_already_claimed" });
+    expect(await store.preview(first.code)).toMatchObject({ code: first.code, available: true });
+    expect(
+      (
+        await pool.query(
+          "SELECT code FROM offer_claims JOIN offer_codes ON offer_codes.id=offer_claims.referral_code_id WHERE organization_external_id=$1",
+          [org]
+        )
+      ).rows
+    ).toEqual([{ code: first.code }]);
+  });
+  it("keeps a blocked generated code from being reactivated by a first branded reservation", async () => {
+    await enroll();
+    const current = (await store.creators.read(creator))!;
+    await store.creators.setCodeBlocked({
+      operator_user_id: operator,
+      code: current.legacy_code,
+      blocked: true,
+      reason: "Suspend this code"
+    });
+    await expect(
+      store.creators.claimCode({ user_id: creator, code: "FIRST20" })
+    ).rejects.toMatchObject({ code: "programme_unavailable" });
+    expect(await store.creators.read(creator)).toMatchObject({
+      code: current.legacy_code,
+      accepting_new_referrals: false
+    });
+  });
   it.each(["legacy", "versioned"] as const)(
     "serialises code blocking with an in-flight %s promise and preserves the admitted claim",
     async (kind) => {
@@ -189,6 +265,11 @@ runIntegration("retired legacy offers and permanent ownership", () => {
     await db.query("UPDATE users SET email_verified_at=now() WHERE id=$1", [projects.userId]);
     await enroll();
     await store.creators.claimCode({ user_id: creator, code: "UNCHANGED20" });
+    const visit = await db.query(
+      "INSERT INTO referral_link_visits(receipt_id,code_id,visited_at) SELECT $1,id,now() FROM offer_codes WHERE code=$2 RETURNING receipt_id",
+      [randomUUID(), "UNCHANGED20"]
+    );
+    expect(visit.rows).toHaveLength(1);
     await store.claims.apply({
       organization_id: projects.organizationId,
       actor_user_id: projects.userId,
@@ -200,7 +281,7 @@ runIntegration("retired legacy offers and permanent ownership", () => {
     });
     const snapshot = async (): Promise<Record<string, unknown[]>> => {
       const data: Record<string, unknown[]> = {};
-      for (const table of OFFER_PROGRAMME_TABLES)
+      for (const table of [...OFFER_PROGRAMME_TABLES, "referral_link_visits"])
         data[table] = (
           await db.query(
             `SELECT to_jsonb(t) AS value FROM ${table} t ORDER BY to_jsonb(t)::text`,

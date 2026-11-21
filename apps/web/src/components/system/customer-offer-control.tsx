@@ -140,7 +140,7 @@ export function CustomerOfferControl({
             >
               Code {data.legacy_attribution.partner_code}.{" "}
               {data.legacy_discount_eligible
-                ? "10% off your first eligible Business base invoice, monthly or yearly. Solo, Team, tax and extra capacity are excluded; your free trial does not consume it."
+                ? "10% off your first eligible Business base invoice, monthly or yearly, even after your trial. Solo, Team, tax and extra capacity are excluded."
                 : "The original agreement remains recorded. A consumed benefit does not apply again on resubscription."}
             </Notice>
           ) : null}
@@ -160,12 +160,8 @@ export function CustomerOfferControl({
               {saved.version.policy.eligible_plans
                 .map((p) => p[0]!.toUpperCase() + p.slice(1))
                 .join(", ")}{" "}
-              base invoice. Your free trial does not consume it.
-              {saved.redeem_by ? (
-                <p>Use by {new Date(saved.redeem_by).toLocaleString()}.</p>
-              ) : (
-                <p>It stays saved to this workspace when your trial ends.</p>
-              )}
+              base invoice, even after your trial.
+              {saved.redeem_by ? <p>Use by {new Date(saved.redeem_by).toLocaleString()}.</p> : null}
             </Notice>
           ) : null}
           {data.intent_status === "pending" ? (

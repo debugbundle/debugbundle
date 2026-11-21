@@ -12,6 +12,7 @@ import { ReferralHttpUrlSchema } from "../../../packages/referrals/src/referral-
 import type { StripeConfig } from "./stripe-config.js";
 import { createReferralFinance } from "../../../packages/referrals/src/referral-finance.js";
 import { createReferralLedgerStore } from "../../../packages/storage/src/referral-ledger-store.js";
+import { readReferralAnalytics } from "../../../packages/storage/src/referral-analytics-store.js";
 
 const ConfigSchema = z
   .object({
@@ -50,6 +51,7 @@ export function createDefaultReferrals(input: {
   const finance = createReferralFinance({
     partners: store,
     ledger: createReferralLedgerStore(input.db),
+    readAnalytics: (userId, days, asOf) => readReferralAnalytics(input.db, userId, days, asOf),
     async isOperator(userId) {
       if (!operators.size) return false;
       const row = (

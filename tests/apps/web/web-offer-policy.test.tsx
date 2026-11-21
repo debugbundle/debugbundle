@@ -37,7 +37,7 @@ it("shows actual initial and renewal totals and collected-cash commission for al
   }
   expect(screen.getByText(/first 12 calendar months/)).toBeVisible();
   expect(screen.getByText(/Tax, extra capacity/)).toBeVisible();
-  expect(screen.getByText(/monthly from a US\$50 available balance/)).toBeVisible();
+  expect(screen.getByText(/monthly from a \$50 USD available balance/)).toBeVisible();
 });
 it("does not claim creator earnings for a promotion", () => {
   render(
@@ -75,4 +75,11 @@ it("shows the selected rate instead of an annual maximum when only one month can
   expect(screen.getByText(/Yearly billing/)).toBeVisible();
   expect(screen.queryByText("Earn up to")).toBeNull();
   expect(screen.queryByText(/235\.20/)).toBeNull();
+});
+
+it("uses the same referral accent for the programme icon and earnings amount", () => {
+  render(<ReferralProgrammeCard programme={{ ...offerDefinition, policy }} />);
+  const card = screen.getByRole("article");
+  expect(card.querySelector(".lucide-users")?.parentElement).toHaveClass("text-referral-accent");
+  expect(within(card).getByText("$235.20").parentElement).toHaveClass("text-referral-accent");
 });

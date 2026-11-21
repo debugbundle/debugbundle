@@ -293,7 +293,9 @@ function registerApiCors(
         "/v2/offers/context",
         "/v2/offers/programmes",
         "/v2/offers/capabilities",
-        "/v2/offers/pending"
+        "/v2/offers/pending",
+        "/v2/offers/visit-receipts",
+        "/v2/offers/visits"
       ].includes(offerPath)
     ) {
       reply.header("Access-Control-Allow-Origin", requestOrigin);
@@ -301,7 +303,12 @@ function registerApiCors(
       reply.header("Access-Control-Expose-Headers", "Retry-After");
       if (isCorsPreflightRequest(request)) {
         const method = request.headers["access-control-request-method"];
-        const permitted = offerPath === "/v2/offers/pending" ? ["POST", "DELETE"] : ["GET"];
+        const permitted =
+          offerPath === "/v2/offers/pending"
+            ? ["POST", "DELETE"]
+            : ["/v2/offers/visit-receipts", "/v2/offers/visits"].includes(offerPath)
+              ? ["POST"]
+              : ["GET"];
         if (!permitted.includes(method ?? ""))
           return reply.status(403).send({ error: "cors_origin_not_allowed" });
         reply.header("Access-Control-Allow-Methods", permitted.join(", "));
@@ -345,7 +352,10 @@ function registerApiCors(
 
     reply.header("Access-Control-Allow-Origin", requestOrigin);
     reply.header("Access-Control-Allow-Credentials", "true");
-    reply.header("Access-Control-Expose-Headers", ANALYTICS_BUNDLE_GENERATION_ID_HEADER);
+    reply.header(
+      "Access-Control-Expose-Headers",
+      `${ANALYTICS_BUNDLE_GENERATION_ID_HEADER}, Retry-After`
+    );
 
     if (!isCorsPreflightRequest(request)) {
       return;

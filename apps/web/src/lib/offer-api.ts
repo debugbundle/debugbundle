@@ -52,8 +52,8 @@ const messages: Record<string, string> = {
     "This legacy referral code is invalid or is no longer accepting new claims.",
   invalid_offer_code: "This code is invalid or is no longer accepting new claims.",
   creator_code_unavailable: "This code is already in use or reserved. Choose another.",
-  creator_code_already_claimed:
-    "You already have a branded code. Contact support for a correction.",
+  creator_code_already_claimed: "Contact support for another code correction.",
+  creator_code_changed: "Your preferred code changed. Reload Referrals to review the current code.",
   programme_terms_mismatch: "The terms changed. Reload and review them before joining.",
   programme_claim_limit: "This programme has reached its claim limit.",
   programme_discount_invalid:

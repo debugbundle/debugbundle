@@ -9,12 +9,14 @@ const TERMS_OF_SERVICE_URL = "https://debugbundle.com/terms";
 const PRIVACY_POLICY_URL = "https://debugbundle.com/privacy";
 
 export function AuthLayout({
+  className,
   title,
   heading = title,
   description,
   children,
   contentClassName
 }: {
+  className?: string;
   title: string;
   heading?: string;
   description: string;
@@ -22,7 +24,12 @@ export function AuthLayout({
   contentClassName?: string;
 }): JSX.Element {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-muted p-6 text-foreground md:p-10">
+    <div
+      className={cn(
+        "flex min-h-screen flex-col items-center justify-center gap-6 bg-muted px-6 py-6 text-foreground md:p-10",
+        className
+      )}
+    >
       <div className={cn("flex w-full max-w-md flex-col gap-6", contentClassName)}>
         <div className="flex justify-center">
           <BrandLockup href="/login" />
@@ -33,7 +40,7 @@ export function AuthLayout({
             <h1 className="text-xl font-semibold">{heading}</h1>
             <CardDescription>{description}</CardDescription>
           </CardHeader>
-          <CardContent>{children}</CardContent>
+          <CardContent className="flex flex-col gap-4">{children}</CardContent>
         </Card>
 
         <FieldDescription className="px-6 text-center text-balance">

@@ -175,6 +175,15 @@ export function registerAccountRoutes(app: FastifyInstance, dependencies: ApiDep
         .send({ error: resolved.error });
     }
 
+    if (
+      !(await enforceRequestRateLimit(request, reply, dependencies, {
+        bucket: "management-write",
+        subject: `account-avatar-import:${resolved.session.user_id}`
+      }))
+    ) {
+      return;
+    }
+
     const imported = await importUserAvatarFromUrl({
       user_id: resolved.session.user_id,
       source: "gravatar",

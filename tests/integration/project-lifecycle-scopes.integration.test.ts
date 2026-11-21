@@ -26,6 +26,41 @@ runIntegration("canonical project and account lifecycle", () => {
   afterAll(async () => {
     await pool.end();
   });
+  it("preserves a grouped incident when a later occurrence escalates to critical", async () => {
+    const f = await seedConsolidationProjects(pool, db);
+    const input = {
+      project_id: f.target,
+      event_id: randomUUID(),
+      event_type: "backend_exception" as const,
+      service_name: "debugbundle-api",
+      environment: "production",
+      fingerprint: "reviewer-deadline",
+      fingerprint_version: "v2",
+      title: "Reviewer credential expiring",
+      occurred_at: new Date().toISOString()
+    };
+    const first = await metadata.upsertIncident({ ...input, severity: "high" });
+    const expired = await metadata.upsertIncident({
+      ...input,
+      event_id: randomUUID(),
+      severity: "critical"
+    });
+    expect(expired).toMatchObject({
+      incident_id: first.incident_id,
+      occurrence_count: 2,
+      severity_escalated: true
+    });
+    const repeated = await metadata.upsertIncident({
+      ...input,
+      event_id: randomUUID(),
+      severity: "critical"
+    });
+    expect(repeated.severity_escalated).toBeUndefined();
+    expect(
+      (await pool.query("SELECT severity FROM incidents WHERE id=$1", [first.incident_id])).rows
+    ).toEqual([{ severity: "critical" }]);
+  });
+
   async function fixture() {
     const f = await seedConsolidationProjects(pool, db);
     await pool.query(

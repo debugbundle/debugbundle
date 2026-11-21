@@ -1,3 +1,4 @@
+import type { ReviewerExpiryMilestone } from "../../../packages/auth/src/reviewer-expiry.js";
 import type { OpenAiToolName } from "../../../packages/mcp-core/src/index.js";
 
 export type OpenAiMcpMethod =
@@ -65,6 +66,8 @@ export type OpenAiOperationalSignal =
       category: "reviewer_credential_expiring";
       remainingDays: number;
       expired: boolean;
+      expiresAt: string;
+      milestone: ReviewerExpiryMilestone;
     };
 
 export type OpenAiOperationalMonitor = (signal: OpenAiOperationalSignal) => void;

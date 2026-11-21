@@ -23,7 +23,7 @@ tests and review are authorised. Publication, deployment and transfers are separ
   metadata. Only payout-authorised operators can explicitly reveal instructions.
 - USD remains the accounting currency. Preferred settlement currency is a manual
   request. Transfers and exchange decisions stay outside the product.
-- Routine payout descriptions say US$50. Smaller balances remain owed, carry
+- Routine payout descriptions say $50 USD. Smaller balances remain owed, carry
   forward and can be manually settled. This is a routine review policy, not a
   forfeiture or automatic transfer trigger.
 
@@ -51,7 +51,7 @@ tests and review are authorised. Publication, deployment and transfers are separ
    on account anonymisation. That destructive retention step is deferred pending
    explicit owner approval; preserve encrypted records and existing financial
    retention rather than add the rejected deletion trigger.
-6. Extend the labelled local simulator and local docs. Use the approved US$50 routine-review wording in
+6. Extend the labelled local simulator and local docs. Use the approved $50 USD routine-review wording in
    public page, terms/guide/announcement and internal contracts/review notes.
 7. Qualify validation, ownership/CSRF/operator boundaries, races/stale revisions,
    snapshots, per-programme accounting and legacy compatibility with real isolated

@@ -38,9 +38,9 @@ export function OfferPriceSummary({
         </dd>
       </dl>
       <p className="text-sm text-muted-foreground">
-        {quote.interval === "year" ? "The annual amount is paid upfront. " : ""}Tax is calculated at
-        secure checkout. Your trial does not consume the offer. The discount applies to the first
-        eligible invoice only.
+        Prices are in USD. {quote.interval === "year" ? "The annual amount is paid upfront. " : ""}
+        Tax is calculated at secure checkout. The discount applies only to the first eligible
+        invoice, even after a trial.
       </p>
     </div>
   );

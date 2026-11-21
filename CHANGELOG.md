@@ -6,6 +6,22 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.31.0] - 2026-11-21
+
+### Added
+
+- Show each creator's referral activity for 7, 30 or 90 days, including link visits, referred accounts, first paid referrals and net commission.
+- Manage the preferred code from the joined programme card and replace a branded code once while keeping its earlier links valid. Add creator resources and a downloadable kit.
+- Add creator analytics and code-management commands and tools to the CLI and ordinary MCP.
+
+### Fixed
+
+- Refresh dashboard incidents and summary cards quietly when the tab regains focus. Reuse recent management reads and invalidate them after relevant writes or access changes.
+- Preserve alert-group access and notification-preference behavior across project consolidation.
+- Rate-limit Gravatar imports and project invitation acceptance.
+- Send OpenAI reviewer expiry reminders at 14, 7 and 1 day and escalate at expiry.
+- Refine signup spacing, offer copy and USD labels.
+
 ## [1.30.1] - 2026-11-19
 
 - Keep shared tab rows horizontally scrollable while preventing vertical scrollbars.

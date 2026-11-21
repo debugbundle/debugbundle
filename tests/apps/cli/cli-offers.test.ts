@@ -113,6 +113,19 @@ it("maps explicit workspace and correction flags without accepting a proof on th
   ).toBe(4);
   expect(command).toHaveBeenCalledOnce();
 });
+it("passes the selected analytics range and expected current creator code", async () => {
+  const command = vi.fn().mockResolvedValue({ exitCode: 0, output: "ok" });
+  const options = { offersCommand: command };
+  expect((await runCli(["offers", "creator_analytics", "--days", "90"], options)).exitCode).toBe(0);
+  expect(
+    (await runCli(["offers", "code", "--code", "NEW20", "--expected-code", "OLD20"], options))
+      .exitCode
+  ).toBe(0);
+  expect(command.mock.calls).toEqual([
+    [{ action: "creator_analytics", payload: { days: "90" } }],
+    [{ action: "code", payload: { code: "NEW20", expected_code: "OLD20" } }]
+  ]);
+});
 it("sends a private, bounded proof only as supplemental authority and never prints it", async () => {
   const root = await mkdtemp(join(tmpdir(), "debugbundle-offer-cli-"));
   temporary.push(root);

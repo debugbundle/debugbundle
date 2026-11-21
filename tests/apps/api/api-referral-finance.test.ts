@@ -8,6 +8,7 @@ const user = "11111111-1111-4111-8111-111111111111",
   batch = "33333333-3333-4333-8333-333333333333";
 const headers = { authorization: "Bearer dbundle_mem_test" };
 function setup() {
+  const analytics = vi.fn().mockResolvedValue(null);
   const earnings = vi.fn().mockResolvedValue({ balance: null, operator_access: false }),
     payouts = vi.fn().mockResolvedValue([]),
     operatorBalances = vi.fn().mockRejectedValue(new ReferralError("forbidden")),
@@ -18,6 +19,7 @@ function setup() {
   const app = createTokenApiServer({
     referrals: mockedObject<NonNullable<ApiDependencies["referrals"]>>({
       finance: {
+        analytics,
         earnings,
         payouts,
         operatorBalances,
@@ -33,8 +35,49 @@ function setup() {
         .mockResolvedValue({ member_id: user, organization_id: org, role: "owner" })
     })
   });
-  return { app, earnings, payouts, operatorBalances, claim, markUncertain, recordPayment };
+  return {
+    app,
+    analytics,
+    earnings,
+    payouts,
+    operatorBalances,
+    claim,
+    markUncertain,
+    recordPayment
+  };
 }
+it("reads a bounded, private analytics report for the authenticated creator only", async () => {
+  const { app, analytics } = setup();
+  const url = "/v2/referrals/analytics";
+  try {
+    const noPartner = await app.inject({ method: "GET", url, headers });
+    expect(noPartner.statusCode).toBe(404);
+    expect(noPartner.json()).toEqual({ error: "creator_membership_required" });
+    expect(analytics).toHaveBeenCalledWith(user, "30");
+    for (const query of ["days=8", "days=7&days=90", `user_id=${org}`]) {
+      const invalid = await app.inject({ method: "GET", url: `${url}?${query}`, headers });
+      expect(invalid.statusCode).toBe(400);
+    }
+    const totals = { referred_accounts: 0, first_paid_referrals: 0, net_commission_minor: 0 };
+    const report = {
+      as_of: "2026-11-20T12:00:00Z",
+      currency: "usd",
+      totals,
+      daily: Array.from({ length: 7 }, (_, day) => ({ ...totals, date: `2026-11-${14 + day}` }))
+    };
+    analytics.mockResolvedValueOnce(report);
+    const available = await app.inject({ method: "GET", url: `${url}?days=7`, headers });
+    expect(available.statusCode).toBe(200);
+    expect(available.json()).toEqual(report);
+    expect(available.headers["cache-control"]).toBe("no-store");
+    expect(analytics.mock.calls).toEqual([
+      [user, "30"],
+      [user, "7"]
+    ]);
+  } finally {
+    await app.close();
+  }
+});
 it("reads personal earnings using the authenticated identity without customer data", async () => {
   const f = setup();
   const response = await f.app.inject({ method: "GET", url: "/v1/referrals/earnings", headers });

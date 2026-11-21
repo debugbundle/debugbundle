@@ -162,7 +162,8 @@ runIntegration("storage bootstrap integration", () => {
       "202611160001_add_offer_programmes",
       "202611160002_add_referral_payout_preferences",
       "202611170001_add_creator_referral_emails",
-      "202611180001_reconcile_offer_publication"
+      "202611180001_reconcile_offer_publication",
+      "202611210001_add_referral_link_visits"
     ];
     const migrated = await migrateStorageSchema(db);
 

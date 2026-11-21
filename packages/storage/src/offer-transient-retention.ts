@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { Queryable } from "./types.js";
-/** Expired proofs have no financial purpose. Signup intents are transient;
+/** Expired proofs, anonymous visits and signup intents are transient;
  * permanent claims, aliases, audit history and accounting are never pruned here. */
 export async function pruneOfferTransientState(
   db: Queryable,
@@ -11,9 +11,20 @@ export async function pruneOfferTransientState(
     .strict()
     .parse(raw);
   let changed = 0;
+  const visits = await db.query(
+    `DELETE FROM referral_link_visits WHERE receipt_id IN (
+      SELECT receipt_id FROM referral_link_visits
+      WHERE visited_at < (date_trunc('day', $1::timestamptz AT TIME ZONE 'UTC') - interval '89 days') AT TIME ZONE 'UTC'
+      ORDER BY visited_at,receipt_id LIMIT $2
+      FOR UPDATE SKIP LOCKED
+    ) RETURNING receipt_id`,
+    [input.now, input.limit]
+  );
+  changed += visits.rows.length;
+  if (changed === input.limit) return changed;
   const delegations = await db.query(
     "DELETE FROM offer_operator_delegations WHERE proof_hash IN (SELECT proof_hash FROM offer_operator_delegations WHERE expires_at<=$1::timestamptz ORDER BY expires_at,proof_hash LIMIT $2) RETURNING proof_hash",
-    [input.now, input.limit]
+    [input.now, input.limit - changed]
   );
   changed += delegations.rows.length;
   if (changed < input.limit) {

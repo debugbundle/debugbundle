@@ -14,6 +14,10 @@ import { z } from "zod";
 import { PublicOfferContextQuerySchema } from "../../referrals/src/offer-choice.js";
 import { PAYOUT_OPERATIONS } from "./payout-operations.js";
 import {
+  ReferralAnalyticsQuerySchema,
+  ReferralAnalyticsSchema
+} from "../../referrals/src/referral-analytics-contract.js";
+import {
   CreatorCodeSchema,
   PromotionCodeSchema,
   CreatorProgrammeSchema,
@@ -110,9 +114,27 @@ export const OFFER_OPERATIONS = {
   code: {
     method: "POST",
     path: "/v2/offers/creator/code",
-    input: z.object({ code: CreatorCodeSchema }).strict(),
+    input: z
+      .object({ code: CreatorCodeSchema, expected_code: CreatorCodeSchema.optional() })
+      .strict(),
     response: creator,
     read: false,
+    operator: false
+  },
+  creator_code_status: {
+    method: "GET",
+    path: "/v2/offers/creator/code",
+    input: empty,
+    response: z.object({ can_replace: z.boolean() }).strict(),
+    read: true,
+    operator: false
+  },
+  creator_analytics: {
+    method: "GET",
+    path: "/v2/referrals/analytics",
+    input: ReferralAnalyticsQuerySchema,
+    response: ReferralAnalyticsSchema,
+    read: true,
     operator: false
   },
   customer: {

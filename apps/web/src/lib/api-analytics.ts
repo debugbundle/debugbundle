@@ -5,7 +5,13 @@ import {
   type AnalyticsActionMetricsResponse,
   type AnalyticsJourneySamplesListResponse
 } from "../../../../packages/shared-types/src/index.js";
-import { API_BASE, buildBrowserSessionHeaders, readJson } from "./api-client.js";
+import {
+  API_BASE,
+  buildBrowserSessionHeaders,
+  invalidateDashboardReads,
+  readDashboardJson,
+  readJson
+} from "./api-client.js";
 import { ANALYTICS_BUNDLE_GENERATION_ID_HEADER } from "../../../../packages/shared-types/src/index.js";
 import type {
   AnalyticsBundleGenerationsListResponse,
@@ -38,10 +44,9 @@ import type {
 export async function getProjectAnalyticsSettings(
   projectId: string
 ): Promise<ProjectAnalyticsSettingsResponse> {
-  return readJson<ProjectAnalyticsSettingsResponse>(
-    await fetch(`${API_BASE}/v1/projects/${projectId}/analytics-settings`, {
-      credentials: "include"
-    })
+  return readDashboardJson<ProjectAnalyticsSettingsResponse>(
+    `/v1/projects/${projectId}/analytics-settings`,
+    "configuration"
   );
 }
 
@@ -49,7 +54,7 @@ export async function updateProjectAnalyticsSettings(
   projectId: string,
   payload: ProjectAnalyticsSettingsUpdate
 ): Promise<ProjectAnalyticsSettingsResponse> {
-  return readJson<ProjectAnalyticsSettingsResponse>(
+  const updated = await readJson<ProjectAnalyticsSettingsResponse>(
     await fetch(`${API_BASE}/v1/projects/${projectId}/analytics-settings`, {
       method: "PATCH",
       credentials: "include",
@@ -57,6 +62,8 @@ export async function updateProjectAnalyticsSettings(
       body: JSON.stringify(payload)
     })
   );
+  invalidateDashboardReads(`/v1/projects/${projectId}/analytics-settings`);
+  return updated;
 }
 
 function projectAnalyticsSavedFunnelsPath(projectId: string): string {

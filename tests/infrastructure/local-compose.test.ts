@@ -89,6 +89,11 @@ it("keeps the public preview and readiness checks in the reproducible Compose se
   const publicSite = getServiceBlock(compose, "public");
   expect(publicSite).toContain('"127.0.0.1:${PUBLIC_SITE_PORT:-5292}:80"');
   expect(publicSite).toContain("./scripts/public-site-preview.nginx.conf:");
+  const preview = readFileSync(
+    join(process.cwd(), "scripts/public-site-preview.nginx.conf"),
+    "utf8"
+  );
+  expect(preview).toContain("return 302 /?offer=$referral_code&referral_visit=$referral_code;");
   for (const service of [
     "api",
     "worker",

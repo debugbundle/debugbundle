@@ -112,6 +112,7 @@ export const PROJECT_MERGE_TABLE_DISPOSITIONS = {
     ...REFERRAL_BENEFIT_TABLES,
     // Commercial promises and protected identity belong to the account, not a project origin.
     ...OFFER_PROGRAMME_TABLES,
+    "referral_link_visits",
     ...PAYOUT_PREFERENCE_TABLES,
     ...CREATOR_EMAIL_TABLES,
     "account_analytics_accounts",

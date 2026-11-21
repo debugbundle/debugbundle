@@ -88,10 +88,14 @@ API composition is `default-payout-preferences.ts` and `routes/payout-preference
 `referral-client/payout-operations.ts` feeds API/CLI/ordinary MCP contracts.
 Creator and operator UI reuse `creator-payout-preferences.tsx` and
 `payout-instruction-details.tsx`. The local mock keeps masked ephemeral state only.
-`referrals-page.tsx` composes the shared Tabs into Programme, Earnings, Referred
-clients and Payments. It owns payout setup alongside payment history; the creator
-programme control reports confirmed enrolment so setup and balances refresh.
-Panels remain mounted while hidden to retain drafts, keyed to personal identity.
+`referrals-page.tsx` composes Programme, Analytics, Earnings, Referred clients,
+Payments and Creator resources. The joined card owns sharing and the management
+dialog. It reports confirmed enrolment so payout setup and balances refresh.
+`storage/referral-analytics-store.ts` aggregates anonymous link visits and personal attribution,
+verified first payments and signed ledger entries into bounded UTC daily results.
+`site/src/lib/referral-visits.ts` coordinates receipt issuance with a browser lock
+and stores the signed 24-hour receipt in first-party storage before confirmation.
+Panels with forms remain mounted while hidden to retain drafts, keyed to personal identity.
 The payout component reports confirmed setup completeness; the page reorders
 keyed cards so history precedes fully saved preferences without resetting state.
 The dedicated optional server key never enters browser or worker configuration.
@@ -230,6 +234,11 @@ already-computed exact attention count. `improvement-review-inventory.ts` loads
 complete authorised metadata through the existing review client with finite
 continuation/cancellation guards; the review card owns local display pages and
 totals. No review settings, authority, generation or storage boundary changes.
+
+The Dashboard route coordinates focus and visibility refreshes and shares the
+incident pagination count with the summary cards. The pagination hook can
+refresh without setting loading or error state, and foreground actions
+invalidate pending background results.
 
 Dashboard health alert: `workspace-health-alert.ts` reads existing project/check
 APIs in batches of four and reuses shared current-state derivation, excluding
@@ -1103,11 +1112,16 @@ Public Reports labels retain existing `smart-reports` routes and capability name
   - `server.ts` — route composition (delegates to route modules)
   - `dogfooding.ts` — env-gated API SDK bootstrap and manual backend trigger registration
   - `audit-logging.ts` — fail-open audit log recording with actor-type resolution (browser session vs member token) and request IP hashing
-  - `routes/account.ts` — owner-scoped browser-session account export, cached-avatar retrieval/import, and destructive account deletion with exact confirmation phrase, email OTP verification, collaborator-membership teardown, external sole-owner/project-owner guards, and audit logging
+  - `routes/account.ts` — owner-scoped browser-session account export, cached-avatar retrieval and Gravatar import with hosted per-user rate limiting, and destructive account deletion with exact confirmation phrase, email OTP verification, collaborator-membership teardown, external sole-owner/project-owner guards, and audit logging
   - `routes/admin-analytics.ts` — internal browser-session-only aggregate product analytics summary route for the hosted `/analytics` page, gated by verified email auth plus `ADMIN_ANALYTICS_ACCESS_EMAILS` and returning `404` on all denial paths
   - `routes/health.ts` — health/ready/live probes
-  - `routes/auth.ts` — signup/login/logout/session plus invite-acceptance, GitHub start/callback browser-auth flows, GitHub device bootstrap, GitHub access-token exchange, session auth-method disclosure, and best-effort GitHub avatar caching after browser OAuth completion
+  - `routes/auth.ts` — signup/login/logout/session, invite acceptance under the shared hosted auth rate limit, GitHub start/callback browser-auth flows, GitHub device bootstrap, GitHub access-token exchange, session auth-method disclosure, and best-effort GitHub avatar caching after browser OAuth completion
   - `openai-authorization-interaction.ts` / `openai-consent-access.ts` / `openai-oauth-http.ts` / `openai-plugin-runtime.ts` / `openai-reviewer-access.ts` — official OpenAI OAuth/OIDC discovery/authorize/token/revoke/UserInfo/JWKS composition, RFC 9207 response issuer, CIMD/client authentication, API-origin interaction parsing, verified-session consent, synthetic reviewer backend, feature gating, and expiry monitoring
+  - The API timer and worker cleanup share the milestone schedule in
+    `packages/auth/src/reviewer-expiry.ts`.
+    `dogfooding.ts` projects one fingerprint per deadline and a deterministic
+    event ID per milestone. At expiry the worker promotes the grouped incident
+    to critical and refreshes its bundle.
   - `routes/openai-connections.ts` — no-store browser-session connection inventory scoped to exact user/current organization plus confirmed POST-body grant/refresh-family revocation and bounded audit evidence
   - `openai-mcp-http.ts` / `openai-mcp-dependencies.ts` / `openai-mcp-operations.ts` / `openai-mcp-projections.ts` / `openai-rate-limits.ts` — canonical-host stateless Streamable HTTP, route-scoped zero-length binary discovery compatibility, protected-resource/challenge/readiness routes, OAuth principal validation, dedicated readers, strict projection, admission/rates/timeout/output bounds, and metadata-only telemetry
   - `routes/ingestion.ts` — event ingestion; splits accepted `analytics_event` inputs into a separate analytics lane after project-token auth, validates analytics enablement/custom dimensions, persists short-lived raw analytics objects, and avoids incident grouping for analytics events
@@ -1223,6 +1237,11 @@ Public Reports labels retain existing `smart-reports` routes and capability name
 
 ### `apps/web`
 
+- **Dashboard reads:** `lib/api-client.ts` scopes the opt-in management GET cache
+  and rate-limit backoff to the active session and workspace. API adapters own
+  cache lifetimes and save invalidation. The dashboard setup provider skips
+  unrelated navigation, while summary cards still revalidate live counts and
+  check status in the foreground.
 - **Session/update lifecycle:** `lib/session.tsx` coalesces bootstrap/manual/focus reads and revalidates on visible focus/visibility return. `lib/api-auth.ts` fences uncached session reads against identity changes; `lib/api-client.ts` owns in-memory session/CSRF revisions and shared cookie-auth invalidation. Protected adapters reuse that boundary, including management `invalid_member_token` responses. `RootGate` owns the single expiry toast/login redirect. `components/system/app-update-notifier.tsx` uses the existing shared Sonner wrapper for a non-dismissible, untimed Reload notice; completed-reload changelog feedback stays temporary. FR/AC-WEB-13 covers local qualification. FR/AC-WEB-14 adds throttled trusted foreground activity in `lib/session-activity.ts` and revision-fenced renewal in `lib/api-auth.ts`. `packages/auth/src/browser-session-policy.ts` owns seven-day idle/thirty-day absolute bounds; `packages/storage/src/auth-session-store.ts` owns session persistence and atomic renewal, composed by the unchanged auth-store factory. `routes/auth-session-renewal.ts` enforces cookie/CSRF/app-Origin renewal without Set-Cookie; email/GitHub sign-in issue the fixed absolute cookie. Existing created/expiry columns support the policy without a migration; background reads and automation tokens retain their policies.
 
 - **Owns:** Implemented first seven web management slices plus hosted improvement management, project product-analytics overview/routes/funnels/audiences/journeys/opportunities/bundles, customer workspace Analytics inventory, internal operator analytics, and the owner-approved existing-app OpenAI consent/reviewer/connection-revocation experience. Public-auth routes include `/login`, `/signup`, `/invite`, `/oauth/consent`, and `/oauth/reviewer`; signed-in management includes `/settings` plus the existing dashboard/project/incident/analytics/billing routes. The explicitly opted-in `/__dev/openai-plugin` route is a non-public synthetic visual-review harness and is not mounted in production.
@@ -1296,7 +1315,7 @@ Health history ownership: `apps/web/src/pages/health-status-page-utils.ts` build
   - `alert-lifecycle.ts` — shared severity-threshold lifecycle scope defaults, matching, and dedupe key helpers
   - `billing-store.ts` — Postgres billing summary queries derived from organization plan, active-project counts, shared allowance-capacity units, and durable organization/project monthly usage counters
   - `alert-delivery-store.ts` — Postgres alert evaluation queries, immediate alert delivery-intent persistence, and queued email-digest persistence/claiming
-  - `alert-group-inspection.ts` — project/organization-scoped, payload-free group summaries and keyset-paginated member incident IDs for direct deliveries and email digests
+  - `alert-group-inspection.ts` — payload-free group summaries and paginated member IDs for direct alerts and email digests across the requested view's authorized origins. The delivery origin bounds membership even when a rule was created in another origin of the merged project.
   - `schema-migrations-catalog.ts` and `storage-bootstrap-statements.ts` — additive `alert_delivery_members` schema for candidate coalesced direct-delivery membership; worker readiness requires the ordered forward migration before membership writes
   - `operational-email-delivery-store.ts` — Postgres operational email delivery ledger with dedupe and retry state for system-triggered owner notifications
   - `plan-cleanup-task-store.ts` — Postgres durable cleanup-task persistence for external cleanup side effects; downgrade cleanup currently preserves hosted improvement bundle objects rather than queuing object deletion

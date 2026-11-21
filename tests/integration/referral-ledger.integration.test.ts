@@ -14,6 +14,7 @@ import { createReferralReconciliationStore } from "../../packages/storage/src/re
 import { createWorkerJobStore } from "../../packages/storage/src/worker-job-store.js";
 import { createReferralLedgerStore } from "../../packages/storage/src/referral-ledger-store.js";
 import { createReferralStore } from "../../packages/storage/src/referral-store.js";
+import { readReferralAnalytics } from "../../packages/storage/src/referral-analytics-store.js";
 import { REFERRAL_TERMS_VERSION } from "../../packages/referrals/src/referral-contracts.js";
 import type { ReferralReceiptSnapshot } from "../../packages/referrals/src/referral-ledger-contracts.js";
 import {
@@ -149,6 +150,45 @@ runIntegration("immutable referral commissions and manual payout claims", () => 
         )
       ).rows[0]
     ).toEqual({ provider_invoice_id: "in_first" });
+  });
+  it("reports only the creator's attributed accounts, first paid referrals and ledger adjustments by UTC day", async () => {
+    await pool.query("UPDATE referral_attributions SET created_at=$2 WHERE id=$1", [
+      referral,
+      "2026-10-31T23:59:59Z"
+    ]);
+    await ledger.reconcile(snapshot());
+    const fixed = await readReferralAnalytics(db, partnerUser, "7", "2026-11-03T00:00:00Z");
+    expect(fixed).toMatchObject({
+      totals: { referred_accounts: 1, first_paid_referrals: 1, net_commission_minor: 0 }
+    });
+    expect(fixed?.daily).toHaveLength(7);
+    expect(fixed?.daily.find(({ date }) => date === "2026-10-31")).toMatchObject({
+      referred_accounts: 1,
+      first_paid_referrals: 0
+    });
+    expect(fixed?.daily.find(({ date }) => date === "2026-11-01")).toMatchObject({
+      referred_accounts: 0,
+      first_paid_referrals: 1
+    });
+    const reportThroughNow = () =>
+      readReferralAnalytics(db, partnerUser, "7", new Date(Date.now() + 1000).toISOString());
+    const current = await reportThroughNow();
+    expect(current?.totals.net_commission_minor).toBe(2655);
+    await ledger.reconcile(
+      snapshot({
+        observed_at: "2026-12-11T00:00:00.000Z",
+        invoices: [{ ...snapshot().invoices[0]!, refunds: [{ id: "re_full", cash_minor: 5310 }] }]
+      })
+    );
+    expect((await reportThroughNow())?.totals.net_commission_minor).toBe(0);
+    const other = await referrals.joinProgram({
+      user_id: owner,
+      terms_version: REFERRAL_TERMS_VERSION
+    });
+    expect(other.partner_id).not.toBe(partner);
+    expect((await readReferralAnalytics(db, owner, "7", new Date().toISOString()))?.totals).toEqual(
+      { visits: 0, referred_accounts: 0, first_paid_referrals: 0, net_commission_minor: 0 }
+    );
   });
   it("derives partner-visible client status and bounded operator balances from the persisted ledger", async () => {
     await ledger.reconcile(snapshot());

@@ -352,6 +352,11 @@ Project list/detail metrics must include `attention_incidents_today`, counting i
 
 **FR-ALT-08:** Account and project notification preferences support personal email and explicitly labelled shared destinations, channel modes, and channel-selectable timed or indefinite pause/resume. Project modes inherit account defaults unless overridden; active account pauses win. Shared restrictions and recipient preferences both apply. Ordinary members can manage their own email; shared changes require account owner or project owner/admin. Account defaults cover future projects. Monitoring and signed lifecycle automation continue. Suppressed alerts must not replay on resume. Dashboard, API, CLI and ordinary MCP share domain services; restricted read-only catalogs stay unchanged. See `spec/notification-preferences.md`.
 
+**FR-ALT-09:** Alert inspection includes the authorized origins of the requested
+project view. Retained views preserve their original scope. The delivery origin
+bounds incident membership, including deliveries created by a rule in another
+origin of the same merged project.
+
 ### 1.9 CLI
 
 **FR-CLI-01:** Core commands: `login`, `whoami`, `setup`, `connect`, `ingest`, `watch`, `process`, `clean`, `incidents`, `inspect`, `resolve`, `reopen`, `bundle`, `reproduce`, `logs`, `services`, `analyze`, `token project list/create/revoke`, `token member list/create/revoke`, `webhook list/create/update/delete/test/deliveries/retry`, `alert list/create/update/delete`, `weekly-report list/create/update/delete`, `capture-policy get/set`, `improvements list/get/bundle/resolve/reopen/snooze`, `improvements settings get/set`, `project list/create/update/delete`, `project members list/invites/invite/cancel-invite/update-role/remove`, `probe activate/list/deactivate`, `billing get/capacity increase/capacity schedule-reduction/capacity cancel-reduction`.
@@ -529,7 +534,11 @@ share count-aware clients with one read-only fallback for strict older servers.
 Dashboard Incidents today, workspace Incidents, Improvements (including Weekly
 reviews), and both workspace Analytics inventories use the same footer and title
 totals. Dashboard's Projects table is excluded. Preserve Dashboard's local-day
-attention filter and ten-row default. Weekly reviews reads the existing
+attention filter and ten-row default. Returning to a visible dashboard tab
+rechecks the summary cards and incident table in the background. The incident
+card and table share the same exact count. Keep loaded data on transient
+refresh failures and let explicit table navigation take precedence.
+Weekly reviews reads the existing
 authorised metadata pages (50 per request, at most 100 requests, cancelled between
 pages on scope/unmount), counts unique returned reviews only after the complete
 read succeeds, and pages that retained history locally. Failed/incomplete reads
@@ -568,6 +577,12 @@ tax, payment authentication, invoice or portal behaviour.
 **FR-WEB-13:** Revalidate an established browser session on visible window focus and tab visibility return through an uncached, cookie-backed session read. Coalesce overlapping reads without unmounting the current page. Confirmed session loss, including shared management routes' `401 invalid_member_token`, clears local identity/CSRF state and returns protected routes to login with one session-expired toast. Network/server failures preserve the session; late session reads cannot restore an invalidated identity or overwrite a newer sign-in/sign-out. An available app update uses the existing shared toast and Reload action, with no timeout or manual dismissal until reload; the post-reload changelog notice remains temporary.
 
 **FR-WEB-14:** Browser sessions renew automatically during foreground activity, with a seven-day inactivity deadline and a non-renewable thirty-day maximum from original sign-in. Server-side authentication enforces both deadlines. An explicit cookie/CSRF/app-Origin renewal endpoint atomically extends only active, unrevoked sessions with unsuspended membership/organization; it cannot revive an expired session or reset its creation time. Trusted foreground input and visible focused tab return trigger bounded renewal; passive API reads, polling, hidden tabs and timers do not. Sign-in sets the HttpOnly cookie's fixed absolute deadline; renewal never rewrites cookies. CLI/MCP access tokens and SDK project tokens retain their existing policies.
+
+**FR-WEB-15:** Repeated signed-in dashboard management reads share a bounded,
+session-scoped memory cache and coalesce identical requests. Settings writes
+invalidate affected reads. Returning to a visible dashboard refreshes live
+counts and check status, while historical data has a longer freshness window.
+Management-read throttling respects `Retry-After` within the active session.
 
 The preview includes all primary dashboard and project pages, including webhooks/deliveries, tokens, members/invitations, billing/capacity, probes, weekly reports, analytics flows/funnels/journeys/artifacts, and public status settings/options/preview/publication. Public status links stay on the current loopback preview origin; selections are explicit and new checks stay private. Project/check fixtures and newly created records use valid UUIDs, preserving strict production form schemas. Mock credentials cannot authenticate with a real installation; mock checkout and provider setup links stay local. Webhook read failures leave a retryable error state, retain independently available endpoint/history data, and ignore results from an unmounted or previous project view.
 
@@ -1183,7 +1198,7 @@ Noise/configuration advice is required across the controls inventoried in
 The approved [referral programme contract](referral-programmes.md) extends FR-BUS-04
 for new versioned programmes while preserving legacy Business-only claims.
 
-- **FR-REF-01:** Verified creators can reserve a unique normalised branded code; aliases and old generated codes remain bound to the permanent partner, including after deletion.
+- **FR-REF-01:** Verified creators can reserve a unique normalised branded code and replace it once while accepting new referrals. Earlier aliases and generated codes remain bound to the permanent partner, including after deletion.
 - **FR-REF-02:** Programmes have immutable commercial versions and explicit lifecycle; claimed benefits and earnings survive revision, pause and end.
   Activation/scheduling replaces the permanent programme's live revision atomically;
   drafts do not replace it. Group revision history and archive ended mistakes without
@@ -1229,5 +1244,6 @@ for new versioned programmes while preserving legacy Business-only claims.
   summary, with exact terms in the existing app dialog. General terms and guides
   describe programme-defined rates and scope rather than one fixed offer.
 - **FR-REF-10:** Additive migrations precede consumers; readiness verifies invariants; backfill preserves old checksums/data; rollback must understand new obligations and retained financial identity.
-- **FR-REF-11:** Verified creators can save encrypted payment preferences per permanent programme (IBAN, Wise or Revolut; USD, EUR, GBP, CAD or AUD; fixed supported countries). Joining and earning do not require setup. Ordinary reads are masked. Only separately authorised payout operators can prepare a programme payment against an exact preference revision and explicitly reveal its immutable instructions. USD accounting, partner-wide negative offsets, existing payout retries/holds and legacy payments remain compatible. Routine review starts at US$50; smaller balances remain owed and may be settled manually.
+- **FR-REF-11:** Verified creators can save encrypted payment preferences per permanent programme (IBAN, Wise or Revolut; USD, EUR, GBP, CAD or AUD; fixed supported countries). Joining and earning do not require setup. Ordinary reads are masked. Only separately authorised payout operators can prepare a programme payment against an exact preference revision and explicitly reveal its immutable instructions. USD accounting, partner-wide negative offsets, existing payout retries/holds and legacy payments remain compatible. Routine review starts at $50 USD; smaller balances remain owed and may be settled manually.
 - **FR-REF-12:** Confirm each accepted programme revision by email. Celebrate the creator's first verified qualifying paid customer once per permanent programme. Subsequent new customers' first paid purchases enter one conditional daily UTC digest per creator, sectioned by programme; quiet days, trials, visits, renewals and repeat payments create no digest activity. Keep amounts explicitly pending, recipient data private, and queue admission atomic with the corresponding enrolment/verified settlement. Replays, revisions and ambiguous mail acknowledgements cannot cause automatic duplicate sends.
+- **FR-REF-13:** Give creators sharing and management controls on their joined programme card, a downloadable starter kit, and private aggregate referral activity for 7, 30 or 90 UTC days. Reports include anonymously confirmed short-link visits alongside attribution, verified paid service periods and commission records. Share a signed 24-hour receipt per link across tabs in the same browser, deduplicate confirmation in storage, filter obvious automated requests and retain only 90 UTC days of visit receipts. Plot daily visits and first paid referrals, with gaps before visit tracking started and an exact-values table.

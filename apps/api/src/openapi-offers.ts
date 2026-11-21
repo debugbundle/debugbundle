@@ -13,6 +13,11 @@ import {
 } from "../../../packages/referrals/src/offer-operator-contracts.js";
 import { apiError } from "./openapi-components.js";
 import {
+  ReferralVisitCaptureSchema,
+  ReferralVisitConfirmSchema,
+  ReferralVisitReceiptSchema
+} from "../../../packages/referrals/src/referral-visit-contract.js";
+import {
   anyMemberAuth,
   browserSessionAuth,
   component,
@@ -33,7 +38,10 @@ const summaries: Record<OfferOperation, string> = {
     "Preview the cheapest eligible code/promotion; supply target_plan and interval together for exact prices. Referrals win ties.",
   creator: "Read your accepted creator programme and codes",
   join: "Join after explicit acceptance of the exact programme terms",
-  code: "Reserve your one branded creator code",
+  code: "Reserve a branded creator code or replace it once with the expected current code",
+  creator_code_status: "Read whether your preferred branded creator code can be replaced",
+  creator_analytics:
+    "Read private aggregate link visits and referral activity over 7, 30 or 90 UTC days",
   customer: "Read the verified Owner's saved workspace offer",
   quote:
     "Review exact initial and renewal amounts; include_public_offers opts into read-only discovery without a saved claim",
@@ -132,7 +140,7 @@ export function offerOperations(): OperationSpec[] {
         headers: {
           Location: {
             description:
-              "Configured public site destination; caller query destinations are ignored.",
+              "Configured public site destination. The server may add the public code as a visit hint. Caller query destinations are ignored.",
             schema: z.url()
           },
           "Set-Cookie": {
@@ -143,6 +151,42 @@ export function offerOperations(): OperationSpec[] {
       }
     }
   });
+  for (const operation of [
+    {
+      path: "visit-receipts",
+      name: "captureReferralVisit",
+      summary: "Issue or reuse a signed anonymous referral-link visit receipt for up to 24 hours",
+      input: ReferralVisitCaptureSchema,
+      output: z.object({ visit: ReferralVisitReceiptSchema.nullable() }).strict()
+    },
+    {
+      path: "visits",
+      name: "confirmReferralVisit",
+      summary: "Confirm a referral-link landing once per signed receipt",
+      input: ReferralVisitConfirmSchema,
+      output: z.object({ recorded: z.boolean() }).strict()
+    }
+  ])
+    operations.push({
+      method: "post",
+      path: `/v2/offers/${operation.path}`,
+      operationId: operation.name,
+      summary: operation.summary,
+      tags: ["Referrals"],
+      security: [],
+      requestBody: component(`${operation.name}Input`, operation.input),
+      responses: {
+        "400": failures["400"],
+        "403": { description: "Exact public site Origin is required.", schema: apiError },
+        "413": { description: "The request exceeds 2 KiB.", schema: apiError },
+        "429": failures["429"],
+        "200": {
+          description:
+            "Anonymous first-party measurement. Exact public site Origin is required. No attribution or account authority.",
+          schema: component(`${operation.name}Result`, operation.output)
+        }
+      }
+    });
   for (const method of ["post", "delete"] as const)
     operations.push({
       method,

@@ -1,3 +1,11 @@
+# Core 1.31.0 and site 1.12.0 release
+
+The [release contract](spec/release-1.31.0.md) covers creator analytics, short-link
+visit counting and code management, dashboard caching and refresh, and the
+account, consolidation and reviewer-expiry fixes. Exact source checks and
+production receipts are tracked with the release workflows and private hosted
+runbook.
+
 # 19 November core 1.30.1 and site 1.11.3 patch release
 
 Core 1.30.1 contains shared tab-scroll containment across Referrals, project

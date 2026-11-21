@@ -63,6 +63,8 @@ it.each(["first_purchase", "daily_digest"] as const)(
     if (kind === "daily_digest") expect(message.text).toContain("Writers");
     expect(message.text).toContain("$15.20");
     expect(message.html).toContain("$15.20");
+    expect(message.text).toContain("Routine payout review starts at $50 USD");
+    expect(message.html).toContain("Routine payout review starts at $50 USD");
     expect(message.text).toContain("Pending");
     expect(message.text).not.toContain("Activity window");
     expect(message.html).not.toContain("Activity window");

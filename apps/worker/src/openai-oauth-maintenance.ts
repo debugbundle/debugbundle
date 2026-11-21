@@ -1,3 +1,4 @@
+import { createReviewerExpirySchedule } from "../../../packages/auth/src/reviewer-expiry.js";
 import type { RuntimeLogger } from "../../../packages/runtime-logger/src/index.js";
 import type { OpenAiOAuthCleanupResult } from "../../../packages/storage/src/openai-oauth-store.js";
 
@@ -15,6 +16,9 @@ export function createOpenAiOAuthMaintenance(input: {
 }): OpenAiOAuthMaintenance {
   let lastAttemptAt = 0;
   const now = input.now ?? Date.now;
+  const reviewerSchedule = input.reviewerCredentialExpiresAt
+    ? createReviewerExpirySchedule(input.reviewerCredentialExpiresAt)
+    : undefined;
 
   return {
     async runIfDue(): Promise<boolean> {
@@ -24,19 +28,17 @@ export function createOpenAiOAuthMaintenance(input: {
       }
       lastAttemptAt = startedAt;
 
-      if (input.reviewerCredentialExpiresAt !== undefined) {
-        const remainingMs = new Date(input.reviewerCredentialExpiresAt).getTime() - startedAt;
-        const remainingDays = Math.floor(remainingMs / (24 * 60 * 60 * 1_000));
-        if (remainingDays <= 14) {
-          input.logger.warn(
-            {
-              event: "openai_reviewer_credential_expiring",
-              remaining_days: remainingDays,
-              expired: remainingMs <= 0
-            },
-            "openai_reviewer_credential_expiring"
-          );
-        }
+      const reminder = reviewerSchedule?.(startedAt).reminder;
+      if (reminder) {
+        input.logger[reminder.expired ? "error" : "warn"](
+          {
+            event: "openai_reviewer_credential_expiring",
+            remaining_days: reminder.remainingDays,
+            milestone: reminder.milestone,
+            expired: reminder.expired
+          },
+          "openai_reviewer_credential_expiring"
+        );
       }
 
       const result = await input.cleanupExpiredCredentials({ limit: input.batchSize });

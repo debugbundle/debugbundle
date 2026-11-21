@@ -200,6 +200,7 @@ export const ProgrammeErrorCodeSchema = z.enum([
   "programme_terms_mismatch",
   "creator_code_unavailable",
   "creator_code_already_claimed",
+  "creator_code_changed",
   "creator_membership_required",
   "invalid_offer_code",
   "offer_ineligible",

@@ -35,7 +35,7 @@ export function useCursorPagination<TItem>(
   hasNextPage: boolean;
   goToNextPage: () => Promise<void>;
   goToPreviousPage: () => void;
-  refreshPage: () => Promise<void>;
+  refreshPage: (mode?: "foreground" | "background") => Promise<void>;
 } {
   const [pages, setPages] = useState<CachedCursorPage<TItem>[]>([]);
   const [pageIndex, setPageIndex] = useState(0);
@@ -43,12 +43,12 @@ export function useCursorPagination<TItem>(
   const [hasError, setHasError] = useState(false);
   const dependencySignature = JSON.stringify(dependencies);
   const generation = useRef(0);
-  const pending = useRef(false);
+  const pending = useRef<"foreground" | "background" | null>(null);
 
   useEffect(() => {
     let isCancelled = false;
     generation.current += 1;
-    pending.current = true;
+    pending.current = "foreground";
 
     setPages([]);
     setPageIndex(0);
@@ -72,7 +72,7 @@ export function useCursorPagination<TItem>(
         }
       } finally {
         if (!isCancelled) {
-          pending.current = false;
+          pending.current = null;
           setIsLoading(false);
         }
       }
@@ -91,18 +91,20 @@ export function useCursorPagination<TItem>(
       currentPage === undefined ||
       currentPage.nextCursor === null ||
       pageIndex + 1 >= (pages[0]?.totalPages ?? Number.POSITIVE_INFINITY) ||
-      pending.current
+      pending.current === "foreground"
     ) {
       return;
     }
 
+    // Explicit navigation takes priority over an in-flight background refresh.
+    const requestGeneration = ++generation.current;
     if (pages[pageIndex + 1] !== undefined) {
+      pending.current = null;
       setPageIndex((current) => current + 1);
       return;
     }
 
-    const requestGeneration = generation.current;
-    pending.current = true;
+    pending.current = "foreground";
     setIsLoading(true);
 
     try {
@@ -133,27 +135,32 @@ export function useCursorPagination<TItem>(
       showErrorToast("Could not load the next page.");
     } finally {
       if (generation.current === requestGeneration) {
-        pending.current = false;
+        pending.current = null;
         setIsLoading(false);
       }
     }
   }
 
   function goToPreviousPage(): void {
-    if (pending.current) return;
+    if (pending.current === "foreground" || pageIndex === 0) return;
+    generation.current += 1;
+    pending.current = null;
     setPageIndex((current) => Math.max(0, current - 1));
   }
 
-  async function refreshPage(): Promise<void> {
-    if (pending.current) {
+  async function refreshPage(mode: "foreground" | "background" = "foreground"): Promise<void> {
+    if (
+      pending.current === "foreground" ||
+      (pending.current === "background" && mode === "background")
+    ) {
       return;
     }
 
     const cursor = pageIndex === 0 ? null : (pages[pageIndex - 1]?.nextCursor ?? null);
 
-    const requestGeneration = generation.current;
-    pending.current = true;
-    setIsLoading(true);
+    const requestGeneration = ++generation.current;
+    pending.current = mode;
+    if (mode === "foreground") setIsLoading(true);
 
     try {
       const [firstPage, refreshedPage] =
@@ -180,13 +187,13 @@ export function useCursorPagination<TItem>(
       }
       setHasError(false);
     } catch (error) {
-      if (generation.current !== requestGeneration) return;
+      if (generation.current !== requestGeneration || mode === "background") return;
       setHasError(true);
       if (!isInvalidSessionError(error)) showErrorToast("Could not refresh the current page.");
     } finally {
       if (generation.current === requestGeneration) {
-        pending.current = false;
-        setIsLoading(false);
+        pending.current = null;
+        if (mode === "foreground") setIsLoading(false);
       }
     }
   }

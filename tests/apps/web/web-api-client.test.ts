@@ -333,7 +333,7 @@ describe("web api client", () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
       buildApiUrl("/v1/projects/proj_1/availability-checks?limit=50"),
-      { credentials: "include" }
+      { credentials: "include", cache: "no-store" }
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
@@ -610,7 +610,7 @@ describe("web api client", () => {
       buildApiUrl(
         "/v1/incidents?limit=5&cursor=cursor_1&project_id=proj_1&environment=production&service=checkout-api&status=resolved&severity=high&attention_after=2026-03-11T00%3A00%3A00.000Z"
       ),
-      { credentials: "include" }
+      { credentials: "include", cache: "no-store" }
     );
     expect(installUrl).toBe("https://github.com/apps/debugbundle/installations/new");
     expect(fetchMock).toHaveBeenNthCalledWith(2, buildApiUrl("/v1/github/app/install-url"), {

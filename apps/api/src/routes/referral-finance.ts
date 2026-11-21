@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { ApiDependencies } from "../api-types.js";
 import { requireRateLimitedMemberAuth } from "../api-helpers.js";
 import type { ReferralFinance } from "../../../../packages/referrals/src/referral-finance.js";
+import { ReferralAnalyticsQuerySchema } from "../../../../packages/referrals/src/referral-analytics-contract.js";
 import {
   ReferralPayoutPageSchema,
   ReferralOperatorPayoutPageSchema,
@@ -69,6 +70,13 @@ export function registerReferralFinanceRoutes(
   route("GET", "/v1/referrals/earnings", null, async (service, user, _request, reply) =>
     reply.send(await service.earnings(user))
   );
+  route("GET", "/v2/referrals/analytics", null, async (service, user, request, reply) => {
+    const query = ReferralAnalyticsQuerySchema.safeParse(request.query);
+    if (!query.success) return reply.status(400).send({ error: "invalid_query" });
+    const analytics = await service.analytics(user, query.data.days);
+    if (analytics === null) return reply.status(404).send({ error: "creator_membership_required" });
+    return reply.send(analytics);
+  });
   route("GET", "/v1/referrals/payouts", null, async (service, user, request, reply) => {
     const query = page.safeParse(request.query);
     if (!query.success) return reply.status(400).send({ error: "invalid_query" });

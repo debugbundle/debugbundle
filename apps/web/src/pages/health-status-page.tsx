@@ -61,7 +61,7 @@ export function HealthStatusPage(): JSX.Element {
       setProjects(null);
 
       try {
-        const nextProjects = await loadHealthStatusProjects(dayRange);
+        const nextProjects = await loadHealthStatusProjects(dayRange, refreshCount > 0);
         if (!canceled) {
           setProjects(nextProjects);
           setExpandedProjectIds(defaultExpandedProjectIds(nextProjects));
@@ -80,7 +80,7 @@ export function HealthStatusPage(): JSX.Element {
     return () => {
       canceled = true;
     };
-  }, [dayRange, refreshHealthAlert]);
+  }, [dayRange, refreshCount, refreshHealthAlert]);
 
   const summary = useMemo(() => buildWorkspaceSummary(projects ?? []), [projects]);
 
@@ -228,19 +228,25 @@ function StatusMetric({ label, value }: { label: string; value: string }): JSX.E
   );
 }
 
-async function loadHealthStatusProjects(dayRange: string[]): Promise<HealthStatusProjectSummary[]> {
-  const projects = await listProjects();
+async function loadHealthStatusProjects(
+  dayRange: string[],
+  refresh: boolean
+): Promise<HealthStatusProjectSummary[]> {
+  const projects = await listProjects(undefined, { refresh });
   const projectInputs = await Promise.all(
     projects
       .filter((project) => !isSharedProjectAccessSuspended(project))
       .map(async (project): Promise<ProjectHealthStatusInput> => {
-        const { checks } = await listProjectAvailabilityChecks(project.project_id, 100);
+        const { checks } = await listProjectAvailabilityChecks(project.project_id, 100, {
+          refresh
+        });
         const rollupEntries = await Promise.all(
           checks.map(async (check) => {
             const rollups = await listProjectAvailabilityCheckDailyRollups(
               project.project_id,
               check.check_id,
-              STATUS_HISTORY_DAYS
+              STATUS_HISTORY_DAYS,
+              { refresh }
             );
             return [check.check_id, rollups] as const;
           })

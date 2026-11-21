@@ -58,6 +58,26 @@ describe("dashboard attention pagination", () => {
     });
     expect(list).toHaveBeenCalledTimes(1);
   });
+
+  it("continues at the next source cursor when today's incidents exactly fill a display page", async () => {
+    const day = getLocalDayWindow(new Date("2026-06-19T07:00:00.000Z"), "Europe/Ljubljana");
+    const incidents = Array.from({ length: 11 }, (_, index) =>
+      buildIncident({ incident_id: `incident-${index}` })
+    );
+    vi.spyOn(api, "listIncidents").mockImplementation(async (query) =>
+      typeof query === "object" && query.cursor === "next"
+        ? { incidents: incidents.slice(10), nextCursor: null }
+        : { incidents: incidents.slice(0, 10), nextCursor: "next" }
+    );
+    const first = await loadDashboardAttentionIncidentPage(day, null);
+    expect(first.items).toEqual(incidents.slice(0, 10));
+    expect(first.totalCount).toBe(11);
+    expect(first.totalPages).toBe(2);
+    expect(first.nextCursor).not.toBeNull();
+    const second = await loadDashboardAttentionIncidentPage(day, first.nextCursor);
+    expect(second.items).toEqual(incidents.slice(10));
+    expect(second.nextCursor).toBeNull();
+  });
 });
 
 describe("incidents today web filtering", () => {
