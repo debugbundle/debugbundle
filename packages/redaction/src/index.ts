@@ -10,10 +10,12 @@ export interface RedactionResult<T extends JsonValue> {
 
 export interface RedactionOptions {
   sensitiveKeys?: string[];
+  exactKeys?: string[];
   replacement?: string;
 }
 
-import { DEFAULT_SENSITIVE_KEYS, isSensitiveKey } from "./keys.js";
+import { DEFAULT_SENSITIVE_KEYS, isExactSensitiveKey, isSensitiveKey } from "./keys.js";
+export { isExactSensitiveKey } from "./keys.js";
 export {
   sanitizeTelemetry,
   TELEMETRY_PRIVACY_POLICY_VERSION,
@@ -25,6 +27,7 @@ function redactInternal(
   value: JsonValue,
   path: string,
   sensitiveKeys: readonly string[],
+  exactKeys: readonly string[],
   replacement: string,
   touchedPaths: string[],
   seen: WeakSet<object>
@@ -40,6 +43,7 @@ function redactInternal(
         entry,
         path.length === 0 ? `[${index}]` : `${path}[${index}]`,
         sensitiveKeys,
+        exactKeys,
         replacement,
         touchedPaths,
         seen
@@ -64,7 +68,7 @@ function redactInternal(
   for (const [key, nestedValue] of Object.entries(value)) {
     const nextPath = path.length === 0 ? key : `${path}.${key}`;
 
-    if (isSensitiveKey(key, sensitiveKeys)) {
+    if (isSensitiveKey(key, sensitiveKeys) || isExactSensitiveKey(key, exactKeys)) {
       output[key] = replacement;
       touchedPaths.push(nextPath);
       continue;
@@ -74,6 +78,7 @@ function redactInternal(
       nestedValue,
       nextPath,
       sensitiveKeys,
+      exactKeys,
       replacement,
       touchedPaths,
       seen
@@ -91,12 +96,14 @@ export function redact<T extends JsonValue>(
   const sensitiveKeys = options?.sensitiveKeys?.map((key) => key.trim().toLowerCase()) ?? [
     ...DEFAULT_SENSITIVE_KEYS
   ];
+  const exactKeys = options?.exactKeys?.map((key) => key.trim().toLowerCase()) ?? [];
   const replacement = options?.replacement ?? "[REDACTED]";
   const touchedPaths: string[] = [];
   const redacted = redactInternal(
     payload,
     "",
     sensitiveKeys,
+    exactKeys,
     replacement,
     touchedPaths,
     new WeakSet<object>()

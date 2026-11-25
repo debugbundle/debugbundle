@@ -1,5 +1,5 @@
 import type { JsonValue } from "./index.js";
-import { DEFAULT_SENSITIVE_KEYS, isSensitiveKey } from "./keys.js";
+import { DEFAULT_SENSITIVE_KEYS, isExactSensitiveKey, isSensitiveKey } from "./keys.js";
 import { scrubCredentialText } from "./telemetry-text.js";
 
 const REDACTED = "[REDACTED]";
@@ -12,6 +12,7 @@ const MAX_TOTAL_BYTES = 256 * 1024;
 
 export interface TelemetrySanitizationOptions {
   additionalKeys?: readonly string[];
+  exactKeys?: readonly string[];
   maxTotalBytes?: number;
 }
 
@@ -26,6 +27,7 @@ interface WorkState {
   seen: WeakSet<object>;
   keys: string[];
   extra: readonly string[];
+  exact: readonly string[];
   maxTotalBytes: number;
 }
 
@@ -62,7 +64,7 @@ function sanitizeString(value: string, state: WorkState, allowStructured: boolea
     }
   }
 
-  const result = scrubCredentialText(value, state.extra);
+  const result = scrubCredentialText(value, state.extra, true, state.exact);
   if (result !== value) state.redactionCount += 1;
   if ((value.startsWith("{") || value.startsWith("[")) && result === value &&
       /(?:password|token|secret|authorization|cookie)["']?\s*[:=]/i.test(value)) {
@@ -104,16 +106,17 @@ function sanitizeValue(value: unknown, state: WorkState, depth: number, allowStr
       }
       state.textBytes += byteLength(key);
       if (state.textBytes > state.maxTotalBytes) throw new BudgetExceeded();
-      const safeKey = scrubCredentialText(key, state.extra);
+      const safeKey = scrubCredentialText(key, state.extra, true, state.exact);
       if (safeKey !== key) {
         state.redactionCount += 1;
         continue;
       }
       const descriptor = Object.getOwnPropertyDescriptor(value, key);
       if (descriptor === undefined || !("value" in descriptor)) throw new TypeError("unsafe_input");
-      const safeValue = isSensitiveKey(key, state.keys)
-        ? mask(state)
-        : sanitizeValue(descriptor.value, state, depth + 1, allowStructured);
+      const safeValue =
+        isSensitiveKey(key, state.keys) || isExactSensitiveKey(key, state.exact)
+          ? mask(state)
+          : sanitizeValue(descriptor.value, state, depth + 1, allowStructured);
       Object.defineProperty(result, key, {
         value: safeValue,
         enumerable: true,
@@ -131,7 +134,12 @@ function sanitizeValue(value: unknown, state: WorkState, depth: number, allowStr
 export function sanitizeTelemetry(value: unknown, options: TelemetrySanitizationOptions = {}): TelemetrySanitizationResult {
   try {
     const extra = options.additionalKeys ?? [];
-    if (extra.length > 128 || extra.some((key) => typeof key !== "string" || key.length > 64 || !key.trim())) {
+    const exact = options.exactKeys ?? [];
+    if (
+      extra.length + exact.length > 128 ||
+      extra.some((key) => typeof key !== "string" || key.length > 64 || !key.trim()) ||
+      exact.some((key) => typeof key !== "string" || key.length > 64 || !key.trim())
+    ) {
       return { ok: false, reason: "unsafe_input" };
     }
     const maxTotalBytes = options.maxTotalBytes ?? MAX_TOTAL_BYTES;
@@ -145,6 +153,7 @@ export function sanitizeTelemetry(value: unknown, options: TelemetrySanitization
       seen: new WeakSet<object>(),
       keys: [...DEFAULT_SENSITIVE_KEYS, ...extra],
       extra,
+      exact,
       maxTotalBytes
     };
     const sanitized = sanitizeValue(value, state, 0, true);
