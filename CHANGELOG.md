@@ -6,6 +6,8 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.32.0] - 2026-11-25
+
 ### Added
 
 - Open or reopen browser resource incidents after a configurable rolling threshold and retain routes from the qualifying window. Allow higher-specificity rules to surface critical resources immediately.
