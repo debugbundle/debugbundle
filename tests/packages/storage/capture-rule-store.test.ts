@@ -312,23 +312,37 @@ describe("capture rule store", () => {
   });
 
   describe("capture rule threshold store", () => {
-    it("bounds rolling-window counts to [lower_bound, received_at] so out-of-order arrivals exclude later events", async () => {
+    const thresholdInput = {
+      project_id: "00000000-0000-4000-8000-000000000010",
+      service_name: "web",
+      environment: "production",
+      fingerprint: "fp_resource_1",
+      event_id: "00000000-0000-4000-8000-000000000201",
+      occurred_at: "2026-11-24T09:00:00.000Z",
+      received_at: "2026-11-24T09:00:00.000Z",
+      resource_route: "/gallery/42",
+      rule_id: "00000000-0000-4000-8000-000000000101",
+      threshold_count: 3,
+      threshold_window_seconds: 3600,
+      threshold_group_by: "resource" as const,
+      bucket_key: JSON.stringify(["resource", "cdn.example.com", "/assets/app.js"]),
+      rule_updated_at: "2026-11-24T08:00:00.000Z"
+    };
+    const liveRule = {
+      enabled: true,
+      action: "threshold",
+      expires_at: null,
+      threshold_count: 3,
+      threshold_window_seconds: 3600,
+      updated_at: thresholdInput.rule_updated_at
+    };
+
+    it("bounds the search to rolling windows that could include an out-of-order receipt", async () => {
       const query = vi
         .fn()
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({
-          rows: [
-            {
-              enabled: true,
-              action: "threshold",
-              expires_at: null,
-              threshold_count: 3,
-              threshold_window_seconds: 3600,
-              updated_at: "2026-11-24T08:00:00.000Z"
-            }
-          ]
-        })
+        .mockResolvedValueOnce({ rows: [liveRule] })
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({
@@ -342,22 +356,7 @@ describe("capture rule store", () => {
         });
 
       const thresholdStore = createPostgresCaptureRuleThresholdStore({ query });
-      const result = await thresholdStore.evaluateThresholdGate({
-        project_id: "00000000-0000-4000-8000-000000000010",
-        service_name: "web",
-        environment: "production",
-        fingerprint: "fp_resource_1",
-        event_id: "00000000-0000-4000-8000-000000000201",
-        occurred_at: "2026-11-24T09:00:00.000Z",
-        received_at: "2026-11-24T09:00:00.000Z",
-        resource_route: "/gallery/42",
-        rule_id: "00000000-0000-4000-8000-000000000101",
-        threshold_count: 3,
-        threshold_window_seconds: 3600,
-        threshold_group_by: "resource",
-        bucket_key: JSON.stringify(["resource", "cdn.example.com", "/assets/app.js"]),
-        rule_updated_at: "2026-11-24T08:00:00.000Z"
-      });
+      const result = await thresholdStore.evaluateThresholdGate(thresholdInput);
 
       expect(result).toEqual({ status: "pending", count: 1 });
       const selectCall = query.mock.calls[5];
@@ -375,6 +374,107 @@ describe("capture rule store", () => {
         "2026-11-24T09:00:00.000Z",
         3600,
         3
+      ]);
+    });
+
+    it("keeps only distinct earlier events in the backfill and consumes the selected window", async () => {
+      const priorEvent = {
+        event_id: "00000000-0000-4000-8000-000000000200",
+        occurred_at: "2026-11-24T08:45:00.000Z",
+        resource_route: null
+      };
+      const query = vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [{ ...liveRule, threshold_count: 2 }] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({
+          rows: [
+            { ...priorEvent, occurred_at: new Date(priorEvent.occurred_at) },
+            {
+              event_id: thresholdInput.event_id,
+              occurred_at: thresholdInput.occurred_at,
+              resource_route: "/gallery/{param}"
+            }
+          ]
+        })
+        .mockResolvedValueOnce({ rows: [] });
+      const store = createPostgresCaptureRuleThresholdStore({ query });
+      const result = await store.evaluateThresholdGate({ ...thresholdInput, acquire_locks: false });
+      const eventIds = [priorEvent.event_id, thresholdInput.event_id];
+      expect(result).toEqual({
+        status: "crossed",
+        prior_events: [priorEvent],
+        consumed_event_ids: eventIds
+      });
+      await store.consumeThresholdEvents({ event_ids: [] });
+      expect(query).toHaveBeenCalledTimes(4);
+      await store.consumeThresholdEvents({ event_ids: eventIds });
+      expect(query).toHaveBeenLastCalledWith(expect.stringContaining("DELETE FROM"), [eventIds]);
+    });
+
+    it.each([
+      { rule: { ...liveRule, enabled: false }, received: thresholdInput.received_at },
+      { rule: liveRule, received: "invalid" },
+      {
+        rule: { ...liveRule, expires_at: thresholdInput.received_at },
+        received: thresholdInput.received_at
+      }
+    ])("bypasses a gate that cannot apply to this receipt", async ({ rule, received }) => {
+      const query = vi.fn().mockResolvedValueOnce({ rows: [rule] });
+      const store = createPostgresCaptureRuleThresholdStore({ query });
+      await expect(
+        store.evaluateThresholdGate({
+          ...thresholdInput,
+          received_at: received,
+          acquire_locks: false
+        })
+      ).resolves.toEqual({ status: "bypass" });
+      expect(query).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      {
+        rule: liveRule,
+        incident: { status: "open", resolved_at: null },
+        expected: { status: "bypass" }
+      },
+      {
+        rule: { ...liveRule, updated_at: "2026-11-24T08:30:00.000Z" },
+        incident: null,
+        expected: { status: "pending", count: 0 }
+      },
+      {
+        rule: liveRule,
+        incident: { status: "resolved", resolved_at: "2026-11-24T09:30:00.000Z" },
+        expected: { status: "pending", count: 0 }
+      }
+    ])(
+      "skips writing a threshold event for a stale or already-open incident job",
+      async ({ rule, incident, expected }) => {
+        const query = vi
+          .fn()
+          .mockResolvedValueOnce({ rows: [rule] })
+          .mockResolvedValueOnce({ rows: incident === null ? [] : [incident] });
+        const store = createPostgresCaptureRuleThresholdStore({ query });
+        await expect(
+          store.evaluateThresholdGate({ ...thresholdInput, acquire_locks: false })
+        ).resolves.toEqual(expected);
+        expect(query).toHaveBeenCalledTimes(2);
+      }
+    );
+
+    it("reports the rows pruned in a bounded retention batch", async () => {
+      const query = vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [{ event_id: thresholdInput.event_id }] });
+      const store = createPostgresCaptureRuleThresholdStore({ query });
+      await expect(
+        store.pruneExpiredCaptureRuleThresholdEvents({ now: thresholdInput.received_at, limit: 10 })
+      ).resolves.toBe(1);
+      expect(query).toHaveBeenCalledWith(expect.stringContaining("LIMIT $2"), [
+        thresholdInput.received_at,
+        10
       ]);
     });
   });

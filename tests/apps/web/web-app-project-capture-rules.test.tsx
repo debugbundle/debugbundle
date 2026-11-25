@@ -706,6 +706,38 @@ describe("web app — project capture rules", () => {
     );
   });
 
+  it("defaults threshold grouping to the matching resource and preserves the selected window", async () => {
+    function Harness(): JSX.Element {
+      const [draft, setDraft] = useState<CaptureRuleCreateDraft>({
+        ...createDefaultCaptureRuleCreateDraft(),
+        name: "Optional script threshold",
+        resourceHost: "cdn.example.com",
+        browserEventKind: "resource_error"
+      });
+      return <CaptureRuleCreateForm draft={draft} disabled={false} onDraftChange={setDraft} />;
+    }
+
+    render(<Harness />);
+    const user = userEvent.setup();
+    await openSelect(/^action$/i);
+    await user.click(screen.getByRole("option", { name: /^open after repeated failures$/i }));
+    expect(screen.getByLabelText(/^group threshold by$/i)).toHaveTextContent(
+      "Resource host + path"
+    );
+    await openSelect(/^rolling window$/i);
+    await user.click(screen.getByRole("option", { name: /^custom seconds$/i }));
+    fireEvent.change(screen.getByLabelText(/^custom window \(seconds\)$/i), {
+      target: { value: "75" }
+    });
+
+    await openSelect(/^action$/i);
+    await user.click(screen.getByRole("option", { name: /^allow immediately$/i }));
+    expect(screen.queryByLabelText(/^rolling window$/i)).toBeNull();
+    await openSelect(/^action$/i);
+    await user.click(screen.getByRole("option", { name: /^open after repeated failures$/i }));
+    expect(screen.getByLabelText(/^custom window \(seconds\)$/i)).toHaveValue(75);
+  });
+
   it("updates guided form controls across matcher and sampling fields", async () => {
     const setInputValue = (label: RegExp, value: string): void => {
       fireEvent.change(screen.getByLabelText(label), {

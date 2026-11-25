@@ -412,6 +412,31 @@ describe("cli capture-rule commands", () => {
     expect(badRequest.output).toBe("Invalid capture rule create payload.");
   });
 
+  it("reports that the hosted bridge has paused threshold writes", async () => {
+    const request = vi.fn().mockResolvedValue({
+      status: 503,
+      body: { error: "capture_rule_v2_writes_paused" }
+    });
+    const result = await createCaptureRuleCommand(
+      {
+        bearerToken: "dbundle_mem_owner",
+        projectId: "proj_1",
+        create: {
+          name: "Threshold analytics resources",
+          action: "threshold",
+          matcher: rule.matcher,
+          threshold_count: 5,
+          threshold_window_seconds: 3600,
+          threshold_group_by: "resource"
+        }
+      },
+      createCaptureRuleApi({ request })
+    );
+
+    expect(result).toEqual({ exitCode: 1, output: "capture_rule_v2_writes_paused" });
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
   it("builds CRUD requests against the capture-rule API and accepts idempotent suggestion creates", async () => {
     const request = vi
       .fn()

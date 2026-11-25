@@ -1,5 +1,8 @@
 import { expect, it } from "vitest";
-import { formatCaptureRuleMatcher } from "../../../apps/web/src/lib/capture-rule-copy.js";
+import {
+  formatCaptureRuleMatcher,
+  formatCaptureRuleThresholdSummary
+} from "../../../apps/web/src/lib/capture-rule-copy.js";
 import { preserveAlertNoiseSettings } from "../../../packages/shared-types/src/alert-notification-policy.js";
 
 it("puts the affected resource first without omitting its type or service scope", () => {
@@ -27,6 +30,20 @@ it("displays every safety condition on a lifecycle-scoped capture rule", () => {
   expect(result).toContain("target: link");
   expect(result).toContain("rel=modulepreload");
   expect(result).toContain("integrity_present=false");
+});
+
+it.each([
+  [3600, "1h"],
+  [900, "15m"],
+  [75, "75s"]
+])("preserves a threshold window of %i seconds in the rule summary", (seconds, window) => {
+  expect(
+    formatCaptureRuleThresholdSummary({
+      threshold_count: 10,
+      threshold_window_seconds: seconds,
+      threshold_group_by: "resource"
+    })
+  ).toBe(`10× / ${window} · resource`);
 });
 
 it("retains noise controls when editing a destination without carrying stale destination fields", () => {

@@ -2,37 +2,37 @@
 
 ## Eligibility
 
-| Distribution                                   | Decision               | Current → candidate     | Shipped change                                                                         |
-| ---------------------------------------------- | ---------------------- | ----------------------- | -------------------------------------------------------------------------------------- |
-| Shared types                                   | Publish                | 3.8.0 → 3.9.0           | Additive capture-rule schemas, evaluation and resource suggestions.                    |
-| Redaction                                      | Publish                | 2.7.1 → 2.8.0           | Exact-key extensions and schema-aware protocol-field handling.                         |
-| Core and dashboard                             | Publish                | 1.31.0 → 1.32.0         | Forward migration, hosted threshold enforcement, incident evidence and rule controls.  |
-| CLI                                            | Publish                | 1.29.0 → 1.30.0         | Threshold management, local incident separation and installed skill guidance.          |
-| Ordinary MCP and Official MCP Registry         | Publish                | 1.29.0 → 1.30.0         | Existing tools take new capture-rule inputs through the shared schemas.                |
-| ClawHub portable skill                         | Publish                | 1.29.0 → 1.30.0         | Installed rule selection and diagnosis guidance with verified npm pins.                |
-| ClawHub OpenClaw plugin                        | Publish                | 1.29.0 → 1.30.0         | Full MCP tool projection carries the new rule inputs.                                  |
-| Smithery MCP and skill                         | Retain                 | Existing listings       | The provider retired its publishing API and CLI.                                       |
-| Claude Code plugin                             | Publish                | 1.25.0 → 1.25.1         | Installed incident diagnosis and capture-rule guidance.                                |
-| Codex plugin                                   | Publish                | 1.9.0 → 1.9.1           | Installed incident diagnosis and capture-rule guidance.                                |
-| Gemini extension                               | Publish                | 1.8.0 → 1.8.1           | Installed incident diagnosis and capture-rule guidance.                                |
-| OpenAI skill archive                           | Retain public version  | 1.1.0 candidate refresh | Updated diagnosis and CLI handoff guidance. Keep the existing tool contracts and scopes. |
-| OpenAI portal and listing                      | Retain                 | Existing                | Candidate archive preparation is the selected distribution action.                     |
-| Browser SDK                                    | Publish                | 3.2.4 → 3.3.0           | Teardown visibility and exact-key privacy before evidence retention.                   |
-| Node SDK                                       | Publish                | 3.2.4 → 3.3.0           | Exact-key privacy in capture, probes and delivery hooks.                               |
-| PHP SDK                                        | Publish                | 2.1.4 → 2.2.0           | Exact-key privacy and allowlisted Laravel/Symfony rate-limit evidence.                 |
-| Python SDK                                     | Publish                | 3.0.0 → 3.1.0           | Exact-key privacy in capture and Django, FastAPI and Flask relays.                     |
-| Go SDK                                         | Publish                | 3.1.4 → 3.2.0           | Exact-key privacy in capture and relay evidence.                                       |
-| Rust SDK                                       | Publish                | 1.0.2 → 1.1.0           | Exact-key privacy at the event and relay wire boundaries.                              |
-| Ruby SDK                                       | Publish                | 2.1.4 → 2.2.0           | Exact-key privacy in capture, Rails and the relay handler.                             |
-| Java family                                    | Publish                | 3.1.4 → 3.2.0           | Exact-key privacy in capture, the Web relay and Spring Boot configuration.             |
-| .NET family                                    | Publish                | 2.1.4 → 2.2.0           | Exact-key privacy in SDK capture and ASP.NET Core relay delivery.                      |
-| Android family                                 | Publish                | 3.1.4 → 3.2.0           | Exact-key privacy in retained native evidence and capture.                             |
-| Swift SDK                                      | Publish                | 3.1.5 → 3.2.0           | Exact-key privacy through native capture, runtime evidence and the crash reporter.     |
-| WordPress plugin                               | Publish                | 2.1.4 → 2.2.0           | Bundles the released PHP and Browser privacy and evidence changes.                     |
-| React Native SDK                               | Publish                | 3.1.4 → 3.2.0           | Exact-key privacy across JavaScript and both native bridges.                           |
-| Public site                                    | Publish                | 1.12.0 → 1.13.0         | Capture controls, privacy guidance, generated API reference and released SDK versions. |
-| GitHub Action and other unchanged integrations | Retain                 | Existing                | Existing public artifacts retain their installed behaviour.                            |
-| CocoaPods Trunk                                | Retain                 | Existing                | Swift selects immutable Git tags, SPM and Git pods.                                    |
+| Distribution                                   | Decision              | Current → candidate     | Shipped change                                                                           |
+| ---------------------------------------------- | --------------------- | ----------------------- | ---------------------------------------------------------------------------------------- |
+| Shared types                                   | Publish               | 3.8.0 → 3.9.0           | Additive capture-rule schemas, evaluation and resource suggestions.                      |
+| Redaction                                      | Publish               | 2.7.1 → 2.8.0           | Exact-key extensions and schema-aware protocol-field handling.                           |
+| Core and dashboard                             | Publish               | 1.31.0 → 1.32.0         | Forward migration, hosted threshold enforcement, incident evidence and rule controls.    |
+| CLI                                            | Publish               | 1.29.0 → 1.30.0         | Threshold management, local incident separation and installed skill guidance.            |
+| Ordinary MCP and Official MCP Registry         | Publish               | 1.29.0 → 1.30.0         | Existing tools take new capture-rule inputs through the shared schemas.                  |
+| ClawHub portable skill                         | Publish               | 1.29.0 → 1.30.0         | Installed rule selection and diagnosis guidance with verified npm pins.                  |
+| ClawHub OpenClaw plugin                        | Publish               | 1.29.0 → 1.30.0         | Full MCP tool projection carries the new rule inputs.                                    |
+| Smithery MCP and skill                         | Retain                | Existing listings       | The provider retired its publishing API and CLI.                                         |
+| Claude Code plugin                             | Publish               | 1.25.0 → 1.25.1         | Installed incident diagnosis and capture-rule guidance.                                  |
+| Codex plugin                                   | Publish               | 1.9.0 → 1.9.1           | Installed incident diagnosis and capture-rule guidance.                                  |
+| Gemini extension                               | Publish               | 1.8.0 → 1.8.1           | Installed incident diagnosis and capture-rule guidance.                                  |
+| OpenAI skill archive                           | Retain public version | 1.1.0 candidate refresh | Updated diagnosis and CLI handoff guidance. Keep the existing tool contracts and scopes. |
+| OpenAI portal and listing                      | Retain                | Existing                | Candidate archive preparation is the selected distribution action.                       |
+| Browser SDK                                    | Publish               | 3.2.4 → 3.3.0           | Teardown visibility and exact-key privacy before evidence retention.                     |
+| Node SDK                                       | Publish               | 3.2.4 → 3.3.0           | Exact-key privacy in capture, probes and delivery hooks.                                 |
+| PHP SDK                                        | Publish               | 2.1.4 → 2.2.0           | Exact-key privacy and allowlisted Laravel/Symfony rate-limit evidence.                   |
+| Python SDK                                     | Publish               | 3.0.0 → 3.1.0           | Exact-key privacy in capture and Django, FastAPI and Flask relays.                       |
+| Go SDK                                         | Publish               | 3.1.4 → 3.2.0           | Exact-key privacy in capture and relay evidence.                                         |
+| Rust SDK                                       | Publish               | 1.0.2 → 1.1.0           | Exact-key privacy at the event and relay wire boundaries.                                |
+| Ruby SDK                                       | Publish               | 2.1.4 → 2.2.0           | Exact-key privacy in capture, Rails and the relay handler.                               |
+| Java family                                    | Publish               | 3.1.4 → 3.2.0           | Exact-key privacy in capture, the Web relay and Spring Boot configuration.               |
+| .NET family                                    | Publish               | 2.1.4 → 2.2.0           | Exact-key privacy in SDK capture and ASP.NET Core relay delivery.                        |
+| Android family                                 | Publish               | 3.1.4 → 3.2.0           | Exact-key privacy in retained native evidence and capture.                               |
+| Swift SDK                                      | Publish               | 3.1.5 → 3.2.0           | Exact-key privacy through native capture, runtime evidence and the crash reporter.       |
+| WordPress plugin                               | Publish               | 2.1.4 → 2.2.0           | Bundles the released PHP and Browser privacy and evidence changes.                       |
+| React Native SDK                               | Publish               | 3.1.4 → 3.2.0           | Exact-key privacy across JavaScript and both native bridges.                             |
+| Public site                                    | Publish               | 1.12.0 → 1.13.0         | Capture controls, privacy guidance, generated API reference and released SDK versions.   |
+| GitHub Action and other unchanged integrations | Retain                | Existing                | Existing public artifacts retain their installed behaviour.                              |
+| CocoaPods Trunk                                | Retain                | Existing                | Swift selects immutable Git tags, SPM and Git pods.                                      |
 
 ## Qualification
 
@@ -54,6 +54,8 @@ Candidate qualification is in progress. Shared package source and versions are c
 
 Once a new rule is saved, the deployed predecessor samples out threshold and allow matches and can broaden a multi-URL drop. This was reproduced with synthetic events using the exact deployed source. The two-step rehearsal verified that the paused bridge refuses new threshold writes and can read rows created by the enabled runtime. Cloud deployment tests verify the active and retained image gate.
 
+The tested bridge automation was merged into DebugBundle Cloud at `f9284e357ea1af6668cadb13f444e5f44b633860`. The first hosted promotion is gated on core qualification and shared package publication. [Cloud pull request](https://github.com/debugbundle/debugbundle-cloud/pull/12)
+
 | Local candidate   | Verification                                                                                                                                         |
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Node and Browser  | 698 source tests against the packed shared candidates.                                                                                               |
@@ -61,8 +63,10 @@ Once a new rule is saved, the deployed predecessor samples out threshold and all
 | Go                | Tests, vet, lint and the per-file coverage gate pass with invalid resource-observation cases.                                                        |
 | Rust              | Formatting, lint, typecheck, feature checks, tests and local crate packaging pass.                                                                   |
 | Java and .NET     | Maven verification and .NET build and tests pass.                                                                                                    |
-| Android and Swift | Per-file coverage and native source tests pass. Swift Git-pod workflow tests pass.                                                                   |
+| Android and Swift | Per-file coverage and native source tests pass. Swift passes 176 iOS simulator tests and the Git-pod workflow tests.                                 |
 | React Native      | JavaScript and iOS bridge harness pass. Public Maven and Swift artifacts are prerequisites for installed wrapper, bare React Native and Expo checks. |
 | WordPress         | The PHP and Browser releases are prerequisites for the final ZIP and installed runtime checks.                                                       |
 
-The packed CLI candidate passes clean local installs on Node 22, 24 and 26. Candidate site artifacts, SDK documentation checks, tests, static build and typecheck pass. Public SDK installs and the broader site rollout follow publication.
+The packed CLI candidate passes clean local installs on Node 22, 24 and 26. The packed OpenClaw candidate loads all 234 tools and passes installed scoped requests on the supported minimum host 2026.6.9 and current public host 2026.11.10. The current-host check uses source and capability acknowledgements for the reviewed local archive in a disposable profile. The public ClawHub install and ClawScan remain separate release gates.
+
+Candidate site artifacts, SDK documentation checks, tests, static build and typecheck pass. Public SDK installs and the broader site rollout follow publication.

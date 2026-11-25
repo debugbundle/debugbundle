@@ -30,6 +30,7 @@ function createMockRetentionStore(overrides: Partial<RetentionStore> = {}): Rete
 
 describe("retention cleanup service", () => {
   it.each([
+    "pruneExpiredCaptureRuleThresholdEvents",
     "pruneExpiredReportLifecycleFacts",
     "pruneExpiredReportSourceText",
     "pruneExpiredReportAvailability",
@@ -56,6 +57,7 @@ describe("retention cleanup service", () => {
     }
   );
   it.each([
+    "pruneExpiredCaptureRuleThresholdEvents",
     "pruneExpiredReportLifecycleFacts",
     "pruneExpiredReportSourceText",
     "pruneExpiredReportAvailability",
@@ -112,6 +114,18 @@ describe("retention cleanup service", () => {
       cleanup.runCleanup({ scheduled_at: "2026-10-03T00:00:00.000Z" })
     ).resolves.toBeUndefined();
     expect(listExpiredSampledRawEvents).toHaveBeenCalledTimes(1);
+  });
+
+  it("prunes capture rule threshold events through the Postgres retention store", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ event_id: "expired-event" }] });
+    const store = createPostgresRetentionStore({ query });
+    const now = "2026-11-25T00:00:00.000Z";
+
+    await expect(store.pruneExpiredCaptureRuleThresholdEvents!({ now, limit: 5 })).resolves.toBe(1);
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("DELETE FROM capture_rule_threshold_events"),
+      [now, 5]
+    );
   });
 
   it("queries and updates retention records through the postgres store", async (): Promise<void> => {
