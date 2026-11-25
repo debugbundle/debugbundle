@@ -1,5 +1,13 @@
 # Agent distribution ledger
 
+## Browser resource controls — 25 November 2026
+
+CLI and MCP 1.30.0 are live on npm from `d3505b12d3413e5ba11e048620b93b4283f45bf6`. Fresh registry installs exercise both packages on Node 22, 24, and 26. The official MCP Registry resolves `com.debugbundle/mcp` at 1.30.0. [CLI workflow](https://github.com/debugbundle/debugbundle/actions/runs/45666347848) · [MCP workflow](https://github.com/debugbundle/debugbundle/actions/runs/45666347355)
+
+ClawHub accepted the portable skill and OpenClaw plugin 1.30.0 submissions. Publication verification waits for the exact versions and their final ClawScan results. The packed plugin passes installed checks on OpenClaw 2026.6.9 and 2026.11.10. The OpenAI 1.1.0 candidate archive uses the live API digest with the existing registered connection, tool declarations, and scopes.
+
+Codex 1.9.1, Claude Code 1.25.1, and Gemini 1.8.1 pin the published MCP 1.30.0. Native candidate checks pass for all three with 234 ordinary tools and synthetic data. Public installation checks follow marketplace and standalone promotion. [Release record](browser-resource-release-20261125.md)
+
 ## Programme and People release — 19 November 2026
 
 CLI/MCP 1.28.0 are published from qualified core `e29549e3`, merged as `cfff75b6`

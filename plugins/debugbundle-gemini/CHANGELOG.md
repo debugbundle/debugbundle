@@ -1,5 +1,9 @@
 # DebugBundle for Gemini CLI changelog
 
+## [1.8.1] - 2026-11-25
+
+- Adopt MCP 1.30.0 and add guidance for diagnosing browser resource failures and selecting scoped capture rules.
+
 ## [1.8.0] - 2026-11-17
 
 - Adopt MCP 1.26.0 with configurable referral programmes, offer management and payout-preference tools. Preserve local authentication and existing tool permissions.
