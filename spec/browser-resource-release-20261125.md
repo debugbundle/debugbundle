@@ -110,7 +110,9 @@ The Rust 1.1.0 tag stopped before crate publication. The release audit found adv
 
 ### Public documentation
 
-Site 1.13.0 was qualified from `faa5692151f8bd59d7fdd0aee1753fcf86f6ab80` after the final SDK appeared on its registry. The generated API and machine-readable reference artifacts were refreshed. All 51 SDK documentation contract tests and 137 site tests passed, as did the webpack static export and typecheck. The deployment and CDN readback are recorded separately below after publication.
+Site 1.13.0 was qualified from `faa5692151f8bd59d7fdd0aee1753fcf86f6ab80` after the final SDK appeared on its registry. All 51 SDK documentation contract tests and 137 site tests passed, as did the webpack static export, typecheck, GitHub CI and tagged release. [Site release](https://github.com/debugbundle/site/releases/tag/v1.13.0) · [Site CI](https://github.com/debugbundle/site/actions/runs/45693251583)
+
+The hosted deployment used site commit `faa5692151f8bd59d7fdd0aee1753fcf86f6ab80` and product commit `f4e89f3d22f01b2050b5e8edd900fc2ba3def2e9`. After CloudFront invalidation, independent public checks matched all 13 version banners, both saved-report disclosures, the current capture guide, the exact generated OpenAPI bytes and Rust discovery version, plus the referenced site CSS and JavaScript. API and MCP remained ready, and the dashboard’s served JavaScript embedded the qualified Core 1.32.0 commit. [Hosted site workflow](https://github.com/debugbundle/debugbundle-cloud/actions/runs/45693625709)
 
 ### Consumer adoption
 

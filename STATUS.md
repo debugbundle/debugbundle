@@ -10,6 +10,8 @@ CLI and ordinary MCP 1.30.0, the Official MCP Registry, ClawHub skill and OpenCl
 
 All 13 maintained SDK capture surfaces shipped their coordinated privacy updates. React Native 3.2.0 passed bare Android, bare iOS and Expo runtime delivery against the published Android and Swift 3.2.0 dependencies. WordPress 2.2.0 passed the installed ZIP smoke and public directory readback with PHP 2.2.0 and Browser 3.3.0. [SDK release evidence](spec/browser-resource-release-20261125.md#sdks)
 
+Site 1.13.0 is live. CloudFront invalidation, all 13 live SDK version banners, the updated capture guide, exact generated OpenAPI, privacy disclosures and linked static assets passed readback. [Site release evidence](spec/browser-resource-release-20261125.md#public-documentation)
+
 # Core 1.31.0 and site 1.12.0 release
 
 The [release contract](spec/release-1.31.0.md) covers creator analytics, short-link
