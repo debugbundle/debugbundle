@@ -3,7 +3,7 @@
   "plugin_version": "1.1.0",
   "evidence_state": "local_connection_ready",
   "source": {
-    "commit": "ba3204a08ff9b1c713afdbf10ba87a824195c750",
+    "commit": "c32f82649777df428cd8888c811324428a3fe659",
     "tree_clean": true,
     "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
@@ -11,18 +11,18 @@
     "resource_origin": "https://mcp.debugbundle.com",
     "mcp_endpoint": "https://mcp.debugbundle.com/mcp",
     "oauth_issuer": "https://api.debugbundle.com",
-    "api_image_digest": "sha256:a3167f509cfff7ecbc08c8a76fbfd3b18996f264328dfd6da082b36e52fa8d4f"
+    "api_image_digest": "sha256:1f93af2d9b68cb9300dcd28ffd158a517cf870ee48e7423e00fe73594b2313fa"
   },
   "registered_connection_id": "plugin_asdk_app_6a99ba6c1e7881919091a592738692c6",
   "package": {
     "archive_file": "debugbundle-openai-plugin-1.1.0.zip",
-    "archive_sha256": "85a9350d0faf0c71fd4a2bb619c996e1cffc38f9ff5551886c891926dc25497c",
-    "archive_bytes": 71692,
+    "archive_sha256": "d439398876286340ec4ad50427f77a21af839d7e35f7ef596db27acd39bd4cbe",
+    "archive_bytes": 72189,
     "files": {
       "LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
       "README.md": "244a6804968f43872ae3731166b2a7f9e5b7cde8fb2107839f5e89751a348a72",
       "assets/icon-512.png": "a05a29674a75a945b1a378c73c27322c9b1f14456329bec1fc1d986453696e30",
-      "skills/debugbundle/SKILL.md": "21afb43f76b2030a0b8ae8056d3af4d756975e2db5d2cfcfda17e52812a0f787",
+      "skills/debugbundle/SKILL.md": "52e4a68785c683ddec897f234ed76ed1fc33e2d04f76825734e61de2e6bfb035",
       "skills/debugbundle/references/cli-handoff.md": "0327b8f03ff1d59b572fe732dfec3f6b962baec881b6a5b1c2fa848d525ca40c",
       "skills/debugbundle/references/privacy-and-safety.md": "436983b21e6570654ff18c148c1099b64f5e051353b02ac7b002b91430ce9682",
       "skills/debugbundle/references/tools.md": "c5e0b001f04c3925967b21a16e94d7e93e92bcf677267ae0f92a50b12fca1020",
