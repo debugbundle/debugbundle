@@ -167,6 +167,7 @@ export function createApiDependenciesFromEnv(
     smartReportConfig: configureSmartReports(env),
     smartImprovementReviewsEnabled: env["SMART_IMPROVEMENTS_ENABLED"] === "true",
     projectMergesEnabled: env["PROJECT_MERGES_ENABLED"] === "true",
+    captureRuleV2WritesEnabled: (env["CAPTURE_RULE_V2_WRITES_ENABLED"] ?? "true") === "true",
     db,
     queue,
     objectStore,

@@ -1,4 +1,4 @@
-import { DEFAULT_SENSITIVE_KEYS, isSensitiveKey } from "./keys.js";
+import { DEFAULT_SENSITIVE_KEYS, isExactSensitiveKey, isSensitiveKey } from "./keys.js";
 
 const REDACTED = "[REDACTED]";
 const BUILTIN_LABELS = [
@@ -43,7 +43,12 @@ function isValidCard(value: string): boolean {
   return sum % 10 === 0;
 }
 
-function scrubUrl(raw: string, keys: readonly string[]): string {
+function scrubUrl(
+  raw: string,
+  additionalKeys: readonly string[],
+  exactKeys: readonly string[]
+): string {
+  const broadKeys = [...DEFAULT_SENSITIVE_KEYS, ...additionalKeys];
   try {
     const url = new URL(raw);
     if (url.username || url.password) {
@@ -52,10 +57,12 @@ function scrubUrl(raw: string, keys: readonly string[]): string {
     }
     const nextQuery = new URLSearchParams();
     for (const [key, value] of url.searchParams) {
-      if (key.length > 128 || scrubCredentialText(key, keys, false) !== key) continue;
+      if (key.length > 128 || scrubCredentialText(key, additionalKeys, false, exactKeys) !== key) continue;
       nextQuery.append(
         key,
-        isSensitiveKey(key, keys) || scrubCredentialText(value, keys, false) !== value
+        isSensitiveKey(key, broadKeys) ||
+          isExactSensitiveKey(key, exactKeys) ||
+          scrubCredentialText(value, additionalKeys, false, exactKeys) !== value
           ? REDACTED
           : value
       );
@@ -73,9 +80,9 @@ function scrubUrl(raw: string, keys: readonly string[]): string {
 export function scrubCredentialText(
   input: string,
   additionalKeys: readonly string[],
-  scanUrls = true
+  scanUrls = true,
+  exactKeys: readonly string[] = []
 ): string {
-  const keys = [...DEFAULT_SENSITIVE_KEYS, ...additionalKeys];
   if (PEM_START.test(input) && !PEM_COMPLETE.test(input)) return REDACTED;
   let output = input;
   if (/(?:password|token|secret|authorization|cookie)%3[ad]/i.test(output)) {
@@ -98,10 +105,23 @@ export function scrubCredentialText(
       output = output.replace(named, "$1$2[REDACTED]");
     }
   }
+  if (exactKeys.length > 0) {
+    for (const key of exactKeys) {
+      const trimmed = key.trim();
+      if (trimmed.length === 0) continue;
+      const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      // Identifier boundaries keep `tag=secret` redacted while preserving `tag_name=script` and `x-tag-name=script`.
+      const named = new RegExp(
+        `(?<![A-Za-z0-9_-])(${escaped})(?![A-Za-z0-9_-])(["']?\\s*[:=]\\s*)(?:"[^"]*"|'[^']*'|[^\\s&,;]+)`,
+        "gi"
+      );
+      output = output.replace(named, "$1$2[REDACTED]");
+    }
+  }
   output = output.replace(CARD, (candidate) => (isValidCard(candidate) ? REDACTED : candidate));
   if (!scanUrls) return output;
   return output.replace(URL_TEXT, (matched) => {
     const trailing = matched.match(/[).,;]+$/)?.[0] ?? "";
-    return scrubUrl(matched.slice(0, matched.length - trailing.length), keys) + trailing;
+    return scrubUrl(matched.slice(0, matched.length - trailing.length), additionalKeys, exactKeys) + trailing;
   });
 }

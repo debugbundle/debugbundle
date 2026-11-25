@@ -8,10 +8,12 @@ import {
   parseStoredEvent
 } from "../../../packages/event-normalizer/src/index.js";
 import {
+  describeBrowserResource,
   normalizeResourceRoute,
   applyCaptureRuleEventClass,
   getRequestAnomalyThreshold
 } from "../../../packages/shared-types/src/index.js";
+import type { CaptureRuleThresholdJobConfig } from "../../../packages/storage/src/index.js";
 import { evaluateRequestAnomalyCandidate } from "./request-anomaly.js";
 import { inferSeverity } from "./severity.js";
 import { maybeGenerateHostedImprovementBundle } from "./improvement-bundles.js";
@@ -55,8 +57,63 @@ export async function processNextNormalizeEventsJob(
   }
 
   const normalized = normalizeEvent(event);
-  const computedFingerprint = fingerprint(normalized);
   const captureRule = job.capture_rule ?? null;
+  let effectiveNormalized = normalized;
+  let captureRuleThreshold: CaptureRuleThresholdJobConfig | undefined;
+  let computedFingerprint = fingerprint(effectiveNormalized);
+
+  if (
+    captureRule?.outcome === "threshold" &&
+    captureRule.threshold_count != null &&
+    captureRule.threshold_window_seconds != null &&
+    captureRule.threshold_group_by != null
+  ) {
+    const receivedAt = job.received_at ?? event.occurred_at;
+    const ruleUpdatedAt = captureRule.rule_updated_at ?? receivedAt;
+    if (captureRule.threshold_group_by === "resource") {
+      const browserEvent =
+        event.event_type === "frontend_exception" ? event.payload.browser_event : undefined;
+      const resource = describeBrowserResource(browserEvent);
+      if (
+        event.event_type === "frontend_exception" &&
+        browserEvent?.kind === "resource_error" &&
+        resource?.host != null &&
+        resource.path.length > 0
+      ) {
+        // Legacy SDKs with a redacted tag_name lose resource_type; keep thresholded resource
+        // failures in one deterministic v3 group scoped to that exact resource path.
+        if (browserEvent.opaque === true && effectiveNormalized.resource_type === undefined) {
+          effectiveNormalized = {
+            ...effectiveNormalized,
+            resource_host: resource.host,
+            resource_path: resource.path,
+            resource_type: "unknown"
+          };
+          computedFingerprint = fingerprint(effectiveNormalized);
+        }
+        captureRuleThreshold = {
+          rule_id: captureRule.rule_id,
+          threshold_count: captureRule.threshold_count,
+          threshold_window_seconds: captureRule.threshold_window_seconds,
+          threshold_group_by: "resource",
+          bucket_key: JSON.stringify(["resource", resource.host, resource.path]),
+          rule_updated_at: ruleUpdatedAt,
+          received_at: receivedAt
+        };
+      }
+    } else {
+      captureRuleThreshold = {
+        rule_id: captureRule.rule_id,
+        threshold_count: captureRule.threshold_count,
+        threshold_window_seconds: captureRule.threshold_window_seconds,
+        threshold_group_by: "fingerprint",
+        bucket_key: JSON.stringify(["fingerprint", computedFingerprint]),
+        rule_updated_at: ruleUpdatedAt,
+        received_at: receivedAt
+      };
+    }
+  }
+
   const capturePreset = job.capture_preset ?? "minimal";
   const immediateClientErrorStatuses = job.immediate_client_error_statuses ?? [];
   const immediateClientErrorPathRules = job.immediate_client_error_path_rules ?? [];
@@ -74,11 +131,13 @@ export async function processNextNormalizeEventsJob(
     event_class: baseEventClass,
     capture_rule: captureRule
   });
-  const matchedFields = inferMatchedFields(normalized);
+  const matchedFields = inferMatchedFields(effectiveNormalized);
   if (captureRule?.outcome === "demote") {
     matchedFields.push("capture_rule_demote");
   } else if (captureRule?.action === "sample" && captureRule.sample_event_class === "context") {
     matchedFields.push("capture_rule_sample_context");
+  } else if (captureRuleThreshold !== undefined) {
+    matchedFields.push("capture_rule_threshold");
   }
   const severity = inferSeverity(
     event,
@@ -132,13 +191,13 @@ export async function processNextNormalizeEventsJob(
   }
 
   const resourceRoute =
-    normalized.resource_type === undefined
+    effectiveNormalized.resource_type === undefined
       ? null
-      : normalizeResourceRoute(normalized.route_template);
+      : normalizeResourceRoute(effectiveNormalized.route_template);
   const alertNotification = buildAlertNotificationContext({
     projectId: job.project_id,
     event,
-    normalized,
+    normalized: effectiveNormalized,
     fingerprint: computedFingerprint
   });
 
@@ -147,6 +206,7 @@ export async function processNextNormalizeEventsJob(
     event_id: event.event_id,
     event_type: event.event_type,
     event_class: eventClass,
+    ...(captureRuleThreshold === undefined ? {} : { capture_rule_threshold: captureRuleThreshold }),
     service_name: event.service.name,
     environment: event.service.environment,
     fingerprint: computedFingerprint,
@@ -157,11 +217,11 @@ export async function processNextNormalizeEventsJob(
     ...(alertNotification.coalescing_key === undefined
       ? {}
       : { alert_coalescing_key: alertNotification.coalescing_key }),
-    fingerprint_version: fingerprintVersion(normalized),
-    normalized_message: normalized.normalized_message,
-    ...(normalized.incident_title === undefined
+    fingerprint_version: fingerprintVersion(effectiveNormalized),
+    normalized_message: effectiveNormalized.normalized_message,
+    ...(effectiveNormalized.incident_title === undefined
       ? {}
-      : { incident_title: normalized.incident_title }),
+      : { incident_title: effectiveNormalized.incident_title }),
     ...(resourceRoute === null ? {} : { resource_route: resourceRoute }),
     matched_fields: matchedFields,
     occurred_at: event.occurred_at,

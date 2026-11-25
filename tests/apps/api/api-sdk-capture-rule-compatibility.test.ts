@@ -92,3 +92,88 @@ it.each([
   expect(response.json().capture_rules).toEqual([]);
   await app.close();
 });
+
+it.each([
+  {
+    name: "threshold action",
+    rule: {
+      action: "threshold" as const,
+      threshold_count: 10,
+      threshold_window_seconds: 3600,
+      threshold_group_by: "resource" as const,
+      matcher: {
+        event_types: ["frontend_exception"] as const,
+        browser_event_kind: "resource_error" as const,
+        resource_url: { host: "app.example.com", path_prefix: "/assets/" }
+      }
+    }
+  },
+  {
+    name: "allow action",
+    rule: {
+      action: "allow" as const,
+      threshold_count: null,
+      threshold_window_seconds: null,
+      threshold_group_by: null,
+      matcher: {
+        event_types: ["frontend_exception"] as const,
+        browser_event_kind: "resource_error" as const,
+        resource_url: { host: "app.example.com", path_prefix: "/assets/checkout-" }
+      }
+    }
+  },
+  {
+    name: "resource_urls matcher",
+    rule: {
+      action: "demote" as const,
+      threshold_count: null,
+      threshold_window_seconds: null,
+      threshold_group_by: null,
+      matcher: {
+        event_types: ["frontend_exception"] as const,
+        browser_event_kind: "resource_error" as const,
+        resource_urls: [
+          { host: "cdn-a.example.com", path_equals: "/sdk.js" },
+          { host: "cdn-b.example.com", path_equals: "/sdk.js" }
+        ]
+      }
+    }
+  }
+])("withholds SDK capture rules when any active rule uses $name", async ({ rule }) => {
+  const baseRule = {
+    id: "00000000-0000-4000-8000-000000000103",
+    project_id: "proj_123",
+    name: "server-only rule",
+    description: null,
+    enabled: true,
+    sample_rate: null,
+    sample_event_class: null,
+    created_by_user_id: null,
+    created_from_incident_id: null,
+    created_from_event_id: null,
+    expires_at: null,
+    hit_count: 0,
+    last_matched_at: null,
+    created_at: "2026-11-24T00:00:00.000Z",
+    updated_at: "2026-11-24T00:00:00.000Z"
+  };
+  const app = createApiServer(
+    createBaseDependencies({
+      captureRuleManagement: mockedObject<
+        NonNullable<Parameters<typeof createApiServer>[0]["captureRuleManagement"]>
+      >({
+        listActiveCaptureRulesForProject: vi.fn().mockResolvedValue([{ ...baseRule, ...rule }])
+      })
+    })
+  );
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/sdk/config",
+    headers: { authorization: "Bearer dbundle_proj_test" }
+  });
+
+  expect(response.statusCode).toBe(200);
+  expect(response.json().capture_rules).toEqual([]);
+  await app.close();
+});

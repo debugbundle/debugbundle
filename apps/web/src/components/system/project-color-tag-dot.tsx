@@ -8,9 +8,18 @@ export function ProjectColorTagDot({
 }: {
   colorTag: ProjectColorTag | null;
   className?: string;
-}): JSX.Element | null {
+}): JSX.Element {
   if (colorTag === null) {
-    return null;
+    return (
+      <span
+        aria-hidden="true"
+        data-project-color-tag="default"
+        className={cn(
+          "inline-flex size-3 shrink-0 rounded-full border border-background/70 bg-muted-foreground/45",
+          className
+        )}
+      />
+    );
   }
 
   return (

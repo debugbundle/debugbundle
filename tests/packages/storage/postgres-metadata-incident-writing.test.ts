@@ -485,6 +485,74 @@ describe("postgres metadata incident-writing", () => {
     expect(query.mock.calls.map(([sql]) => String(sql))).toContain("ROLLBACK");
   });
 
+  it("counts only newly inserted threshold links and retains the earliest linked time", async () => {
+    const currentEvent = "550e8400-e29b-41d4-a716-446655440001";
+    const firstEvent = "550e8400-e29b-41d4-a716-446655440002";
+    const secondEvent = "550e8400-e29b-41d4-a716-446655440003";
+    const linkedTime = "2026-03-10T08:00:00.000Z";
+    const currentTime = "2026-03-10T09:00:00.000Z";
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ id: "svc_123" }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            incident_id: "inc_123",
+            matched_fields: ["capture_rule_threshold"],
+            status: "open",
+            occurrence_count: 1,
+            created_now: true
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        rows: [{ event_id: secondEvent, occurred_at: new Date(linkedTime) }]
+      })
+      .mockResolvedValueOnce({ rows: [{ occurrence_count: 2 }] });
+    const store = createPostgresMetadataStore({ query });
+
+    const result = await store.upsertIncident({
+      event_id: currentEvent,
+      project_id: "proj_123",
+      service_name: "online-store",
+      environment: "production",
+      fingerprint: "fp_resource",
+      fingerprint_version: "v3",
+      title: "Optional resource failed",
+      severity: "medium",
+      occurred_at: currentTime,
+      matched_fields: ["capture_rule_threshold"],
+      prior_events: [
+        { event_id: currentEvent, occurred_at: currentTime, resource_route: "/" },
+        {
+          event_id: firstEvent,
+          occurred_at: "2026-03-10T07:00:00.000Z",
+          resource_route: null
+        },
+        { event_id: secondEvent, occurred_at: linkedTime, resource_route: "/gallery/42" }
+      ]
+    });
+
+    expect(result).toMatchObject({ created_now: true, occurrence_count: 2 });
+    expect(query).toHaveBeenNthCalledWith(4, expect.stringContaining("ON CONFLICT"), [
+      "inc_123",
+      "frontend_exception",
+      "incident_signal",
+      firstEvent,
+      "2026-03-10T07:00:00.000Z",
+      null,
+      secondEvent,
+      linkedTime,
+      "/gallery/{param}"
+    ]);
+    expect(query).toHaveBeenLastCalledWith(expect.stringContaining("SET occurrence_count"), [
+      "inc_123",
+      1,
+      linkedTime
+    ]);
+  });
+
   it("should preserve explicit matched fields during incident upsert", async (): Promise<void> => {
     const query = vi
       .fn()

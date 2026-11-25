@@ -41,7 +41,12 @@ export class CaptureRuleApiError extends Error {
 }
 
 function toApiError(status: number, body: unknown, fallback: string): CaptureRuleApiError {
-  if (typeof body === "object" && body !== null && "error" in body && typeof body.error === "string") {
+  if (
+    typeof body === "object" &&
+    body !== null &&
+    "error" in body &&
+    typeof body.error === "string"
+  ) {
     return new CaptureRuleApiError(status, body.error);
   }
 
@@ -51,9 +56,19 @@ function toApiError(status: number, body: unknown, fallback: string): CaptureRul
 export function createCaptureRuleApi(httpClient: {
   request(request: CaptureRuleHttpRequest): Promise<CaptureRuleHttpResponse>;
 }): {
-  listCaptureRules(input: { bearerToken: string; projectId: string }): Promise<CaptureRulesResponse>;
-  createCaptureRule(input: { bearerToken: string; projectId: string; create: CaptureRuleCreate }): Promise<CaptureRuleResponse>;
-  suggestCaptureRulesFromIncident(input: { bearerToken: string; incidentId: string }): Promise<CaptureRuleSuggestionsResponse>;
+  listCaptureRules(input: {
+    bearerToken: string;
+    projectId: string;
+  }): Promise<CaptureRulesResponse>;
+  createCaptureRule(input: {
+    bearerToken: string;
+    projectId: string;
+    create: CaptureRuleCreate;
+  }): Promise<CaptureRuleResponse>;
+  suggestCaptureRulesFromIncident(input: {
+    bearerToken: string;
+    incidentId: string;
+  }): Promise<CaptureRuleSuggestionsResponse>;
   createCaptureRuleFromIncidentSuggestion(input: {
     bearerToken: string;
     incidentId: string;
@@ -65,13 +80,17 @@ export function createCaptureRuleApi(httpClient: {
     ruleId: string;
     update: CaptureRuleUpdate;
   }): Promise<CaptureRuleResponse>;
-  deleteCaptureRule(input: { bearerToken: string; projectId: string; ruleId: string }): Promise<{ success: true }>;
+  deleteCaptureRule(input: {
+    bearerToken: string;
+    projectId: string;
+    ruleId: string;
+  }): Promise<{ success: true }>;
 } {
   return {
     async listCaptureRules(input): Promise<CaptureRulesResponse> {
       const response = await httpClient.request({
         method: "GET",
-        path: `/v1/projects/${encodeURIComponent(input.projectId)}/capture-rules`,
+        path: `/v1/projects/${encodeURIComponent(input.projectId)}/capture-rules?rule_schema=2`,
         bearerToken: input.bearerToken
       });
 
@@ -110,7 +129,7 @@ export function createCaptureRuleApi(httpClient: {
     async suggestCaptureRulesFromIncident(input): Promise<CaptureRuleSuggestionsResponse> {
       const response = await httpClient.request({
         method: "POST",
-        path: `/v1/incidents/${encodeURIComponent(input.incidentId)}/capture-rule-suggestion`,
+        path: `/v1/incidents/${encodeURIComponent(input.incidentId)}/capture-rule-suggestion?rule_schema=2`,
         bearerToken: input.bearerToken
       });
 
@@ -129,13 +148,17 @@ export function createCaptureRuleApi(httpClient: {
     async createCaptureRuleFromIncidentSuggestion(input): Promise<CaptureRuleResponse> {
       const response = await httpClient.request({
         method: "POST",
-        path: `/v1/incidents/${encodeURIComponent(input.incidentId)}/capture-rules`,
+        path: `/v1/incidents/${encodeURIComponent(input.incidentId)}/capture-rules?rule_schema=2`,
         bearerToken: input.bearerToken,
         body: input.create
       });
 
       if (response.status !== 200 && response.status !== 201) {
-        throw toApiError(response.status, response.body, "Failed to create capture rule from suggestion.");
+        throw toApiError(
+          response.status,
+          response.body,
+          "Failed to create capture rule from suggestion."
+        );
       }
 
       const parsed = CaptureRuleResponseSchema.safeParse(response.body);
@@ -227,7 +250,11 @@ function formatMatcherFromValue(matcher: CaptureRuleCreate["matcher"]): string {
   if (matcher.browser_event_opaque !== undefined) {
     parts.push(`browser_event_opaque=${String(matcher.browser_event_opaque)}`);
   }
-  for (const key of ["browser_page_visibility_state", "browser_page_ready_state", "browser_target_tag_name"] as const) {
+  for (const key of [
+    "browser_page_visibility_state",
+    "browser_page_ready_state",
+    "browser_target_tag_name"
+  ] as const) {
     if (matcher[key] !== undefined) parts.push(`${key}=${matcher[key]}`);
   }
   if (matcher.browser_target_attributes !== undefined) {
@@ -257,8 +284,19 @@ function formatMatcherFromValue(matcher: CaptureRuleCreate["matcher"]): string {
   if (matcher.resource_url?.host !== undefined) {
     parts.push(`resource_host=${matcher.resource_url.host}`);
   }
+  if (matcher.resource_url?.host_suffix !== undefined) {
+    parts.push(`resource_host_suffix=${matcher.resource_url.host_suffix}`);
+  }
   if (matcher.resource_url?.path_equals !== undefined) {
     parts.push(`resource_path=${matcher.resource_url.path_equals}`);
+  }
+  if (matcher.resource_url?.path_prefix !== undefined) {
+    parts.push(`resource_path_prefix=${matcher.resource_url.path_prefix}`);
+  }
+  if (matcher.resource_urls !== undefined && matcher.resource_urls.length > 0) {
+    parts.push(
+      `resource_urls=${matcher.resource_urls.map((entry) => `${entry.host}${entry.path_equals}`).join(",")}`
+    );
   }
   if (matcher.request_url?.path_equals !== undefined) {
     parts.push(`request_path=${matcher.request_url.path_equals}`);
@@ -281,7 +319,9 @@ function formatRule(rule: CaptureRule): string {
   const action =
     rule.action === "sample"
       ? `${rule.action}:${rule.sample_rate ?? "?"}:${rule.sample_event_class ?? "?"}`
-      : rule.action;
+      : rule.action === "threshold"
+        ? `${rule.action}:${rule.threshold_count ?? "?"}/${rule.threshold_window_seconds ?? "?"}s:${rule.threshold_group_by ?? "?"}`
+        : rule.action;
 
   return [
     `${rule.enabled ? "enabled" : "disabled"} ${rule.id} ${action} ${rule.name}`,
@@ -325,7 +365,10 @@ export async function listCaptureRulesCommand(
     json?: boolean;
   },
   api: {
-    listCaptureRules(input: { bearerToken: string; projectId: string }): Promise<CaptureRulesResponse>;
+    listCaptureRules(input: {
+      bearerToken: string;
+      projectId: string;
+    }): Promise<CaptureRulesResponse>;
   }
 ): Promise<CliCommandResult> {
   try {
@@ -368,7 +411,11 @@ export async function createCaptureRuleCommand(
     json?: boolean;
   },
   api: {
-    createCaptureRule(input: { bearerToken: string; projectId: string; create: CaptureRuleCreate }): Promise<CaptureRuleResponse>;
+    createCaptureRule(input: {
+      bearerToken: string;
+      projectId: string;
+      create: CaptureRuleCreate;
+    }): Promise<CaptureRuleResponse>;
   }
 ): Promise<CliCommandResult> {
   try {
@@ -388,7 +435,9 @@ export async function createCaptureRuleCommand(
 
     return {
       exitCode: 0,
-      output: input.json ? JSON.stringify(response) : `Capture rule created.\n${formatRule(response.rule)}`
+      output: input.json
+        ? JSON.stringify(response)
+        : `Capture rule created.\n${formatRule(response.rule)}`
     };
   } catch (error) {
     return {
@@ -461,7 +510,9 @@ export async function createCaptureRuleFromIncidentSuggestionCommand(
 
     return {
       exitCode: 0,
-      output: input.json ? JSON.stringify(response) : `Capture rule applied.\n${formatRule(response.rule)}`
+      output: input.json
+        ? JSON.stringify(response)
+        : `Capture rule applied.\n${formatRule(response.rule)}`
     };
   } catch (error) {
     return {
@@ -506,7 +557,9 @@ export async function updateCaptureRuleCommand(
 
     return {
       exitCode: 0,
-      output: input.json ? JSON.stringify(response) : `Capture rule updated.\n${formatRule(response.rule)}`
+      output: input.json
+        ? JSON.stringify(response)
+        : `Capture rule updated.\n${formatRule(response.rule)}`
     };
   } catch (error) {
     return {
@@ -524,7 +577,11 @@ export async function deleteCaptureRuleCommand(
     json?: boolean;
   },
   api: {
-    deleteCaptureRule(input: { bearerToken: string; projectId: string; ruleId: string }): Promise<{ success: true }>;
+    deleteCaptureRule(input: {
+      bearerToken: string;
+      projectId: string;
+      ruleId: string;
+    }): Promise<{ success: true }>;
   }
 ): Promise<CliCommandResult> {
   try {
@@ -550,7 +607,9 @@ async function createAuthenticatedCaptureRuleApi(
   input: { authFilePath?: string },
   dependencies?: {
     readAuthState?: (input: { authFilePath?: string }) => Promise<CliAuthState>;
-    createHttpClient?: (input: { baseUrl: string }) => { request(request: CaptureRuleHttpRequest): Promise<CaptureRuleHttpResponse> };
+    createHttpClient?: (input: { baseUrl: string }) => {
+      request(request: CaptureRuleHttpRequest): Promise<CaptureRuleHttpResponse>;
+    };
     createApi?: typeof createCaptureRuleApi;
     fetchImpl?: typeof fetch;
   }
@@ -562,14 +621,16 @@ async function createAuthenticatedCaptureRuleApi(
   }
 
   const authState = await readAuthState(authStateInput);
-  const createHttpClient = dependencies?.createHttpClient ?? ((clientInput: { baseUrl: string }) => {
-    const httpClientDependencies: { fetchImpl?: typeof fetch } = {};
-    if (dependencies?.fetchImpl !== undefined) {
-      httpClientDependencies.fetchImpl = dependencies.fetchImpl;
-    }
+  const createHttpClient =
+    dependencies?.createHttpClient ??
+    ((clientInput: { baseUrl: string }) => {
+      const httpClientDependencies: { fetchImpl?: typeof fetch } = {};
+      if (dependencies?.fetchImpl !== undefined) {
+        httpClientDependencies.fetchImpl = dependencies.fetchImpl;
+      }
 
-    return createCliHttpClient(clientInput, httpClientDependencies);
-  });
+      return createCliHttpClient(clientInput, httpClientDependencies);
+    });
   const httpClient = createHttpClient({ baseUrl: authState.base_url });
   const createApi = dependencies?.createApi ?? createCaptureRuleApi;
 
@@ -638,7 +699,12 @@ export async function suggestCaptureRulesFromIncidentWithAuthCommand(
 }
 
 export async function createCaptureRuleFromIncidentSuggestionWithAuthCommand(
-  input: { authFilePath?: string; incidentId: string; create: CreateCaptureRuleFromSuggestion; json?: boolean },
+  input: {
+    authFilePath?: string;
+    incidentId: string;
+    create: CreateCaptureRuleFromSuggestion;
+    json?: boolean;
+  },
   dependencies?: Parameters<typeof createAuthenticatedCaptureRuleApi>[1]
 ): Promise<CliCommandResult> {
   return runAuthenticatedCliCommand(input, {
@@ -658,7 +724,13 @@ export async function createCaptureRuleFromIncidentSuggestionWithAuthCommand(
 }
 
 export async function updateCaptureRuleWithAuthCommand(
-  input: { authFilePath?: string; projectId: string; ruleId: string; update: CaptureRuleUpdate; json?: boolean },
+  input: {
+    authFilePath?: string;
+    projectId: string;
+    ruleId: string;
+    update: CaptureRuleUpdate;
+    json?: boolean;
+  },
   dependencies?: Parameters<typeof createAuthenticatedCaptureRuleApi>[1]
 ): Promise<CliCommandResult> {
   return runAuthenticatedCliCommand(input, {

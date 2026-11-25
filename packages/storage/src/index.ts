@@ -84,6 +84,14 @@ export type { CapturePolicyStore } from "./capture-policy-store.js";
 export { createPostgresCapturePolicyStore } from "./capture-policy-store.js";
 export type { CaptureRuleStore } from "./capture-rule-store.js";
 export { createPostgresCaptureRuleStore } from "./capture-rule-store.js";
+export { CaptureRuleValidationError } from "./capture-rule-management.js";
+export type {
+  CaptureRuleThresholdStore,
+  CaptureRuleThresholdWindowEvent,
+  EvaluateCaptureRuleThresholdInput,
+  EvaluateCaptureRuleThresholdResult
+} from "./capture-rule-threshold-store.js";
+export { createPostgresCaptureRuleThresholdStore } from "./capture-rule-threshold-store.js";
 export type { ImprovementSettingsStore } from "./improvement-settings-store.js";
 export { createPostgresImprovementSettingsStore } from "./improvement-settings-store.js";
 export type { AnalyticsSettingsStore } from "./analytics-settings-store.js";

@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { buildApiUrl, InvalidSessionError, resetBrowserSessionClientState } from "../../../apps/web/src/lib/api.ts";
+import {
+  buildApiUrl,
+  InvalidSessionError,
+  resetBrowserSessionClientState
+} from "../../../apps/web/src/lib/api.ts";
 import {
   createProjectCaptureRule,
   createCaptureRuleFromIncidentSuggestion,
@@ -24,7 +28,9 @@ describe("web capture-rules api", () => {
         new Response(JSON.stringify({ access_mode: "manage", rules: [] }), { status: 200 })
       )
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ rule: { id: "rule_created", enabled: true } }), { status: 201 })
+        new Response(JSON.stringify({ rule: { id: "rule_created", enabled: true } }), {
+          status: 201
+        })
       )
       .mockResolvedValueOnce(
         new Response(JSON.stringify({ rule: { id: "rule_1", enabled: false } }), { status: 200 })
@@ -60,9 +66,13 @@ describe("web capture-rules api", () => {
       suggestion_id: "primary_resource_host_demote"
     });
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, buildApiUrl("/v1/projects/proj_1/capture-rules"), {
-      credentials: "include"
-    });
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      buildApiUrl("/v1/projects/proj_1/capture-rules?rule_schema=2"),
+      {
+        credentials: "include"
+      }
+    );
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       buildApiUrl("/v1/projects/proj_1/capture-rules"),
@@ -100,14 +110,14 @@ describe("web capture-rules api", () => {
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       5,
-      buildApiUrl("/v1/incidents/inc_1/capture-rule-suggestion"),
+      buildApiUrl("/v1/incidents/inc_1/capture-rule-suggestion?rule_schema=2"),
       expect.objectContaining({
         method: "POST"
       })
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       6,
-      buildApiUrl("/v1/incidents/inc_1/capture-rules"),
+      buildApiUrl("/v1/incidents/inc_1/capture-rules?rule_schema=2"),
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({ suggestion_id: "primary_resource_host_demote" })
@@ -118,10 +128,72 @@ describe("web capture-rules api", () => {
   it("maps invalid browser sessions to InvalidSessionError", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(() => Promise.resolve(new Response(JSON.stringify({ error: "invalid_session" }), { status: 401 })))
+      vi.fn(() =>
+        Promise.resolve(new Response(JSON.stringify({ error: "invalid_session" }), { status: 401 }))
+      )
     );
 
     await expect(listProjectCaptureRules("proj_1")).rejects.toBeInstanceOf(InvalidSessionError);
-    await expect(suggestCaptureRulesFromIncident("inc_1")).rejects.toBeInstanceOf(InvalidSessionError);
+    await expect(suggestCaptureRulesFromIncident("inc_1")).rejects.toBeInstanceOf(
+      InvalidSessionError
+    );
+  });
+
+  it("validates threshold rules and multi-URL exact resource matchers cleanly in form helpers", async () => {
+    const {
+      buildProjectCaptureRuleCreate,
+      createDefaultCaptureRuleCreateDraft,
+      getCaptureRuleCreateDraftValidationError
+    } = await import("../../../apps/web/src/components/system/capture-rule-form-helpers.ts");
+
+    const base = {
+      ...createDefaultCaptureRuleCreateDraft(),
+      name: "Optional multi-CDN widget",
+      action: "threshold" as const,
+      browserEventKind: "resource_error" as const,
+      thresholdCount: "10",
+      thresholdWindowPreset: "3600" as const,
+      thresholdGroupBy: "resource" as const,
+      resourceUrlsText: "https://cdn.example.com/widget.js\nhttps://fallback.example.com/widget.js"
+    };
+    expect(getCaptureRuleCreateDraftValidationError(base)).toBeNull();
+    expect(buildProjectCaptureRuleCreate(base)).toMatchObject({
+      action: "threshold",
+      threshold_count: 10,
+      threshold_window_seconds: 3600,
+      threshold_group_by: "resource",
+      matcher: {
+        resource_urls: [
+          { host: "cdn.example.com", path_equals: "/widget.js" },
+          { host: "fallback.example.com", path_equals: "/widget.js" }
+        ]
+      }
+    });
+
+    expect(
+      getCaptureRuleCreateDraftValidationError({
+        ...base,
+        resourceHost: "cdn.example.com"
+      })
+    ).toMatch(/not both/i);
+    expect(
+      getCaptureRuleCreateDraftValidationError({
+        ...base,
+        resourceUrlsText: "https://cdn.example.com/widget.js?token=secret"
+      })
+    ).toMatch(/without credentials, queries, or fragments/i);
+    expect(
+      getCaptureRuleCreateDraftValidationError({
+        ...base,
+        thresholdCount: "1"
+      })
+    ).toMatch(/between 2 and 1000/i);
+    expect(
+      getCaptureRuleCreateDraftValidationError({
+        ...base,
+        thresholdWindowPreset: "custom",
+        thresholdWindowCustomSeconds: "30"
+      })
+    ).toMatch(/between 60 and 86400/i);
   });
 });

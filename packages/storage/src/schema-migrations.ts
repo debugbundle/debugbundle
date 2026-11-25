@@ -6,6 +6,10 @@ import {
 import { CREATOR_EMAIL_MIGRATION, creatorEmailSchemaAvailable } from "./creator-email-schema.js";
 import { REFERRAL_VISIT_MIGRATION, referralVisitSchemaAvailable } from "./referral-visit-schema.js";
 import {
+  CAPTURE_RULE_THRESHOLD_MIGRATION,
+  captureRuleThresholdSchemaAvailable
+} from "./capture-rule-threshold-schema.js";
+import {
   PAYOUT_PREFERENCE_MIGRATION,
   payoutPreferenceSchemaAvailable
 } from "./payout-preference-schema.js";
@@ -176,7 +180,8 @@ export const STORAGE_SCHEMA_MIGRATIONS: readonly StorageSchemaMigration[] = [
   PAYOUT_PREFERENCE_MIGRATION,
   CREATOR_EMAIL_MIGRATION,
   OFFER_PUBLICATION_MIGRATION,
-  REFERRAL_VISIT_MIGRATION
+  REFERRAL_VISIT_MIGRATION,
+  CAPTURE_RULE_THRESHOLD_MIGRATION
 ].sort((left, right) => left.id.localeCompare(right.id));
 
 function validateStorageSchemaMigrations(migrations: readonly StorageSchemaMigration[]): void {
@@ -267,10 +272,12 @@ async function reconcileMigrationLedgerInTransaction(
   const payoutPreferenceReady = await payoutPreferenceSchemaAvailable(db);
   const creatorEmailReady = await creatorEmailSchemaAvailable(db);
   const referralVisitReady = await referralVisitSchemaAvailable(db);
+  const captureRuleThresholdReady = await captureRuleThresholdSchemaAvailable(db);
   const verifiedBaseline = STORAGE_SCHEMA_MIGRATIONS.filter(
     (migration) =>
       // Publication reconciliation is data-only; schema shape cannot prove it ran.
       migration.id !== OFFER_PUBLICATION_MIGRATION.id &&
+      (migration.id !== CAPTURE_RULE_THRESHOLD_MIGRATION.id || captureRuleThresholdReady) &&
       (migration.id !== REFERRAL_VISIT_MIGRATION.id || referralVisitReady) &&
       (migration.id !== CREATOR_EMAIL_MIGRATION.id || creatorEmailReady) &&
       (migration.id !== PAYOUT_PREFERENCE_MIGRATION.id || payoutPreferenceReady) &&
@@ -483,6 +490,8 @@ export async function assertStorageSchemaMigrationsApplied(db: Queryable): Promi
   if (!(await creatorEmailSchemaAvailable(db))) throw new Error("creator_email_schema_incomplete");
   if (!(await referralVisitSchemaAvailable(db)))
     throw new Error("referral_visit_schema_incomplete");
+  if (!(await captureRuleThresholdSchemaAvailable(db)))
+    throw new Error("capture_rule_threshold_schema_incomplete");
   if (!(await referralSchemaAvailable(db))) throw new Error("referral_schema_incomplete");
   if (!(await referralLedgerSchemaAvailable(db)))
     throw new Error("referral_ledger_schema_incomplete");

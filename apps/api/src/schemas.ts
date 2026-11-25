@@ -644,6 +644,10 @@ export const ProjectParamsSchema = z
   })
   .strict();
 
+export const CaptureRuleSchemaQuery = z.object({
+  rule_schema: z.literal("2").optional().describe("Include threshold, allow, and multi-URL rules.")
+});
+
 export const ProjectCaptureRuleParamsSchema = z
   .object({
     id: z.string().guid(),

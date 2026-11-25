@@ -6,6 +6,18 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.32.0] - 2026-11-25
+
+### Added
+
+- Open or reopen browser resource incidents after a configurable rolling threshold and retain routes from the qualifying window. Allow higher-specificity rules to surface critical resources immediately.
+- Manage threshold, allow, and multi-URL capture rules in the API, CLI, ordinary MCP, and dashboard. Existing clients keep their compatible rule responses.
+- Add exact-key redaction alongside the existing segment-aware policy and preserve validated SDK protocol fields.
+
+### Fixed
+
+- Keep independently received browser resource failures distinct in local CLI processing and distinguish unload, CSP, timing, recovery, and visibility evidence in hosted incident summaries.
+
 ## [1.31.0] - 2026-11-21
 
 ### Added

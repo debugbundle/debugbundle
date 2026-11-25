@@ -165,15 +165,16 @@ describe("api runtime start", () => {
       API_PORT: "3010"
     });
 
-    // The current runtime validates additive access, financial and reporting
-    // structures as well as the installed table/ledger and project-scope guards.
-    expect(queryMock).toHaveBeenCalledTimes(29);
+    // The current runtime validates additive access, financial, reporting and
+    // capture-rule structures alongside the installed ledger and project scopes.
+    expect(queryMock).toHaveBeenCalledTimes(30);
     for (const guard of [
       "referral_creator_email_deliveries",
       "referral_creator_email_state",
       "referral_link_visits_code_date_idx",
       "report_identity_snapshots",
       "report_runs_factual_no_ai",
+      "capture_rule_threshold_events_bucket_idx",
       "project_analytics_review_privacy_guard",
       "improvement_reviews_context_size_check"
     ])

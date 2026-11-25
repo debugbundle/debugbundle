@@ -49,6 +49,8 @@ describe("capture rule schemas", () => {
     expect(CaptureRuleActionSchema.safeParse("demote").success).toBe(true);
     expect(CaptureRuleActionSchema.safeParse("sample").success).toBe(true);
     expect(CaptureRuleActionSchema.safeParse("drop").success).toBe(true);
+    expect(CaptureRuleActionSchema.safeParse("threshold").success).toBe(true);
+    expect(CaptureRuleActionSchema.safeParse("allow").success).toBe(true);
   });
 
   it("rejects invalid rule actions", () => {
@@ -683,4 +685,304 @@ it("keeps valid existing events ingestible when captured DOM strings exceed matc
       "2026-05-26T10:00:00.000Z"
     )
   ).toBeNull();
+});
+
+describe("threshold, allow, and multi-URL capture rules", () => {
+  it("validates threshold create/update constraints and rejects invalid combinations", () => {
+    const created = CaptureRuleCreateSchema.parse({
+      name: "Threshold transient asset failures",
+      action: "threshold",
+      matcher: {
+        event_types: ["frontend_exception"],
+        browser_event_kind: "resource_error",
+        resource_url: { host: "app.example.com", path_prefix: "/assets/" }
+      },
+      threshold_count: 10,
+      threshold_window_seconds: 3600,
+      threshold_group_by: "resource"
+    });
+    expect(created.threshold_count).toBe(10);
+    expect(created.threshold_window_seconds).toBe(3600);
+    expect(created.threshold_group_by).toBe("resource");
+    expect(created.sample_rate).toBeNull();
+
+    // Threshold requires all three parameters within bounds.
+    expect(
+      CaptureRuleCreateSchema.safeParse({
+        name: "Missing count",
+        action: "threshold",
+        matcher: {
+          event_types: ["frontend_exception"],
+          browser_event_kind: "resource_error",
+          resource_url: { host: "app.example.com", path_prefix: "/assets/" }
+        },
+        threshold_window_seconds: 3600,
+        threshold_group_by: "resource"
+      }).success
+    ).toBe(false);
+    expect(
+      CaptureRuleCreateSchema.safeParse({
+        name: "Count below min",
+        action: "threshold",
+        matcher: {
+          event_types: ["frontend_exception"],
+          browser_event_kind: "resource_error",
+          resource_url: { host: "app.example.com", path_prefix: "/assets/" }
+        },
+        threshold_count: 1,
+        threshold_window_seconds: 3600,
+        threshold_group_by: "resource"
+      }).success
+    ).toBe(false);
+    expect(
+      CaptureRuleCreateSchema.safeParse({
+        name: "Resource grouping on non-resource matcher",
+        action: "threshold",
+        matcher: {
+          event_types: ["frontend_exception"],
+          error_name: "PageAssetLoadError"
+        },
+        threshold_count: 5,
+        threshold_window_seconds: 600,
+        threshold_group_by: "resource"
+      }).success
+    ).toBe(false);
+    expect(
+      CaptureRuleCreateSchema.safeParse({
+        name: "Fingerprint grouping on app exception",
+        action: "threshold",
+        matcher: {
+          event_types: ["frontend_exception"],
+          error_name: "ChunkLoadError"
+        },
+        threshold_count: 5,
+        threshold_window_seconds: 600,
+        threshold_group_by: "fingerprint"
+      }).success
+    ).toBe(true);
+    expect(
+      CaptureRuleCreateSchema.safeParse({
+        name: "Non-threshold rule with threshold fields",
+        action: "allow",
+        matcher: {
+          event_types: ["frontend_exception"],
+          browser_event_kind: "resource_error",
+          resource_url: { host: "app.example.com", path_prefix: "/assets/checkout-" }
+        },
+        threshold_count: 5
+      }).success
+    ).toBe(false);
+    expect(
+      CaptureRuleUpdateSchema.safeParse({
+        threshold_count: 5
+      }).success
+    ).toBe(false);
+    expect(
+      CaptureRuleUpdateSchema.safeParse({
+        action: "threshold",
+        threshold_count: 5,
+        threshold_window_seconds: 300,
+        threshold_group_by: "fingerprint"
+      }).success
+    ).toBe(true);
+  });
+
+  it("normalizes bounded resource_urls lists and rejects combining with resource_url", () => {
+    const parsed = CaptureRuleMatcherSchema.parse({
+      event_types: ["frontend_exception"],
+      browser_event_kind: "resource_error",
+      resource_urls: [
+        { host: "CDN-A.EXAMPLE.COM", path_equals: "widget.js" },
+        { host: "cdn-a.example.com", path_equals: "/widget.js" },
+        { host: "cdn-b.example.com", path_equals: "/fallback/widget.js" }
+      ]
+    });
+    expect(parsed.resource_urls).toEqual([
+      { host: "cdn-a.example.com", path_equals: "/widget.js" },
+      { host: "cdn-b.example.com", path_equals: "/fallback/widget.js" }
+    ]);
+
+    expect(
+      CaptureRuleMatcherSchema.safeParse({
+        browser_event_kind: "resource_error",
+        resource_url: { host: "cdn-a.example.com", path_equals: "/widget.js" },
+        resource_urls: [{ host: "cdn-b.example.com", path_equals: "/widget.js" }]
+      }).success
+    ).toBe(false);
+
+    expect(
+      CaptureRuleMatcherSchema.safeParse({
+        browser_event_kind: "resource_error",
+        resource_urls: Array.from({ length: 11 }, (_, idx) => ({
+          host: `cdn-${idx}.example.com`,
+          path_equals: "/widget.js"
+        }))
+      }).success
+    ).toBe(false);
+  });
+
+  it("evaluates resource_urls, longer path_prefix allow carve-outs, and server-only guards", () => {
+    const assetsThreshold: CaptureRule = {
+      ...baseRule,
+      id: "00000000-0000-4000-8000-000000000301",
+      action: "threshold",
+      threshold_count: 10,
+      threshold_window_seconds: 3600,
+      threshold_group_by: "resource",
+      updated_at: "2026-06-01T12:00:00.000Z",
+      matcher: {
+        event_types: ["frontend_exception"],
+        browser_event_kind: "resource_error",
+        resource_url: { host: "app.example.com", path_prefix: "/assets/" }
+      }
+    };
+    const checkoutAllow: CaptureRule = {
+      ...baseRule,
+      id: "00000000-0000-4000-8000-000000000302",
+      action: "allow",
+      updated_at: "2026-05-01T12:00:00.000Z",
+      matcher: {
+        event_types: ["frontend_exception"],
+        browser_event_kind: "resource_error",
+        resource_url: { host: "app.example.com", path_prefix: "/assets/checkout-" }
+      }
+    };
+    const multiUrlDemote: CaptureRule = {
+      ...baseRule,
+      id: "00000000-0000-4000-8000-000000000303",
+      action: "demote",
+      matcher: {
+        event_types: ["frontend_exception"],
+        browser_event_kind: "resource_error",
+        resource_urls: [
+          { host: "cdn-primary.example.com", path_equals: "/chat.js" },
+          { host: "cdn-fallback.example.com", path_equals: "/chat-v2.js" }
+        ]
+      }
+    };
+
+    expect(captureRuleRequiresServerEvaluation(assetsThreshold)).toBe(true);
+    expect(captureRuleRequiresServerEvaluation(checkoutAllow)).toBe(true);
+    expect(captureRuleRequiresServerEvaluation(multiUrlDemote)).toBe(true);
+    expect(getCaptureRuleSpecificityScore(checkoutAllow)).toBeGreaterThan(
+      getCaptureRuleSpecificityScore(assetsThreshold)
+    );
+
+    const checkoutResult = evaluateCaptureRules(
+      [assetsThreshold, checkoutAllow],
+      {
+        project_id: baseRule.project_id,
+        event_id: "00000000-0000-4000-8000-000000000401",
+        event_type: "frontend_exception",
+        runtime: "browser",
+        browser_event_kind: "resource_error",
+        client_kind: "human",
+        resource_url: { host: "app.example.com", path: "/assets/checkout-abc123.js" }
+      },
+      "2026-06-02T00:00:00.000Z"
+    );
+    expect(checkoutResult).toEqual({
+      rule_id: checkoutAllow.id,
+      action: "allow",
+      outcome: "allow",
+      sample_rate: null,
+      sample_event_class: null
+    });
+    expect(
+      applyCaptureRuleEventClass({
+        event_class: "incident_signal",
+        capture_rule: checkoutResult
+      })
+    ).toBe("incident_signal");
+
+    const regularAssetResult = evaluateCaptureRules(
+      [assetsThreshold, checkoutAllow],
+      {
+        project_id: baseRule.project_id,
+        event_id: "00000000-0000-4000-8000-000000000402",
+        event_type: "frontend_exception",
+        runtime: "browser",
+        browser_event_kind: "resource_error",
+        client_kind: "human",
+        resource_url: { host: "app.example.com", path: "/assets/App-abc123.css" }
+      },
+      "2026-06-02T00:00:00.000Z"
+    );
+    expect(regularAssetResult).toEqual({
+      rule_id: assetsThreshold.id,
+      action: "threshold",
+      outcome: "threshold",
+      sample_rate: null,
+      sample_event_class: null,
+      threshold_count: 10,
+      threshold_window_seconds: 3600,
+      threshold_group_by: "resource",
+      rule_updated_at: "2026-06-01T12:00:00.000Z"
+    });
+    expect(
+      applyCaptureRuleEventClass({
+        event_class: "incident_signal",
+        capture_rule: regularAssetResult
+      })
+    ).toBe("incident_signal");
+
+    const fallbackMatch = evaluateCaptureRules(
+      [multiUrlDemote],
+      {
+        project_id: baseRule.project_id,
+        event_id: "00000000-0000-4000-8000-000000000403",
+        event_type: "frontend_exception",
+        runtime: "browser",
+        browser_event_kind: "resource_error",
+        client_kind: "human",
+        resource_url: { host: "cdn-fallback.example.com", path: "/chat-v2.js" }
+      },
+      "2026-06-02T00:00:00.000Z"
+    );
+    expect(fallbackMatch?.rule_id).toBe(multiUrlDemote.id);
+
+    const unlistedMatch = evaluateCaptureRules(
+      [multiUrlDemote],
+      {
+        project_id: baseRule.project_id,
+        event_id: "00000000-0000-4000-8000-000000000404",
+        event_type: "frontend_exception",
+        runtime: "browser",
+        browser_event_kind: "resource_error",
+        client_kind: "human",
+        resource_url: { host: "cdn-fallback.example.com", path: "/other.js" }
+      },
+      "2026-06-02T00:00:00.000Z"
+    );
+    expect(unlistedMatch).toBeNull();
+  });
+
+  it("supports all maintained SDK runtimes and keeps newer runtime matchers server-evaluated", () => {
+    const cases = [
+      [".net", "dotnet"],
+      ["rust", "rust"],
+      ["android", "android"],
+      ["ios", "swift"],
+      ["react_native", "react-native"],
+      ["jvm", "java"]
+    ] as const;
+    for (const [raw, expected] of cases) {
+      const parsed = CaptureRuleCreateSchema.parse({
+        name: `Match ${expected}`,
+        action: "demote",
+        matcher: { runtime: [expected] }
+      });
+      const ctx = buildCaptureRuleEvaluationContext({
+        project_id: baseRule.project_id,
+        event: {
+          event_id: "00000000-0000-4000-8000-000000000499",
+          event_type: "backend_exception",
+          service: { name: "svc", environment: "production", runtime: raw },
+          payload: { name: "Error", message: "boom" }
+        }
+      });
+      expect(ctx.runtime).toBe(expected);
+      expect(captureRuleRequiresServerEvaluation(parsed)).toBe(expected !== "java");
+    }
+  });
 });

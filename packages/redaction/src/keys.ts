@@ -37,3 +37,13 @@ export function isSensitiveKey(key: string, sensitiveKeys: readonly string[]): b
   }
   return false;
 }
+
+/** ASCII case-insensitive whole-key match with punctuation significant (e.g. `tag` does not match `tag_name`). */
+export function isExactSensitiveKey(key: string, exactKeys: readonly string[]): boolean {
+  if (exactKeys.length === 0) {
+    return false;
+  }
+
+  const normalized = key.trim().toLowerCase();
+  return exactKeys.some((candidate) => candidate.trim().toLowerCase() === normalized);
+}

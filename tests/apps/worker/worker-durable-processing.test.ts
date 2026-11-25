@@ -37,6 +37,7 @@ vi.mock("../../../packages/storage/src/worker-job-store.js", () => ({
 }));
 vi.mock("../../../packages/storage/src/index.js", () => ({
   createPostgresMetadataStore: () => ({ upsertIncident: mocks.upsertIncident }),
+  createPostgresCaptureRuleThresholdStore: () => ({}),
   createPostgresAccountAnalyticsStore: () => mocks.analyticsStore,
   createPostgresAnalyticsCorrelationStore: () => ({}),
   createPostgresImprovementOpportunityStore: () => mocks.opportunityStore

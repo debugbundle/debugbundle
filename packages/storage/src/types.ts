@@ -103,6 +103,7 @@ export type {
 export type {
   BuildBundleJob,
   BuildReproductionJob,
+  CaptureRuleThresholdJobConfig,
   ClaimedRedisJob,
   CleanupRetentionJob,
   CreateRedisQueueClientInput,
@@ -526,6 +527,7 @@ export interface DeleteWebhookResult {
 export interface UpsertIncidentInput {
   event_id: string;
   event_type?: EventEnvelope["event_type"];
+  event_class?: EventClass;
   project_id: string;
   service_name: string;
   environment: string;
@@ -535,6 +537,11 @@ export interface UpsertIncidentInput {
   title: string;
   severity: "low" | "medium" | "high" | "critical";
   occurred_at: string;
+  prior_events?: Array<{
+    event_id: string;
+    occurred_at: string;
+    resource_route: string | null;
+  }>;
   deploy_metadata?: {
     commit_sha: string;
     version: string;
@@ -556,6 +563,7 @@ export interface UpsertIncidentResult {
   incident_id: string;
   matched_fields: string[];
   status: "open" | "resolved" | "regressed";
+  created_now?: boolean;
   regressed_now: boolean;
   occurrence_count: number;
   duplicate_event?: boolean;

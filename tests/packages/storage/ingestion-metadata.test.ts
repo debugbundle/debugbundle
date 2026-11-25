@@ -40,16 +40,15 @@ describe("ingestion metadata service", () => {
     expect(first).toHaveLength(64);
   });
 
-  it("should persist incident and event linkage", async (): Promise<void> => {
-    const upsertIncident = vi
-      .fn()
-      .mockResolvedValue({
-        incident_id: "inc_123",
-        matched_fields: ["normalized_message"],
-        status: "open",
-        regressed_now: false,
-        occurrence_count: 1
-      });
+  it.each([1, 4])("records opening with %i occurrences", async (count) => {
+    const upsertIncident = vi.fn().mockResolvedValue({
+      incident_id: "inc_123",
+      matched_fields: ["normalized_message"],
+      status: "open",
+      regressed_now: false,
+      occurrence_count: count,
+      ...(count === 4 ? { created_now: true } : {})
+    });
     const insertIncidentEvent = vi.fn().mockResolvedValue(undefined);
     const markIncidentSpiking = vi.fn().mockResolvedValue(false);
     const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");

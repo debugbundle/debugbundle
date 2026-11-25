@@ -1,6 +1,7 @@
 import type {
   CapturePreset,
   CaptureRuleEvaluationResult,
+  CaptureRuleThresholdGroupBy,
   EventClass,
   EventEnvelope,
   ImmediateClientErrorPathRule
@@ -110,12 +111,23 @@ export interface NormalizeEventsJob {
   capture_rule?: CaptureRuleEvaluationResult;
 }
 
+export interface CaptureRuleThresholdJobConfig {
+  rule_id: string;
+  threshold_count: number;
+  threshold_window_seconds: number;
+  threshold_group_by: CaptureRuleThresholdGroupBy;
+  bucket_key: string;
+  rule_updated_at: string;
+  received_at: string;
+}
+
 export interface GroupIncidentJob {
   project_id: string;
   event_id: string;
   event_type: EventEnvelope["event_type"];
   event_class: EventClass;
   incident_trigger?: "request_anomaly";
+  capture_rule_threshold?: CaptureRuleThresholdJobConfig;
   service_name: string;
   environment: string;
   fingerprint: string;

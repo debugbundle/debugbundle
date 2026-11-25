@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ApiDependencies } from "../../../apps/api/src/api-types.js";
 import { createApiServer } from "../../../apps/api/src/server.js";
+import { CaptureRuleSuggestionsResponseSchema } from "../../../packages/shared-types/src/index.js";
+import { CaptureRuleValidationError } from "../../../packages/storage/src/index.js";
 import { createBundleWithRequestContext } from "../../helpers/repro-engine.js";
 
 function createDependencies(
@@ -11,6 +13,7 @@ function createDependencies(
     auditLogging?: ApiDependencies["auditLogging"];
     memberAuth?: ApiDependencies["memberAuth"];
     captureRuleManagement?: ApiDependencies["captureRuleManagement"];
+    captureRuleV2WritesEnabled?: boolean;
     projectManagement?: ApiDependencies["projectManagement"];
     authRateLimiter?: ApiDependencies["authRateLimiter"];
     incidentRetrieval?: ApiDependencies["incidentRetrieval"];
@@ -21,6 +24,9 @@ function createDependencies(
   return createApiServer({
     ingestionPersistence: { persistAndEnqueue: vi.fn() },
     ingestionMetadata: { resolveProjectByTokenHash: vi.fn() },
+    ...(overrides.captureRuleV2WritesEnabled === undefined
+      ? {}
+      : { captureRuleV2WritesEnabled: overrides.captureRuleV2WritesEnabled }),
     ...(overrides.authRateLimiter === undefined
       ? {}
       : { authRateLimiter: overrides.authRateLimiter }),
@@ -330,6 +336,40 @@ describe("capture rule routes", () => {
     });
   });
 
+  it("keeps existing capture-rule list clients compatible when a project adds new rule actions", async () => {
+    const thresholdRule = {
+      ...rule,
+      id: "550e8400-e29b-41d4-a716-446655440124",
+      action: "threshold" as const,
+      threshold_count: 10,
+      threshold_window_seconds: 3600,
+      threshold_group_by: "fingerprint" as const
+    };
+    const app = createDependencies({
+      captureRuleManagement: {
+        listCaptureRulesForProject: vi.fn().mockResolvedValue([rule, thresholdRule]),
+        listActiveCaptureRulesForProject: vi.fn(),
+        createCaptureRuleForProject: vi.fn(),
+        updateCaptureRuleForProject: vi.fn(),
+        deleteCaptureRuleForProject: vi.fn()
+      }
+    });
+
+    try {
+      const url = "/v1/projects/00000000-0000-0000-0000-000000000001/capture-rules";
+      const headers = { authorization: "Bearer dbundle_mem_test_token" };
+      const legacy = await app.inject({ method: "GET", url, headers });
+      const current = await app.inject({ method: "GET", url: `${url}?rule_schema=2`, headers });
+
+      expect(legacy.statusCode).toBe(200);
+      expect(legacy.json()).toEqual({ access_mode: "manage", rules: [rule] });
+      expect(current.statusCode).toBe(200);
+      expect(current.json()).toEqual({ access_mode: "manage", rules: [rule, thresholdRule] });
+    } finally {
+      await app.close();
+    }
+  });
+
   it("creates capture rules for owners and admins", async () => {
     const app = createDependencies({
       auditLogging: {
@@ -367,6 +407,57 @@ describe("capture rule routes", () => {
     expect(response.json()).toEqual({ rule });
   });
 
+  it("pauses creation and conversion to new rule types while keeping existing rule writes available", async () => {
+    const create = vi.fn().mockResolvedValue(rule);
+    const update = vi.fn().mockResolvedValue(rule);
+    const app = createDependencies({
+      captureRuleV2WritesEnabled: false,
+      captureRuleManagement: {
+        listCaptureRulesForProject: vi.fn(),
+        listActiveCaptureRulesForProject: vi.fn(),
+        createCaptureRuleForProject: create,
+        updateCaptureRuleForProject: update,
+        deleteCaptureRuleForProject: vi.fn()
+      }
+    });
+    const url = `/v1/projects/${rule.project_id}/capture-rules`;
+    const headers = { authorization: "Bearer dbundle_mem_test_token" };
+
+    try {
+      const createPaused = await app.inject({
+        method: "POST",
+        url,
+        headers,
+        payload: { name: "Allow web", action: "allow", matcher: { services: ["web"] } }
+      });
+      expect(createPaused.statusCode).toBe(503);
+      expect(createPaused.json()).toEqual({ error: "capture_rule_v2_writes_paused" });
+
+      const updatePaused = await app.inject({
+        method: "PATCH",
+        url: `${url}/${rule.id}`,
+        headers,
+        payload: {
+          matcher: { resource_urls: [{ host: "cdn.example.test", path_equals: "/one.js" }] }
+        }
+      });
+      expect(updatePaused.statusCode).toBe(503);
+      expect(create).not.toHaveBeenCalled();
+      expect(update).not.toHaveBeenCalled();
+
+      const legacyWrite = await app.inject({
+        method: "POST",
+        url,
+        headers,
+        payload: { name: "Demote web", action: "demote", matcher: { services: ["web"] } }
+      });
+      expect(legacyWrite.statusCode).toBe(201);
+      expect(create).toHaveBeenCalledOnce();
+    } finally {
+      await app.close();
+    }
+  });
+
   it.each([
     "https://www.googletagmanager.com/gtm.js",
     "https://www.googletagmanager.com/gtag/js",
@@ -390,24 +481,53 @@ describe("capture rule routes", () => {
 
       const response = await app.inject({
         method: "POST",
-        url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440123/capture-rule-suggestion",
+        url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440123/capture-rule-suggestion?rule_schema=2",
         headers: { authorization: "Bearer dbundle_mem_test_token" }
       });
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
         bundle_status: "ready",
-        suggestions: [
-          expect.objectContaining({
-            suggestion_id: url === null ? "exact_fingerprint_demote" : "resource_context",
-            recommended_action: "demote"
-          }),
-          expect.objectContaining({
-            suggestion_id: url === null ? "exact_fingerprint_drop" : "resource_drop",
-            recommended_action: "drop"
-          })
-        ]
+        suggestions:
+          url === null
+            ? [
+                expect.objectContaining({
+                  suggestion_id: "exact_fingerprint_demote",
+                  recommended_action: "demote"
+                }),
+                expect.objectContaining({
+                  suggestion_id: "exact_fingerprint_drop",
+                  recommended_action: "drop"
+                })
+              ]
+            : [
+                expect.objectContaining({
+                  suggestion_id: "resource_context",
+                  recommended_action: "demote"
+                }),
+                expect.objectContaining({
+                  suggestion_id: "resource_drop",
+                  recommended_action: "drop"
+                }),
+                expect.objectContaining({
+                  suggestion_id: "resource_threshold",
+                  recommended_action: "threshold"
+                })
+              ]
       });
+      const legacy = await app.inject({
+        method: "POST",
+        url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440123/capture-rule-suggestion",
+        headers: { authorization: "Bearer dbundle_mem_test_token" }
+      });
+      expect(legacy.statusCode).toBe(200);
+      const currentBody = CaptureRuleSuggestionsResponseSchema.parse(response.json());
+      const legacyBody = CaptureRuleSuggestionsResponseSchema.parse(legacy.json());
+      expect(legacyBody.suggestions).toEqual(
+        currentBody.suggestions.filter(
+          (suggestion) => suggestion.suggestion_id !== "resource_threshold"
+        )
+      );
     }
   );
 
@@ -653,5 +773,119 @@ describe("capture rule routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ success: true });
+  });
+
+  it("creates threshold, allow, and multi-URL resource_urls rules and maps merged PATCH validation failures to 400", async () => {
+    const thresholdRule = {
+      ...rule,
+      action: "threshold" as const,
+      threshold_count: 10,
+      threshold_window_seconds: 3600,
+      threshold_group_by: "resource" as const,
+      matcher: {
+        event_types: ["frontend_exception"] as const,
+        browser_event_kind: "resource_error" as const,
+        services: ["web"],
+        environments: ["production"],
+        resource_urls: [
+          { host: "cdn-primary.example.com", path_equals: "/widget.js" },
+          { host: "cdn-fallback.example.com", path_equals: "/widget.js" }
+        ]
+      }
+    };
+    const allowRule = {
+      ...rule,
+      action: "allow" as const,
+      threshold_count: null,
+      threshold_window_seconds: null,
+      threshold_group_by: null,
+      matcher: {
+        event_types: ["frontend_exception"] as const,
+        browser_event_kind: "resource_error" as const,
+        resource_url: { host: "app.example.com", path_prefix: "/assets/checkout-" }
+      }
+    };
+    const createCaptureRuleForProject = vi
+      .fn()
+      .mockResolvedValueOnce(thresholdRule)
+      .mockResolvedValueOnce(allowRule);
+    const updateCaptureRuleForProject = vi
+      .fn()
+      .mockRejectedValueOnce(new CaptureRuleValidationError("invalid_capture_rule_update"));
+    const app = createDependencies({
+      auditLogging: { createAuditLog: vi.fn().mockResolvedValue(undefined) },
+      captureRuleManagement: {
+        listCaptureRulesForProject: vi.fn(),
+        listActiveCaptureRulesForProject: vi.fn(),
+        createCaptureRuleForProject,
+        updateCaptureRuleForProject,
+        deleteCaptureRuleForProject: vi.fn()
+      }
+    });
+
+    const thresholdResponse = await app.inject({
+      method: "POST",
+      url: "/v1/projects/00000000-0000-0000-0000-000000000001/capture-rules",
+      headers: { authorization: "Bearer dbundle_mem_test_token" },
+      payload: {
+        name: "Threshold optional CDN widget",
+        description: null,
+        enabled: true,
+        action: "threshold",
+        matcher: thresholdRule.matcher,
+        sample_rate: null,
+        sample_event_class: null,
+        threshold_count: 10,
+        threshold_window_seconds: 3600,
+        threshold_group_by: "resource",
+        created_by_user_id: null,
+        created_from_incident_id: null,
+        created_from_event_id: null,
+        expires_at: null
+      }
+    });
+    expect(thresholdResponse.statusCode).toBe(201);
+    expect(thresholdResponse.json().rule).toMatchObject({
+      action: "threshold",
+      threshold_count: 10,
+      threshold_window_seconds: 3600,
+      threshold_group_by: "resource"
+    });
+
+    const allowResponse = await app.inject({
+      method: "POST",
+      url: "/v1/projects/00000000-0000-0000-0000-000000000001/capture-rules",
+      headers: { authorization: "Bearer dbundle_mem_test_token" },
+      payload: {
+        name: "Allow checkout assets immediately",
+        description: null,
+        enabled: true,
+        action: "allow",
+        matcher: allowRule.matcher,
+        sample_rate: null,
+        sample_event_class: null,
+        created_by_user_id: null,
+        created_from_incident_id: null,
+        created_from_event_id: null,
+        expires_at: null
+      }
+    });
+    expect(allowResponse.statusCode).toBe(201);
+    expect(allowResponse.json().rule.action).toBe("allow");
+
+    const invalidPatch = await app.inject({
+      method: "PATCH",
+      url: "/v1/projects/00000000-0000-0000-0000-000000000001/capture-rules/00000000-0000-4000-8000-000000000101",
+      headers: { authorization: "Bearer dbundle_mem_test_token" },
+      payload: {
+        action: "threshold",
+        threshold_count: 10,
+        threshold_window_seconds: 3600,
+        threshold_group_by: "resource"
+      }
+    });
+    expect(invalidPatch.statusCode).toBe(400);
+    expect(invalidPatch.json()).toMatchObject({ error: "invalid_payload" });
+    await app.close();
   });
 });

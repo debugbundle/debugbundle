@@ -12,6 +12,7 @@ import type {
   BundleBuildContextStore,
   BuildBundleJob,
   BuildAnalyticsBundleJob,
+  CaptureRuleThresholdStore,
   CleanupRetentionJob,
   RetentionCleanupResult,
   DeliverAlertEmailDigestJob,
@@ -176,6 +177,10 @@ export interface GroupIncidentWorkerDependencies {
     "upsertIncident" | "insertIncidentEvent" | "markIncidentSpiking"
   > &
     Partial<Pick<MetadataStore, "recordIncidentEventRetention">>;
+  captureRuleThresholdStore?: Pick<
+    CaptureRuleThresholdStore,
+    "evaluateThresholdGate" | "consumeThresholdEvents"
+  >;
   frequencyCounter: IncidentFrequencyCounter;
   lifecycleWebhookPublisher: IncidentLifecycleWebhookPublisher;
   githubDispatchPublisher?: IncidentLifecycleGitHubDispatchPublisher;

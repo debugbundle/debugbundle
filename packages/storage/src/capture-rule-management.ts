@@ -1,4 +1,4 @@
-import { getTierCapabilities } from "../../shared-types/src/index.js";
+import { CaptureRuleSchema, getTierCapabilities } from "../../shared-types/src/index.js";
 import type {
   CaptureRule,
   CaptureRuleCreate,
@@ -8,6 +8,13 @@ import { createPostgresCaptureRuleStore } from "./capture-rule-store.js";
 import type { Queryable } from "./types.js";
 import type { PostgresMetadataStoreOptions } from "./metadata-shared.js";
 import { runInTransaction } from "./transaction.js";
+
+export class CaptureRuleValidationError extends Error {
+  public constructor(message = "invalid_capture_rule_update") {
+    super(message);
+    this.name = "CaptureRuleValidationError";
+  }
+}
 
 interface ManagementScope {
   organization_id: string;
@@ -95,17 +102,53 @@ export function createCaptureRuleManagement(
     async updateCaptureRuleForProject(input) {
       return runInTransaction(db, async (tx) => {
         if (!(await projectAllowed(tx, input, true))) return null;
+        const txStore = createPostgresCaptureRuleStore(tx);
         const update = {
           ...input.update,
           ...(input.update.action && input.update.action !== "sample"
             ? { sample_rate: null, sample_event_class: null }
+            : {}),
+          ...(input.update.action && input.update.action !== "threshold"
+            ? {
+                threshold_count: null,
+                threshold_window_seconds: null,
+                threshold_group_by: null
+              }
             : {})
         };
-        return createPostgresCaptureRuleStore(tx).updateCaptureRule({
+        if (input.update.action === "threshold" || input.update.matcher !== undefined) {
+          const existing = await txStore.getCaptureRuleById({
+            id: input.rule_id,
+            project_id: input.project_id
+          });
+          if (existing === null) return null;
+          const merged = CaptureRuleSchema.safeParse({
+            ...existing,
+            ...update
+          });
+          if (!merged.success) {
+            throw new CaptureRuleValidationError("invalid_capture_rule_update");
+          }
+        }
+        const updated = await txStore.updateCaptureRule({
           id: input.rule_id,
           project_id: input.project_id,
           ...update
         });
+        if (
+          updated !== null &&
+          (input.update.action !== undefined ||
+            input.update.matcher !== undefined ||
+            input.update.enabled !== undefined ||
+            input.update.threshold_count !== undefined ||
+            input.update.threshold_window_seconds !== undefined ||
+            input.update.threshold_group_by !== undefined)
+        ) {
+          await tx.query("DELETE FROM capture_rule_threshold_events WHERE rule_id = $1", [
+            updated.id
+          ]);
+        }
+        return updated;
       });
     },
     async deleteCaptureRuleForProject(input) {

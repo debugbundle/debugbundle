@@ -15,7 +15,10 @@ function sameAction(rule: CaptureRule, suggestion: CaptureRuleCreate): boolean {
   return (
     rule.action === suggestion.action &&
     rule.sample_rate === suggestion.sample_rate &&
-    rule.sample_event_class === suggestion.sample_event_class
+    rule.sample_event_class === suggestion.sample_event_class &&
+    (rule.threshold_count ?? null) === (suggestion.threshold_count ?? null) &&
+    (rule.threshold_window_seconds ?? null) === (suggestion.threshold_window_seconds ?? null) &&
+    (rule.threshold_group_by ?? null) === (suggestion.threshold_group_by ?? null)
   );
 }
 

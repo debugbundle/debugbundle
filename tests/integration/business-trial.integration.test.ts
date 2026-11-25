@@ -13,6 +13,7 @@ import { createPostgresBillingStore } from "../../packages/storage/src/billing-s
 import { createReportDefinitionStore } from "../../packages/storage/src/report-definition-store.js";
 import { createReportRunAdmissionStore } from "../../packages/storage/src/report-run-admission.js";
 import { reportModelProfile } from "../../packages/smart-reports/src/model-request.js";
+import { lastCompletedReportPeriod } from "../../packages/smart-reports/src/report-period.js";
 import {
   createIntegrationPool,
   createQueryable,
@@ -56,6 +57,21 @@ runIntegration("Business no-card trial lifecycle", () => {
       started_at: "2026-10-25T00:00:00.000Z",
       ends_at: "2026-11-24T00:00:00.000Z"
     });
+
+  async function startCurrentTrial() {
+    // Report admission compares the deadline to the database's real clock.
+    const result = await pool.query<{ now: Date }>("SELECT now()");
+    const now = result.rows[0]!.now.getTime();
+    const day = 24 * 60 * 60 * 1_000;
+    const at = (days: number) => new Date(now + days * day).toISOString();
+    await billing.startTrialForOrganization({
+      organization_id: org,
+      target_plan: "business",
+      started_at: at(-14),
+      ends_at: at(16)
+    });
+    return lastCompletedReportPeriod("weekly", at(0));
+  }
   it("serialises one-time admission, exposes Business and retains the full thirty-day allowance across a calendar boundary", async () => {
     const result = await Promise.all([trial(), trial()]);
     expect(result.filter((value) => value === "trial_unavailable")).toHaveLength(1);
@@ -85,7 +101,7 @@ runIntegration("Business no-card trial lifecycle", () => {
     ).toBe(0);
   });
   it("shares forty admissions and the normal AI budget, then refuses generation at the deadline before cleanup", async () => {
-    await trial();
+    const period = await startCurrentTrial();
     const initiator = { version: 1 as const, kind: "browser_session" as const, user_id: owner };
     const definition = await createReportDefinitionStore(db).create({
       organization_id: org,
@@ -109,12 +125,7 @@ runIntegration("Business no-card trial lifecycle", () => {
         request_id: randomUUID(),
         definition_id: definition.id,
         expected_version: 1,
-        period: {
-          kind: "weekly",
-          starts_at: "2026-10-26T00:00:00.000Z",
-          ends_at: "2026-11-02T00:00:00.000Z",
-          duration_days: 7
-        },
+        period,
         kind: "manual"
       });
     for (let i = 0; i < 40; i++) await admit();
@@ -174,7 +185,7 @@ runIntegration("Business no-card trial lifecycle", () => {
     await expect(assertStorageSchemaMigrationsApplied(db)).resolves.toBeUndefined();
   });
   it("preserves the Owner's generated archive after trial expiry without generating another report", async () => {
-    await trial();
+    const period = await startCurrentTrial();
     const initiator = { version: 1 as const, kind: "browser_session" as const, user_id: owner };
     const definition = await createReportDefinitionStore(db).create({
       organization_id: org,
@@ -194,12 +205,7 @@ runIntegration("Business no-card trial lifecycle", () => {
       request_id: randomUUID(),
       definition_id: definition.id,
       expected_version: 1,
-      period: {
-        kind: "weekly",
-        starts_at: "2026-10-26T00:00:00.000Z",
-        ends_at: "2026-11-02T00:00:00.000Z",
-        duration_days: 7
-      },
+      period,
       kind: "manual"
     });
     const saved = new Map<string, Buffer>(),

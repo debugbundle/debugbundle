@@ -506,6 +506,7 @@ export interface ApiDependencies extends ApiAnalyticsDependencies, ApiManagement
         }): Promise<CapturePolicyRecord | null>;
       }
     | undefined;
+  captureRuleV2WritesEnabled?: boolean;
   captureRuleManagement?:
     | {
         listCaptureRulesForProject(input: {

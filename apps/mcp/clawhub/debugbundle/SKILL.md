@@ -22,11 +22,11 @@ metadata:
         description: Optional DebugBundle API base URL for self-hosted or non-production environments.
     install:
       - kind: node
-        package: "@debugbundle/mcp@1.29.0"
+        package: "@debugbundle/mcp@1.30.0"
         bins:
           - debugbundle-mcp
       - kind: node
-        package: "@debugbundle/cli@1.29.0"
+        package: "@debugbundle/cli@1.30.0"
         bins:
           - debugbundle
     skillKey: debugbundle
@@ -144,10 +144,12 @@ Analytics is browser-first, opt-in, aggregate-first product evidence. Use it whe
 
 Prefer CLI `debugbundle capture-rule suggest <incident-id> --json` and an authorized `create-from-suggestion` command. Use `suggest_capture_rules_from_incident` and `create_capture_rule_from_incident_suggestion` when MCP is selected.
 
-- Inspect the primary failure and routes: one resource can span pages, route coverage may be incomplete, and historical incidents stay separate. Related tracker evidence does not explain an application exception.
-- If the cause is unknown, say "possibly blocked by privacy tools." Network/CSP/provider failures remain possible; provider recognition proves neither Pi-hole blocking nor optionality.
+- Inspect the primary failure, routes, and passive evidence first: one resource can span pages, route coverage may be incomplete, and historical incidents stay separate. Related tracker evidence does not explain an application exception.
+- Distinguish enforced CSP blocks from report-only policies (which do not block), observed resource-timing HTTP status, explicit recovery outcomes, and `visibility_state: "unloaded"` (`pagehide` teardown aborts). If the cause is unknown, say "possibly blocked by privacy tools." Network/CSP/provider failures remain possible; provider recognition proves neither Pi-hole blocking nor optionality.
 - Review exact resource host/path/type, service, environment and opacity, or the returned exact fingerprint when evidence is incomplete; never widen to a whole host. All resource incidents can offer explicit controls. Provider recognition does not establish that a dependency is optional; do not suppress authentication, app assets or unknown dependencies automatically.
-- For confirmed optional dependencies, context (demote) retains diagnostics without new incidents/alerts/automation and may remain billable. Drop discards future matches; choose it only when evidence has no diagnostic value. Explain the tradeoff; neither deletes history. Use the returned suggestion ID.
+- For single-visitor transient resource failures or deploy-hashed assets (such as `/assets/`), prefer an opt-in `threshold` rule (`resource_threshold` suggestion) over `demote` or `drop`, paired with higher-specificity `allow` carve-outs when critical paths (such as checkout or auth assets) must still open on occurrence #1.
+- For confirmed optional dependencies, context (`demote`) retains diagnostics without new incidents/alerts/automation and may remain billable; `drop` discards future matches and should be chosen only when evidence has no diagnostic value. Use `matcher.resource_urls` (1–10 exact `{ host, path_equals }` entries) for primary and fallback CDN URLs. Explain the tradeoff; neither deletes history. Use the returned suggestion ID.
+- If legacy resource events show a redacted `tag_name` splitting one resource across routes, check the app's SDK `redactFields` config and recommend moving narrow private keys (such as `tag`) to exact-key `redactExactFields` alongside a protected SDK release.
 - Check existing/disabled rules. Empty suggestions or pending/failed bundles do not justify broader rules. Applying requires user authorization and owner/admin access; preview is read-only. Verify subsequent matching and protected captures before claiming improvement; live tests need authorization.
 - The official OpenAI connection cannot suggest or apply rules. Check the separately authenticated CLI before declaring the action unavailable. When neither path can perform it, review returned evidence and offer a returned safe dashboard URL; never invent tools or bypass access restrictions.
 

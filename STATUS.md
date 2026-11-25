@@ -1,3 +1,11 @@
+# 25 November privacy policy update
+
+The public privacy policy discloses saved report summaries, structured facts and saved narrative. The copy states that OpenAI needs separate reports access and a linked account with access to every project in the report. Site commit `9fb3271c` passed local checks, GitHub CI, hosted deployment and public readback after CloudFront invalidation. [Release receipt](spec/browser-resource-release-20261125.md#release-receipts)
+
+# Core 1.32.0 release
+
+Core 1.32.0 is live with threshold, allow and multi-URL capture rules. The first hosted rollout applied the forward migration with writes paused. The second verified both compatible image pairs, activated writes and retained the paused bridge for rollback. Worker processing, public API and MCP readiness, and the exact dashboard build passed. Shared types 3.9.0 and redaction 2.8.0 are live on npm and pass clean registry installs. [Release receipts](spec/browser-resource-release-20261125.md#release-receipts)
+
 # Core 1.31.0 and site 1.12.0 release
 
 The [release contract](spec/release-1.31.0.md) covers creator analytics, short-link

@@ -111,18 +111,28 @@ docker run --rm --network "$network" -v "$repo_root:/workspace" -w /workspace \
   'corepack enable && corepack pnpm db:migrate' >/dev/null
 wait_ready "${prefix}-old"
 
+docker run -d --name "${prefix}-bridge" --network "$network" \
+  --label "com.debugbundle.test-owner=$prefix" \
+  -v "$repo_root:/workspace" -w /workspace "${runtime_env[@]}" \
+  -e CAPTURE_RULE_V2_WRITES_ENABLED=false \
+  node:24-alpine sh -lc 'corepack enable && corepack pnpm api:start' >/dev/null
+owned_containers+=("${prefix}-bridge")
+wait_ready "${prefix}-bridge"
+
 docker run -d --name "${prefix}-new" --network "$network" \
   --label "com.debugbundle.test-owner=$prefix" \
   -v "$repo_root:/workspace" -w /workspace "${runtime_env[@]}" \
+  -e CAPTURE_RULE_V2_WRITES_ENABLED=true \
   node:24-alpine sh -lc 'corepack enable && corepack pnpm api:start' >/dev/null
 owned_containers+=("${prefix}-new")
 wait_ready "${prefix}-new"
 
 docker run --rm --network "$network" -v "$repo_root:/workspace" -w /workspace \
   "${runtime_env[@]}" -e MIXED_API_OLD_HOST="${prefix}-old" \
+  -e MIXED_API_BRIDGE_HOST="${prefix}-bridge" \
   -e MIXED_API_NEW_HOST="${prefix}-new" node:24-alpine sh -lc \
   'corepack enable && corepack pnpm exec tsx scripts/verify-mixed-version-api-traffic.ts'
 
 docker rm -f "${prefix}-new" >/dev/null
-check_ready "${prefix}-old"
+check_ready "${prefix}-bridge"
 echo "mixed_api_forward_migration_and_rollback_ok"

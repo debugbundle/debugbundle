@@ -139,7 +139,9 @@ describe("web app — incident table interactions", () => {
       }
 
       if (
-        url.endsWith(`/v1/incidents/${incident.incident_id}/capture-rule-suggestion`) &&
+        url.endsWith(
+          `/v1/incidents/${incident.incident_id}/capture-rule-suggestion?rule_schema=2`
+        ) &&
         init?.method === "POST"
       ) {
         return jsonResponse(200, {
@@ -177,7 +179,7 @@ describe("web app — incident table interactions", () => {
       }
 
       if (
-        url.endsWith(`/v1/incidents/${incident.incident_id}/capture-rules`) &&
+        url.endsWith(`/v1/incidents/${incident.incident_id}/capture-rules?rule_schema=2`) &&
         init?.method === "POST"
       ) {
         expect(init.body).toBe(JSON.stringify({ suggestion_id: "primary_resource_host_demote" }));
@@ -229,8 +231,9 @@ describe("web app — incident table interactions", () => {
       expect(
         fetchMock.mock.calls.some(
           ([input, init]) =>
-            requestUrl(input).endsWith(`/v1/incidents/${incident.incident_id}/capture-rules`) &&
-            init?.method === "POST"
+            requestUrl(input).endsWith(
+              `/v1/incidents/${incident.incident_id}/capture-rules?rule_schema=2`
+            ) && init?.method === "POST"
         )
       ).toBe(true);
     });

@@ -216,4 +216,66 @@ describe("incident noise controls", () => {
     fireEvent.click(screen.getByRole("checkbox"));
     expect(screen.getByRole("button", { name: "Stop capturing" })).toBeEnabled();
   });
+
+  it("renders resource_threshold suggestion with threshold summary badge and confirmation flow", async () => {
+    const thresholdSuggestion: api.CaptureRuleSuggestion = {
+      suggestion_id: "resource_threshold",
+      label: "Open incident after repeated asset failures",
+      recommended_action: "threshold",
+      confidence: "high",
+      reason: "Require 10 failures within 1 hour before opening an incident.",
+      requires_confirmation: true,
+      created_rule_id: null,
+      created_rule_enabled: null,
+      rule: {
+        name: "Threshold /assets/ failures",
+        description: null,
+        enabled: true,
+        action: "threshold",
+        matcher: {
+          event_types: ["frontend_exception"],
+          browser_event_kind: "resource_error",
+          browser_event_opaque: true,
+          services: ["web"],
+          environments: ["production"],
+          resource_url: { host: "app.example.com", path_prefix: "/assets/" }
+        },
+        sample_rate: null,
+        sample_event_class: null,
+        threshold_count: 10,
+        threshold_window_seconds: 3600,
+        threshold_group_by: "resource",
+        created_by_user_id: null,
+        created_from_incident_id: "inc_test",
+        created_from_event_id: null,
+        expires_at: null
+      }
+    };
+    vi.mocked(api.suggestCaptureRulesFromIncident).mockResolvedValue({
+      access_mode: "manage",
+      bundle_status: "ready",
+      suggestions: [thresholdSuggestion]
+    });
+    vi.mocked(api.createCaptureRuleFromIncidentSuggestion).mockResolvedValue({
+      ...thresholdSuggestion.rule,
+      id: "rule_threshold_1",
+      enabled: true
+    } as api.ProjectCaptureRule);
+
+    renderDialog();
+    const create = await screen.findByRole("button", { name: "Threshold repeated failures" });
+    expect(create).toBeDisabled();
+    expect(screen.getByText("10× / 1h · resource")).toBeInTheDocument();
+    expect(screen.getByText(/resource: app\.example\.com \/assets\/\*/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("checkbox"));
+    expect(create).toBeEnabled();
+    fireEvent.click(create);
+    await waitFor(() =>
+      expect(api.createCaptureRuleFromIncidentSuggestion).toHaveBeenCalledWith("inc_test", {
+        suggestion_id: "resource_threshold"
+      })
+    );
+    expect(await screen.findByRole("button", { name: "Rule exists" })).toBeDisabled();
+  });
 });

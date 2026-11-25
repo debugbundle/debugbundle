@@ -17,6 +17,11 @@ import { createReportMocks } from "./reports.js";
 import { createImprovementReviewMocks } from "./improvement-reviews.js";
 import { createReferralOfferMocks } from "./referral-offers.js";
 import { createAdminAnalyticsMocks } from "./admin-analytics.js";
+import {
+  buildMockBrowserResourceBundle,
+  buildMockCaptureRuleSuggestions,
+  isMockBrowserResourceIncident
+} from "./resource-preview.js";
 
 export interface MockResponse {
   status: number;
@@ -277,6 +282,71 @@ export function createDevMockApi() {
       });
       return reply({ incidents });
     }
+    const suggestMatch = /^\/v1\/incidents\/([^/]+)\/capture-rule-suggestion$/.exec(route);
+    if (method === "POST" && suggestMatch) {
+      const incident = data.incidents.find(
+        (row) =>
+          row["incident_id"] === suggestMatch[1] && (!projectId || row["project_id"] === projectId)
+      );
+      if (!incident) return missing();
+      const bundle = isMockBrowserResourceIncident(String(incident["incident_id"]))
+        ? buildMockBrowserResourceBundle(incident)
+        : (structuredClone(syntheticBundle) as unknown as ReturnType<
+            typeof buildMockBrowserResourceBundle
+          >);
+      return reply(buildMockCaptureRuleSuggestions(incident, bundle, data.captureRules));
+    }
+    const createFromSuggestionMatch = /^\/v1\/incidents\/([^/]+)\/capture-rules$/.exec(route);
+    if (method === "POST" && createFromSuggestionMatch) {
+      const incident = data.incidents.find(
+        (row) =>
+          row["incident_id"] === createFromSuggestionMatch[1] &&
+          (!projectId || row["project_id"] === projectId)
+      );
+      if (!incident) return missing();
+      const parsed = objectSchema.safeParse(payload);
+      if (!parsed.success) return reply({ error: "invalid_mock_payload" }, 400);
+      const bundle = isMockBrowserResourceIncident(String(incident["incident_id"]))
+        ? buildMockBrowserResourceBundle(incident)
+        : (structuredClone(syntheticBundle) as unknown as ReturnType<
+            typeof buildMockBrowserResourceBundle
+          >);
+      const { suggestions } = buildMockCaptureRuleSuggestions(incident, bundle, data.captureRules);
+      const selectedId =
+        typeof parsed.data["suggestion_id"] === "string" ? parsed.data["suggestion_id"] : "";
+      const selected = suggestions.find((item) => item.suggestion_id === selectedId);
+      if (!selected) return reply({ error: "capture_rule_suggestion_not_found" }, 404);
+      const now = new Date().toISOString();
+      const rule: MockRecord = {
+        ...structuredClone(base.captureRules),
+        ...selected.rule,
+        id: `rule_${randomUUID().slice(0, 8)}`,
+        project_id: String(incident["project_id"]),
+        name:
+          typeof parsed.data["name"] === "string" && parsed.data["name"].trim()
+            ? parsed.data["name"].trim()
+            : selected.rule.name,
+        description:
+          parsed.data["description"] !== undefined
+            ? parsed.data["description"]
+            : selected.rule.description,
+        enabled:
+          typeof parsed.data["enabled"] === "boolean"
+            ? parsed.data["enabled"]
+            : selected.rule.enabled,
+        expires_at:
+          parsed.data["expires_at"] !== undefined
+            ? parsed.data["expires_at"]
+            : selected.rule.expires_at,
+        created_from_incident_id: String(incident["incident_id"]),
+        hit_count: 0,
+        last_matched_at: null,
+        created_at: now,
+        updated_at: now
+      };
+      data.captureRules.unshift(rule);
+      return reply({ rule }, 201);
+    }
     const contextMatch = /^\/v1\/incidents\/([^/]+)\/context$/.exec(route);
     if (read && contextMatch) {
       const incident = data.incidents.find(
@@ -284,10 +354,13 @@ export function createDevMockApi() {
           row["incident_id"] === contextMatch[1] && (!projectId || row["project_id"] === projectId)
       );
       if (!incident) return missing();
+      const bundleState = isMockBrowserResourceIncident(String(incident["incident_id"]))
+        ? { status: "ready" as const, bundle: buildMockBrowserResourceBundle(incident) }
+        : { status: "pending" as const };
       return reply(
         buildIncidentContextRecord({
           incident: incident as IncidentContextIncidentRecord,
-          bundle: { status: "pending" },
+          bundle: bundleState,
           reproduction: { status: "pending" },
           logs: { logs: [], next_cursor: null }
         })
@@ -308,6 +381,9 @@ export function createDevMockApi() {
       if (!row || (projectId && row["project_id"] !== projectId)) return missing();
       if (detail[3] === "reproduction") return reply(syntheticBundle.reproduction);
       if (detail[3] === "bundle") {
+        if (key === "incident" && isMockBrowserResourceIncident(String(row["incident_id"]))) {
+          return reply(buildMockBrowserResourceBundle(row));
+        }
         const bundle = structuredClone(syntheticBundle);
         bundle.bundle_type = key === "improvement" ? "improvement" : "failure";
         bundle.bundle_id = `demo_bundle_${detail[2]}`;

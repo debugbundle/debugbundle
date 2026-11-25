@@ -23,11 +23,11 @@ Use the same runtime-evidence-gated workflow through MCP when it is the selected
 
 - `suggest_capture_rules_from_incident` — generate deterministic capture-rule suggestions from an incident bundle.
 - `create_capture_rule_from_incident_suggestion` — apply a confirmed suggestion.
-- `list_capture_rules`, `create_capture_rule`, `update_capture_rule`, `delete_capture_rule` — manage project capture rules.
+- `list_capture_rules`, `create_capture_rule`, `update_capture_rule`, `delete_capture_rule` — manage project capture rules (`demote`, `sample`, `drop`, `threshold` with rolling-window counts, `allow` carve-outs, and bounded `matcher.resource_urls`).
 - `get_capture_policy`, `update_capture_policy` — review or update capture policy, including path-scoped client-error incident rules.
 
-Use these tools for repeated low-value operational noise only after inspecting incident evidence. Keep frontend suppression scoped by structured browser and client signals, and use path-scoped capture policy for known 4xx routes.
-For browser resource failures, follow the skill's Browser resource failures guidance and use the suggestion ID returned by the server. These management tools belong to the member-authenticated MCP surface; the official OpenAI connection is read-only and cannot suggest or apply capture rules.
+Use these tools for repeated low-value operational noise only after inspecting incident evidence. Prefer `threshold` (`resource_threshold`) for transient single-visitor or deploy-hashed resource noise, `allow` carve-outs for critical assets, and `resource_urls` for multi-CDN optional dependencies. Keep frontend suppression scoped by structured browser and client signals, and use path-scoped capture policy for known 4xx routes.
+For browser resource failures, follow the skill's Browser resource failures guidance and use the suggestion ID returned by the server. These management tools belong to the access-token-authenticated MCP surface; the official OpenAI connection is read-only and cannot suggest or apply capture rules.
 
 ## Product Analytics Tools
 
@@ -38,7 +38,7 @@ For browser resource failures, follow the skill's Browser resource failures guid
 - Settings: `get_analytics_settings` and `update_analytics_settings`.
 - Saved funnels: `list_saved_analytics_funnels`, `create_saved_analytics_funnel`, `update_saved_analytics_funnel`, and `archive_saved_analytics_funnel`.
 
-Start with aggregate reads and narrow only as the question requires. Journey samples are bounded redacted event sequences, not video. Generate a bundle only for a durable bounded analysis question, not one bundle per visit. Treat bundle generation, settings updates, and saved-funnel changes as explicit mutations. Use member auth; project tokens are ingestion-only.
+Start with aggregate reads and narrow only as the question requires. Journey samples are bounded redacted event sequences, not video. Generate a bundle only for a durable bounded analysis question, not one bundle per visit. Treat bundle generation, settings updates, and saved-funnel changes as explicit mutations. Use access-token authentication; project tokens are ingestion-only.
 
 ## Probe Tools
 
@@ -46,7 +46,7 @@ Start with aggregate reads and narrow only as the question requires. Journey sam
 - `list_active_probes` — list active probe activations for a project.
 - `deactivate_probe` — deactivate one active probe.
 
-Use probes for targeted evidence gathering when incident bundles do not contain enough runtime context.
+Use probes for future calls to already deployed, bounded checkpoint instrumentation. An empty section means no matching retained observation; check versions, scope, policy, expiry and delivery receipts before inferring why.
 
 ## Notification Tools
 

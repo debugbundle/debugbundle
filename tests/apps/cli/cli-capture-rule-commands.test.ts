@@ -144,6 +144,39 @@ describe("cli capture-rule commands", () => {
     expect(result.output).toContain('browser_target_attributes={"rel":"modulepreload"}');
   });
 
+  it("formats threshold rules and multi-URL resource_urls matchers in human output", async () => {
+    const thresholdRule = {
+      ...rule,
+      name: "Threshold optional widget CDNs",
+      action: "threshold" as const,
+      threshold_count: 10,
+      threshold_window_seconds: 3600,
+      threshold_group_by: "resource" as const,
+      matcher: {
+        event_types: ["frontend_exception"] as const,
+        browser_event_kind: "resource_error" as const,
+        resource_urls: [
+          { host: "cdn-primary.example.com", path_equals: "/widget.js" },
+          { host: "cdn-fallback.example.com", path_equals: "/widget.js" }
+        ]
+      }
+    };
+    const result = await listCaptureRulesCommand(
+      { bearerToken: "dbundle_mem_x", projectId: "proj_1" },
+      {
+        listCaptureRules: vi.fn().mockResolvedValue({
+          access_mode: "manage",
+          rules: [thresholdRule]
+        })
+      }
+    );
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain("threshold:10/3600s:resource");
+    expect(result.output).toContain(
+      "resource_urls=cdn-primary.example.com/widget.js,cdn-fallback.example.com/widget.js"
+    );
+  });
+
   it("renders create/update/delete results", async () => {
     const created = await createCaptureRuleCommand(
       {
@@ -379,6 +412,39 @@ describe("cli capture-rule commands", () => {
     expect(badRequest.output).toBe("Invalid capture rule create payload.");
   });
 
+  it("reports that the hosted bridge has paused threshold writes", async () => {
+    const request = vi.fn().mockResolvedValue({
+      status: 503,
+      body: { error: "capture_rule_v2_writes_paused" }
+    });
+    const result = await createCaptureRuleCommand(
+      {
+        bearerToken: "dbundle_mem_owner",
+        projectId: "proj_1",
+        create: {
+          name: "Threshold analytics resources",
+          description: null,
+          enabled: true,
+          action: "threshold",
+          matcher: rule.matcher,
+          sample_rate: null,
+          sample_event_class: null,
+          threshold_count: 5,
+          threshold_window_seconds: 3600,
+          threshold_group_by: "resource",
+          created_by_user_id: null,
+          created_from_incident_id: null,
+          created_from_event_id: null,
+          expires_at: null
+        }
+      },
+      createCaptureRuleApi({ request })
+    );
+
+    expect(result).toEqual({ exitCode: 1, output: "capture_rule_v2_writes_paused" });
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
   it("builds CRUD requests against the capture-rule API and accepts idempotent suggestion creates", async () => {
     const request = vi
       .fn()
@@ -468,7 +534,7 @@ describe("cli capture-rule commands", () => {
       [
         {
           method: "GET",
-          path: "/v1/projects/proj_1/capture-rules",
+          path: "/v1/projects/proj_1/capture-rules?rule_schema=2",
           bearerToken: "dbundle_mem_owner"
         }
       ],
@@ -495,14 +561,14 @@ describe("cli capture-rule commands", () => {
       [
         {
           method: "POST",
-          path: `/v1/incidents/${encodeURIComponent("inc_123")}/capture-rule-suggestion`,
+          path: `/v1/incidents/${encodeURIComponent("inc_123")}/capture-rule-suggestion?rule_schema=2`,
           bearerToken: "dbundle_mem_owner"
         }
       ],
       [
         {
           method: "POST",
-          path: `/v1/incidents/${encodeURIComponent("inc_123")}/capture-rules`,
+          path: `/v1/incidents/${encodeURIComponent("inc_123")}/capture-rules?rule_schema=2`,
           bearerToken: "dbundle_mem_owner",
           body: {
             suggestion_id: "primary_resource_host_demote",

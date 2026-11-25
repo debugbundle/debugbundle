@@ -275,3 +275,140 @@ it("ignores invalid breadcrumb methods and produces schema-valid recovery eviden
   expect(BundleV1Schema.safeParse(buildBundle(args)).success).toBe(true);
   expect(buildBundle(args).context.resource_failure?.recovery_failures).toBeUndefined();
 });
+
+describe("browser resource customer visibility and passive diagnostic summaries", () => {
+  const refId = "00000000-0000-4000-8000-000000000501";
+  const pageId = "00000000-0000-4000-8000-000000000502";
+  const attemptId = "00000000-0000-4000-8000-000000000503";
+
+  function buildResourceArgs(visibilityState: "visible" | "hidden" | "prerender" | "unloaded") {
+    const args = input();
+    const resource = browserResourceEvent({
+      url: "https://cdn.example.com/assets/app.js",
+      page: "https://app.example.com/checkout",
+      tag: "script",
+      visibilityState,
+      readyState: "complete"
+    });
+    resource.occurred_at = "2026-11-24T10:00:00.000Z";
+    resource.correlation = {
+      request_id: null,
+      trace_id: null,
+      session_id: "sess-passive-1",
+      user_id_hash: null
+    };
+    resource.context = {
+      evidence_reference: {
+        version: 1,
+        failure_ref: refId,
+        scope: { kind: "page", page_id: pageId }
+      }
+    };
+    args.sourceEnvelopes = [resource];
+    args.bundleMetadata.source_event_id = resource.event_id;
+    args.bundleMetadata.source_occurred_at = resource.occurred_at;
+    args.incident.first_seen_at = resource.occurred_at;
+    args.incident.last_seen_at = resource.occurred_at;
+    return { args, resource };
+  }
+
+  it.each(["hidden", "prerender", "unloaded"] as const)(
+    "marks %s opaque resource failures as not customer_visible",
+    (visibility) => {
+      const { args } = buildResourceArgs(visibility);
+      const bundle = buildBundle(args);
+      expect(bundle.summary.signals.customer_visible).toBe(false);
+      expect(bundle.impact.customer_visible).toBe(false);
+    }
+  );
+
+  it("keeps visible opaque resource failures marked customer_visible", () => {
+    const { args } = buildResourceArgs("visible");
+    const bundle = buildBundle(args);
+    expect(bundle.summary.signals.customer_visible).toBe(true);
+    expect(bundle.impact.customer_visible).toBe(true);
+  });
+
+  it("surfaces enforced CSP directives, report-only CSP, timing HTTP statuses, and explicit recovery deterministically", () => {
+    const { args: enforcedArgs, resource: enforcedResource } = buildResourceArgs("visible");
+    if (enforcedResource.event_type !== "frontend_exception") throw new Error("expected frontend");
+    enforcedResource.payload.resource_observations = {
+      version: 1,
+      items: [
+        {
+          kind: "csp",
+          observed_at: "2026-11-24T10:00:00.100Z",
+          disposition: "enforce",
+          effective_directive: "script-src",
+          source_url: "https://cdn.example.com/assets/app.js",
+          document_status_code: 200
+        }
+      ]
+    };
+    enforcedArgs.diagnosticContexts = [
+      {
+        received_at: "2026-11-24T10:00:02.000Z",
+        event: createEventEnvelope({
+          event_type: "diagnostic_context",
+          occurred_at: "2026-11-24T10:00:02.000Z",
+          service: { name: "web", environment: "production", runtime: "browser" },
+          correlation: { session_id: "sess-passive-1" },
+          payload: {
+            version: 1,
+            kind: "recovery",
+            failure_ref: refId,
+            scope: { kind: "page", page_id: pageId },
+            attempt_id: attemptId,
+            state: "recovery_observed"
+          }
+        })
+      }
+    ];
+    const enforcedBundle = buildBundle(enforcedArgs);
+    expect(enforcedBundle.summary.likely_cause).toContain("enforced Content Security Policy");
+    expect(enforcedBundle.summary.likely_cause).toContain("script-src");
+    expect(enforcedBundle.summary.likely_cause).toContain("Explicit application recovery");
+    expect(enforcedBundle.summary.recommended_action).toContain("script-src");
+    expect(buildBundle(enforcedArgs)).toEqual(enforcedBundle);
+
+    const { args: reportOnlyArgs, resource: reportOnlyResource } = buildResourceArgs("visible");
+    if (reportOnlyResource.event_type !== "frontend_exception") throw new Error("expected frontend");
+    reportOnlyResource.payload.resource_observations = {
+      version: 1,
+      items: [
+        {
+          kind: "csp",
+          observed_at: "2026-11-24T10:00:00.100Z",
+          disposition: "report",
+          effective_directive: "style-src",
+          source_url: "https://cdn.example.com/assets/app.js",
+          document_status_code: 200
+        }
+      ]
+    };
+    const reportOnlyBundle = buildBundle(reportOnlyArgs);
+    expect(reportOnlyBundle.summary.likely_cause).toContain("report-only Content Security Policy");
+    expect(reportOnlyBundle.summary.likely_cause).toContain("do not block");
+    expect(reportOnlyBundle.summary.likely_cause).toContain("remain unknown");
+
+    const { args: timingArgs, resource: timingResource } = buildResourceArgs("visible");
+    if (timingResource.event_type !== "frontend_exception") throw new Error("expected frontend");
+    timingResource.payload.resource_observations = {
+      version: 1,
+      items: [
+        {
+          kind: "timing",
+          observed_at: "2026-11-24T10:00:00.100Z",
+          availability: "observed",
+          source_url: "https://cdn.example.com/assets/app.js",
+          response_status: 503,
+          duration_ms: 120,
+          transfer_size_bytes: 0
+        }
+      ]
+    };
+    const timingBundle = buildBundle(timingArgs);
+    expect(timingBundle.summary.likely_cause).toContain("HTTP 503");
+    expect(timingBundle.summary.recommended_action).toContain("HTTP 503");
+  });
+});

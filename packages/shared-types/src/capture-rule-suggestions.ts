@@ -536,6 +536,10 @@ export function buildCaptureRuleSuggestions(input: {
 
     const actionRank = (action: CaptureRuleAction): number => {
       switch (action) {
+        case "allow":
+          return 5;
+        case "threshold":
+          return 4;
         case "demote":
           return 3;
         case "sample":

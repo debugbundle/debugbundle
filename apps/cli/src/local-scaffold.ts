@@ -151,10 +151,12 @@ export function buildSkill(): string {
     "",
     "### Browser resource failures",
     "",
-    "- Inspect the primary failure and routes: one resource can span pages, route coverage may be incomplete, and historical incidents stay separate. Related tracker evidence does not explain an application exception.",
-    '- If the cause is unknown, say "possibly blocked by privacy tools." Network/CSP/provider failures remain possible; provider recognition proves neither Pi-hole blocking nor optionality.',
+    "- Inspect the primary failure, routes, and passive evidence first: one resource can span pages, route coverage may be incomplete, and historical incidents stay separate. Related tracker evidence does not explain an application exception.",
+    '- Distinguish observed evidence from unknown causes: treat enforced CSP (`disposition: "enforce"`) separately from report-only CSP (`disposition: "report"`, which does not block), check observed resource-timing HTTP status, explicit recovery outcomes, and `visibility_state: "unloaded"` (`pagehide` teardown aborts). When the cause is still unknown, say "possibly blocked by privacy tools." Network/CSP/provider failures remain possible; provider recognition proves neither Pi-hole blocking nor optionality.',
     "- Review exact resource host/path/type, service, environment and opacity, or the returned exact fingerprint when evidence is incomplete; never widen to a whole host. All resource incidents can offer explicit controls. Provider recognition does not establish that a dependency is optional; do not suppress authentication, app assets or unknown dependencies automatically.",
-    "- For confirmed optional dependencies, context (demote) retains diagnostics without new incidents/alerts/automation and may remain billable. Drop discards future matches; choose it only when evidence has no diagnostic value. Explain the tradeoff; neither deletes history. Use the returned suggestion ID.",
+    "- For single-visitor transient resource failures or deploy-hashed application assets (such as `/assets/`), prefer an opt-in `threshold` rule (`resource_threshold` suggestion or `--action threshold` with `--threshold-count`, `--threshold-window-seconds`, and `--threshold-group-by <resource|fingerprint>`) over `demote` or `drop`. Events below threshold wait without opening incidents or alerts, while real repeated outages still open one incident with prior-window occurrences and routes backfilled. Pair broader prefix rules with higher-specificity `action: \"allow\"` carve-outs when critical paths (such as checkout or authentication assets) must still open on the first failure.",
+    "- For confirmed optional dependencies, context (`demote`) retains diagnostics without new incidents/alerts/automation and may remain billable; `drop` discards future matches and should be chosen only when evidence has no diagnostic value. When one confirmed optional dependency loads across primary and fallback CDN addresses, group them in one rule using `matcher.resource_urls` (1–10 exact `{ host, path_equals }` entries) instead of widening to a host. Explain the tradeoff; neither deletes history. Use the returned suggestion ID.",
+    "- If legacy resource events show a redacted `tag_name` splitting one resource into per-route incidents, check the app's SDK `redactFields` configuration and recommend moving narrow private domain keys (such as `tag`) to exact-key `redactExactFields` alongside a protected SDK release that preserves schema-validated protocol fields.",
     "- Check existing/disabled rules. Empty suggestions or pending/failed bundles do not justify broader rules. Applying requires user authorization and owner/admin access; preview is read-only. Verify subsequent matching and protected captures before claiming improvement; live tests need authorization.",
     "- The official OpenAI connection cannot suggest or apply rules. When it is the only connection, review returned evidence and hand off through a returned safe dashboard URL; never invent tools or switch credentials.",
     "",
@@ -266,11 +268,12 @@ export function buildCliReference(): string {
     "- `debugbundle capture-rule suggest <incident-id> [--auth-file <path>] [--json]`",
     "- `debugbundle capture-rule create-from-suggestion <incident-id> --suggestion-id <id> [--name <name>] [--expires-at <ISO8601>] [--auth-file <path>] [--json]`",
     "- `debugbundle capture-rule list --project-id <id> [--auth-file <path>] [--json]`",
-    "- `debugbundle capture-rule create --project-id <id> --name <name> --action <demote|sample|drop> --matcher-json <json> [--auth-file <path>] [--json]`",
+    "- `debugbundle capture-rule create --project-id <id> --name <name> --action <demote|sample|drop|threshold|allow> --matcher-json <json> [--threshold-count <2-1000>] [--threshold-window-seconds <60-86400>] [--threshold-group-by <resource|fingerprint>] [--expires-at <ISO8601>] [--auth-file <path>] [--json]`",
+    "- `debugbundle capture-rule update <rule-id> --project-id <id> [--name <name>] [--action <demote|sample|drop|threshold|allow>] [--matcher-json <json>] [--threshold-count <2-1000>] [--threshold-window-seconds <60-86400>] [--threshold-group-by <resource|fingerprint>] [--enabled <true|false>] [--expires-at <ISO8601|null>] [--auth-file <path>] [--json]`",
     "- `debugbundle capture-policy get [--project <id>] [--json]`",
     "- `debugbundle capture-policy set [--project <id>] --client-error-path-rule <404=/path/*@GET,POST> [--json]`",
     "",
-    "Use capture-rule suggestions for repeated operational noise after inspecting an incident bundle. Use capture-policy client-error path rules for route-scoped 4xx incidents instead of promoting all client errors.",
+    "Use capture-rule suggestions for repeated operational noise after inspecting an incident bundle. Prefer `threshold` (`resource_threshold` suggestion) for single-visitor transient resource failures and deploy-hashed assets, pair broader prefix rules with higher-specificity `allow` carve-outs for critical paths, and use `matcher.resource_urls` (1–10 exact `{ host, path_equals }` entries) for multi-CDN optional dependencies. Use capture-policy client-error path rules for route-scoped 4xx incidents instead of promoting all client errors.",
     "For browser resource failures, follow the skill's Browser resource failures guidance. Use the current response's suggestion ID, inspect `bundle_status`, `access_mode` and existing-rule state, and review the complete matcher before applying.",
     "",
     "## Probes",
@@ -412,10 +415,10 @@ export function buildMcpReference(): string {
     "",
     "- `suggest_capture_rules_from_incident` — generate deterministic capture-rule suggestions from an incident bundle.",
     "- `create_capture_rule_from_incident_suggestion` — apply a confirmed suggestion.",
-    "- `list_capture_rules`, `create_capture_rule`, `update_capture_rule`, `delete_capture_rule` — manage project capture rules.",
+    "- `list_capture_rules`, `create_capture_rule`, `update_capture_rule`, `delete_capture_rule` — manage project capture rules (`demote`, `sample`, `drop`, `threshold` with rolling-window counts, `allow` carve-outs, and bounded `matcher.resource_urls`).",
     "- `get_capture_policy`, `update_capture_policy` — review or update capture policy, including path-scoped client-error incident rules.",
     "",
-    "Use these tools for repeated low-value operational noise only after inspecting incident evidence. Keep frontend suppression scoped by structured browser and client signals, and use path-scoped capture policy for known 4xx routes.",
+    "Use these tools for repeated low-value operational noise only after inspecting incident evidence. Prefer `threshold` (`resource_threshold`) for transient single-visitor or deploy-hashed resource noise, `allow` carve-outs for critical assets, and `resource_urls` for multi-CDN optional dependencies. Keep frontend suppression scoped by structured browser and client signals, and use path-scoped capture policy for known 4xx routes.",
     "For browser resource failures, follow the skill's Browser resource failures guidance and use the suggestion ID returned by the server. These management tools belong to the access-token-authenticated MCP surface; the official OpenAI connection is read-only and cannot suggest or apply capture rules.",
     "",
     "## Product Analytics Tools",
@@ -657,6 +660,16 @@ export function buildSkillEvals(): string {
             "Describe privacy blocking as possible, not proven; do not diagnose Pi-hole.",
             "Review the exact matcher and use the returned context suggestion ID; explain retained evidence and possible paid usage.",
             "Verify the returned rule without claiming historical incidents were removed or live noise reduction was already observed."
+          ]
+        },
+        {
+          name: "transient_hashed_asset_threshold_review",
+          prompt:
+            "Single-visitor deploy-hashed CSS/JS failures under /assets/ keep opening one-off incidents, while checkout assets under /assets/checkout- must stay immediate. A separate resource incident has a redacted tag_name because the app put tag in redactFields. Explain how to handle both safely.",
+          expected_behavior: [
+            "Inspect bundle evidence first, including passive CSP disposition, resource timing status, recovery observations, and unloaded teardown state.",
+            "Recommend a scoped threshold rule (or resource_threshold suggestion) for transient /assets/ failures instead of broad demote/drop or whole-host suppression, paired with a higher-specificity allow carve-out for /assets/checkout-.",
+            "Recommend moving narrow private domain keys such as tag to exact-key redactExactFields alongside a protected SDK release so protocol fields like tag_name stay intact."
           ]
         },
         {

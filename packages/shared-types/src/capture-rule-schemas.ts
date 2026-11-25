@@ -20,16 +20,25 @@ const CAPTURE_RULE_RUNTIME_VALUES = [
   "java",
   "go",
   "ruby",
+  "dotnet",
+  "rust",
+  "android",
+  "swift",
+  "react-native",
   "unknown"
 ] as const;
 
-export const CaptureRuleActionValues = ["demote", "sample", "drop"] as const;
+export const CaptureRuleActionValues = ["demote", "sample", "drop", "threshold", "allow"] as const;
 export const CaptureRuleActionSchema = z.enum(CaptureRuleActionValues);
 export type CaptureRuleAction = z.infer<typeof CaptureRuleActionSchema>;
 
 export const CaptureRuleSampleEventClassValues = ["preserve", "context"] as const;
 export const CaptureRuleSampleEventClassSchema = z.enum(CaptureRuleSampleEventClassValues);
 export type CaptureRuleSampleEventClass = z.infer<typeof CaptureRuleSampleEventClassSchema>;
+
+export const CaptureRuleThresholdGroupByValues = ["resource", "fingerprint"] as const;
+export const CaptureRuleThresholdGroupBySchema = z.enum(CaptureRuleThresholdGroupByValues);
+export type CaptureRuleThresholdGroupBy = z.infer<typeof CaptureRuleThresholdGroupBySchema>;
 
 export const CaptureRuleRuntimeSchema = z.enum(CAPTURE_RULE_RUNTIME_VALUES);
 export type CaptureRuleRuntime = z.infer<typeof CaptureRuleRuntimeSchema>;
@@ -82,6 +91,11 @@ export interface CaptureRuleUrlMatcher {
   host_suffix?: string;
   path_prefix?: string;
   path_equals?: string;
+}
+
+export interface CaptureRuleExactUrlMatcher {
+  host: string;
+  path_equals: string;
 }
 
 export interface CaptureRuleBrowserTargetAttributes {
@@ -162,6 +176,37 @@ const UrlMatcherSchema = z
     }
   );
 
+const ExactUrlMatcherSchema = z
+  .object({
+    host: z.string().trim().min(1).max(255),
+    path_equals: z.string().trim().min(1).max(1024)
+  })
+  .strict()
+  .transform((value): CaptureRuleExactUrlMatcher => ({
+    host: value.host.toLowerCase(),
+    path_equals: value.path_equals.startsWith("/") ? value.path_equals : `/${value.path_equals}`
+  }));
+
+function normalizeExactUrlMatchers(
+  values: readonly CaptureRuleExactUrlMatcher[] | undefined
+): CaptureRuleExactUrlMatcher[] | undefined {
+  if (values === undefined) {
+    return undefined;
+  }
+
+  const seen = new Set<string>();
+  const normalized: CaptureRuleExactUrlMatcher[] = [];
+  for (const entry of values) {
+    const key = `${entry.host}\0${entry.path_equals}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    normalized.push(entry);
+  }
+  return normalized;
+}
+
 const StatusRangeSchema = z
   .object({
     start: z.number().int().min(100).max(599),
@@ -214,6 +259,7 @@ export interface CaptureRuleMatcher {
   client_kind?: CaptureRuleClientKind;
   bot_family?: string;
   resource_url?: CaptureRuleUrlMatcher;
+  resource_urls?: readonly CaptureRuleExactUrlMatcher[];
   request_url?: CaptureRuleUrlMatcher;
   status_codes?: readonly number[];
   status_ranges?: readonly { start: number; end: number }[];
@@ -239,6 +285,7 @@ export const CaptureRuleMatcherSchema = z
     client_kind: CaptureRuleClientKindSchema.optional(),
     bot_family: z.string().min(1).max(120).optional(),
     resource_url: UrlMatcherSchema.optional(),
+    resource_urls: z.array(ExactUrlMatcherSchema).min(1).max(10).optional(),
     request_url: UrlMatcherSchema.optional(),
     status_codes: z.array(z.number().int().min(100).max(599)).min(1).optional(),
     status_ranges: z.array(StatusRangeSchema).min(1).optional(),
@@ -257,6 +304,7 @@ export const CaptureRuleMatcherSchema = z
     const messageEquals = normalizeOptionalTrimmedString(value.message_equals);
     const botFamily = normalizeOptionalTrimmedString(value.bot_family);
     const browserTargetTagName = normalizeOptionalTrimmedString(value.browser_target_tag_name);
+    const resourceUrls = normalizeExactUrlMatchers(value.resource_urls);
     const statusCodes = normalizeNumberArray(value.status_codes);
 
     if (eventTypes !== undefined) {
@@ -310,6 +358,9 @@ export const CaptureRuleMatcherSchema = z
     if (value.resource_url !== undefined) {
       normalized.resource_url = value.resource_url;
     }
+    if (resourceUrls !== undefined) {
+      normalized.resource_urls = resourceUrls;
+    }
     if (value.request_url !== undefined) {
       normalized.request_url = value.request_url;
     }
@@ -343,6 +394,7 @@ export const CaptureRuleMatcherSchema = z
       "client_kind",
       "bot_family",
       "resource_url",
+      "resource_urls",
       "request_url",
       "status_codes",
       "status_ranges",
@@ -356,8 +408,19 @@ export const CaptureRuleMatcherSchema = z
       });
     }
 
+    if (hasValue(value.resource_url) && hasValue(value.resource_urls)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["resource_urls"],
+        message: "Capture rules cannot combine resource_url and resource_urls."
+      });
+    }
+
     if (value.browser_event_kind === "resource_error") {
-      const hasResourceConstraint = hasValue(value.resource_url) || hasValue(value.fingerprint);
+      const hasResourceConstraint =
+        hasValue(value.resource_url) ||
+        hasValue(value.resource_urls) ||
+        hasValue(value.fingerprint);
       if (!hasResourceConstraint) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
@@ -375,45 +438,121 @@ const CaptureRuleCoreObjectSchema = z.object({
   matcher: CaptureRuleMatcherSchema,
   sample_rate: z.number().min(0).max(1).nullable(),
   sample_event_class: CaptureRuleSampleEventClassSchema.nullable(),
+  threshold_count: z.number().int().min(2).max(1000).nullable().optional(),
+  threshold_window_seconds: z.number().int().min(60).max(86400).nullable().optional(),
+  threshold_group_by: CaptureRuleThresholdGroupBySchema.nullable().optional(),
   created_by_user_id: z.string().min(1).max(120).nullable(),
   created_from_incident_id: z.string().min(1).max(120).nullable(),
   created_from_event_id: z.string().min(1).max(120).nullable(),
   expires_at: z.string().datetime().nullable()
 });
 
+function validateResourceThresholdMatcher(
+  matcher: CaptureRuleMatcher | undefined,
+  context: z.RefinementCtx
+): void {
+  if (matcher === undefined) {
+    return;
+  }
+  const allowsFrontendException =
+    matcher.event_types === undefined || matcher.event_types.includes("frontend_exception");
+  if (matcher.browser_event_kind !== "resource_error" || !allowsFrontendException) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["threshold_group_by"],
+      message: "Resource threshold grouping requires a browser resource_error matcher."
+    });
+  }
+}
+
 function addCaptureRuleActionValidation<Schema extends z.ZodObject>(schema: Schema): Schema {
   return schema.superRefine((value, context) => {
-    if (value["action"] === "sample") {
-      if (value["sample_rate"] === null) {
+    const action = value["action"];
+    const sampleRate = value["sample_rate"];
+    const sampleEventClass = value["sample_event_class"];
+    const thresholdCount = value["threshold_count"];
+    const thresholdWindowSeconds = value["threshold_window_seconds"];
+    const thresholdGroupBy = value["threshold_group_by"];
+    const matcher = value["matcher"] as CaptureRuleMatcher | undefined;
+
+    if (action === "sample") {
+      if (sampleRate === null || sampleRate === undefined) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["sample_rate"],
           message: "Sample rules require sample_rate."
         });
       }
-      if (value["sample_event_class"] === null) {
+      if (sampleEventClass === null || sampleEventClass === undefined) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["sample_event_class"],
           message: "Sample rules require sample_event_class."
         });
       }
+    } else {
+      if (hasValue(sampleRate)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["sample_rate"],
+          message: "Only sample rules can set sample_rate."
+        });
+      }
+      if (hasValue(sampleEventClass)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["sample_event_class"],
+          message: "Only sample rules can set sample_event_class."
+        });
+      }
+    }
+
+    if (action === "threshold") {
+      if (!hasValue(thresholdCount)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["threshold_count"],
+          message: "Threshold rules require threshold_count."
+        });
+      }
+      if (!hasValue(thresholdWindowSeconds)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["threshold_window_seconds"],
+          message: "Threshold rules require threshold_window_seconds."
+        });
+      }
+      if (!hasValue(thresholdGroupBy)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["threshold_group_by"],
+          message: "Threshold rules require threshold_group_by."
+        });
+      } else if (thresholdGroupBy === "resource") {
+        validateResourceThresholdMatcher(matcher, context);
+      }
       return;
     }
 
-    if (value["sample_rate"] !== null) {
+    if (hasValue(thresholdCount)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["sample_rate"],
-        message: "Only sample rules can set sample_rate."
+        path: ["threshold_count"],
+        message: "Only threshold rules can set threshold_count."
       });
     }
-
-    if (value["sample_event_class"] !== null) {
+    if (hasValue(thresholdWindowSeconds)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["sample_event_class"],
-        message: "Only sample rules can set sample_event_class."
+        path: ["threshold_window_seconds"],
+        message: "Only threshold rules can set threshold_window_seconds."
+      });
+    }
+    if (hasValue(thresholdGroupBy)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["threshold_group_by"],
+        message: "Only threshold rules can set threshold_group_by."
       });
     }
   });
@@ -443,6 +582,9 @@ export const CaptureRuleCreateSchema = z
     matcher: CaptureRuleMatcherSchema,
     sample_rate: z.number().min(0).max(1).nullable().optional(),
     sample_event_class: CaptureRuleSampleEventClassSchema.nullable().optional(),
+    threshold_count: z.number().int().min(2).max(1000).nullable().optional(),
+    threshold_window_seconds: z.number().int().min(60).max(86400).nullable().optional(),
+    threshold_group_by: CaptureRuleThresholdGroupBySchema.nullable().optional(),
     created_by_user_id: z.string().min(1).max(120).nullable().default(null),
     created_from_incident_id: z.string().min(1).max(120).nullable().default(null),
     created_from_event_id: z.string().min(1).max(120).nullable().default(null),
@@ -457,32 +599,89 @@ export const CaptureRuleCreateSchema = z
           message: "Sample rules require sample_rate."
         });
       }
+    } else {
+      if (value.sample_rate !== undefined && value.sample_rate !== null) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["sample_rate"],
+          message: "Only sample rules can set sample_rate."
+        });
+      }
+      if (value.sample_event_class !== undefined && value.sample_event_class !== null) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["sample_event_class"],
+          message: "Only sample rules can set sample_event_class."
+        });
+      }
+    }
+
+    if (value.action === "threshold") {
+      if (!hasValue(value.threshold_count)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["threshold_count"],
+          message: "Threshold rules require threshold_count."
+        });
+      }
+      if (!hasValue(value.threshold_window_seconds)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["threshold_window_seconds"],
+          message: "Threshold rules require threshold_window_seconds."
+        });
+      }
+      if (!hasValue(value.threshold_group_by)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["threshold_group_by"],
+          message: "Threshold rules require threshold_group_by."
+        });
+      } else if (value.threshold_group_by === "resource") {
+        validateResourceThresholdMatcher(value.matcher, context);
+      }
       return;
     }
 
-    if (value.sample_rate !== undefined && value.sample_rate !== null) {
+    if (hasValue(value.threshold_count)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["sample_rate"],
-        message: "Only sample rules can set sample_rate."
+        path: ["threshold_count"],
+        message: "Only threshold rules can set threshold_count."
       });
     }
-
-    if (value.sample_event_class !== undefined && value.sample_event_class !== null) {
+    if (hasValue(value.threshold_window_seconds)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["sample_event_class"],
-        message: "Only sample rules can set sample_event_class."
+        path: ["threshold_window_seconds"],
+        message: "Only threshold rules can set threshold_window_seconds."
+      });
+    }
+    if (hasValue(value.threshold_group_by)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["threshold_group_by"],
+        message: "Only threshold rules can set threshold_group_by."
       });
     }
   })
   .transform((value) => ({
     ...value,
     sample_rate: value.action === "sample" ? value.sample_rate! : null,
-    sample_event_class: value.action === "sample" ? (value.sample_event_class ?? "preserve") : null
+    sample_event_class: value.action === "sample" ? (value.sample_event_class ?? "preserve") : null,
+    threshold_count: value.action === "threshold" ? value.threshold_count! : null,
+    threshold_window_seconds: value.action === "threshold" ? value.threshold_window_seconds! : null,
+    threshold_group_by: value.action === "threshold" ? value.threshold_group_by! : null
   }));
 
-export type CaptureRuleCreate = z.infer<typeof CaptureRuleCreateSchema>;
+export type CaptureRuleCreate = Omit<
+  z.infer<typeof CaptureRuleCreateSchema>,
+  "threshold_count" | "threshold_window_seconds" | "threshold_group_by"
+> & {
+  threshold_count?: number | null;
+  threshold_window_seconds?: number | null;
+  threshold_group_by?: CaptureRuleThresholdGroupBy | null;
+};
 
 export const CaptureRuleUpdateSchema = z
   .object({
@@ -494,6 +693,9 @@ export const CaptureRuleUpdateSchema = z
     matcher: CaptureRuleMatcherSchema.optional(),
     sample_rate: z.number().min(0).max(1).nullable().optional(),
     sample_event_class: CaptureRuleSampleEventClassSchema.nullable().optional(),
+    threshold_count: z.number().int().min(2).max(1000).nullable().optional(),
+    threshold_window_seconds: z.number().int().min(60).max(86400).nullable().optional(),
+    threshold_group_by: CaptureRuleThresholdGroupBySchema.nullable().optional(),
     expires_at: z.string().datetime().nullable().optional()
   })
   .superRefine((value, context) => {
@@ -506,14 +708,14 @@ export const CaptureRuleUpdateSchema = z
 
     const resolvedAction = value.action;
     if (resolvedAction === "sample") {
-      if (!("sample_rate" in value)) {
+      if (!("sample_rate" in value) || value.sample_rate === null) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["sample_rate"],
           message: "Sample rule updates must include sample_rate when changing action to sample."
         });
       }
-      if (!("sample_event_class" in value)) {
+      if (!("sample_event_class" in value) || value.sample_event_class === null) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["sample_event_class"],
@@ -521,22 +723,72 @@ export const CaptureRuleUpdateSchema = z
             "Sample rule updates must include sample_event_class when changing action to sample."
         });
       }
+    } else {
+      if ("sample_rate" in value) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["sample_rate"],
+          message: "Sample rule fields can only be updated while setting action to sample."
+        });
+      }
+      if ("sample_event_class" in value) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["sample_event_class"],
+          message: "Sample rule fields can only be updated while setting action to sample."
+        });
+      }
+    }
+
+    if (resolvedAction === "threshold") {
+      if (!("threshold_count" in value) || !hasValue(value.threshold_count)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["threshold_count"],
+          message:
+            "Threshold rule updates must include threshold_count when changing action to threshold."
+        });
+      }
+      if (!("threshold_window_seconds" in value) || !hasValue(value.threshold_window_seconds)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["threshold_window_seconds"],
+          message:
+            "Threshold rule updates must include threshold_window_seconds when changing action to threshold."
+        });
+      }
+      if (!("threshold_group_by" in value) || !hasValue(value.threshold_group_by)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["threshold_group_by"],
+          message:
+            "Threshold rule updates must include threshold_group_by when changing action to threshold."
+        });
+      } else if (value.threshold_group_by === "resource" && value.matcher !== undefined) {
+        validateResourceThresholdMatcher(value.matcher, context);
+      }
       return;
     }
 
-    if ("sample_rate" in value) {
+    if ("threshold_count" in value) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["sample_rate"],
-        message: "Sample rule fields can only be updated while setting action to sample."
+        path: ["threshold_count"],
+        message: "Threshold rule fields can only be updated while setting action to threshold."
       });
     }
-
-    if ("sample_event_class" in value) {
+    if ("threshold_window_seconds" in value) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["sample_event_class"],
-        message: "Sample rule fields can only be updated while setting action to sample."
+        path: ["threshold_window_seconds"],
+        message: "Threshold rule fields can only be updated while setting action to threshold."
+      });
+    }
+    if ("threshold_group_by" in value) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["threshold_group_by"],
+        message: "Threshold rule fields can only be updated while setting action to threshold."
       });
     }
   });

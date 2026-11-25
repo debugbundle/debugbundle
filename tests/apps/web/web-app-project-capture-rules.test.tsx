@@ -97,7 +97,10 @@ describe("web app — project capture rules", () => {
         });
       }
 
-      if (url.endsWith("/v1/projects/proj_123/capture-rules") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/projects/proj_123/capture-rules?rule_schema=2") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           access_mode: "manage",
           rules: [captureRuleFixture]
@@ -234,7 +237,10 @@ describe("web app — project capture rules", () => {
         });
       }
 
-      if (url.endsWith("/v1/projects/proj_123/capture-rules") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/projects/proj_123/capture-rules?rule_schema=2") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           access_mode: "preview",
           rules: [captureRuleFixture]
@@ -326,7 +332,10 @@ describe("web app — project capture rules", () => {
         });
       }
 
-      if (url.endsWith("/v1/projects/proj_123/capture-rules") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/projects/proj_123/capture-rules?rule_schema=2") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           access_mode: "manage",
           rules: [fingerprintRule]
@@ -411,7 +420,10 @@ describe("web app — project capture rules", () => {
         });
       }
 
-      if (url.endsWith("/v1/projects/proj_123/capture-rules") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/projects/proj_123/capture-rules?rule_schema=2") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           access_mode: "manage",
           rules: captureRules
@@ -499,7 +511,10 @@ describe("web app — project capture rules", () => {
         });
       }
 
-      if (url.endsWith("/v1/projects/proj_123/capture-rules") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/projects/proj_123/capture-rules?rule_schema=2") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           access_mode: "manage",
           rules: []
@@ -686,7 +701,41 @@ describe("web app — project capture rules", () => {
         name: "Resource error without constraint",
         browserEventKind: "resource_error"
       })
-    ).toBe("Resource-error rules need a resource URL matcher or exact fingerprint.");
+    ).toBe(
+      "Resource-error rules need a resource URL matcher, exact resource URL list, or exact fingerprint."
+    );
+  });
+
+  it("defaults threshold grouping to the matching resource and preserves the selected window", async () => {
+    function Harness(): JSX.Element {
+      const [draft, setDraft] = useState<CaptureRuleCreateDraft>({
+        ...createDefaultCaptureRuleCreateDraft(),
+        name: "Optional script threshold",
+        resourceHost: "cdn.example.com",
+        browserEventKind: "resource_error"
+      });
+      return <CaptureRuleCreateForm draft={draft} disabled={false} onDraftChange={setDraft} />;
+    }
+
+    render(<Harness />);
+    const user = userEvent.setup();
+    await openSelect(/^action$/i);
+    await user.click(screen.getByRole("option", { name: /^open after repeated failures$/i }));
+    expect(screen.getByLabelText(/^group threshold by$/i)).toHaveTextContent(
+      "Resource host + path"
+    );
+    await openSelect(/^rolling window$/i);
+    await user.click(screen.getByRole("option", { name: /^custom seconds$/i }));
+    fireEvent.change(screen.getByLabelText(/^custom window \(seconds\)$/i), {
+      target: { value: "75" }
+    });
+
+    await openSelect(/^action$/i);
+    await user.click(screen.getByRole("option", { name: /^allow immediately$/i }));
+    expect(screen.queryByLabelText(/^rolling window$/i)).toBeNull();
+    await openSelect(/^action$/i);
+    await user.click(screen.getByRole("option", { name: /^open after repeated failures$/i }));
+    expect(screen.getByLabelText(/^custom window \(seconds\)$/i)).toHaveValue(75);
   });
 
   it("updates guided form controls across matcher and sampling fields", async () => {

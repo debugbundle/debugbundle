@@ -11,6 +11,7 @@ export {
 import type {
   AlertConditionType,
   BuildBundleJob,
+  CaptureRuleThresholdWindowEvent,
   RegressionDeployCorrelation
 } from "../../../packages/storage/src/index.js";
 import {
@@ -83,9 +84,41 @@ export async function processNextGroupIncidentJob(
             : { coalescing_key: job.alert_coalescing_key })
         };
 
+  let priorThresholdEvents: CaptureRuleThresholdWindowEvent[] | undefined;
+  let consumedThresholdEventIds: string[] = [];
+  if (
+    job.capture_rule_threshold !== undefined &&
+    dependencies.captureRuleThresholdStore !== undefined
+  ) {
+    const thresholdGate = await dependencies.captureRuleThresholdStore.evaluateThresholdGate({
+      project_id: job.project_id,
+      service_name: job.service_name,
+      environment: job.environment,
+      fingerprint: job.fingerprint,
+      event_id: job.event_id,
+      occurred_at: job.occurred_at,
+      received_at: job.capture_rule_threshold.received_at,
+      ...(job.resource_route === undefined ? {} : { resource_route: job.resource_route }),
+      rule_id: job.capture_rule_threshold.rule_id,
+      threshold_count: job.capture_rule_threshold.threshold_count,
+      threshold_window_seconds: job.capture_rule_threshold.threshold_window_seconds,
+      threshold_group_by: job.capture_rule_threshold.threshold_group_by,
+      bucket_key: job.capture_rule_threshold.bucket_key,
+      rule_updated_at: job.capture_rule_threshold.rule_updated_at
+    });
+    if (thresholdGate.status === "pending") {
+      return { processed: true, reason: "threshold_pending" };
+    }
+    if (thresholdGate.status === "crossed") {
+      priorThresholdEvents = thresholdGate.prior_events;
+      consumedThresholdEventIds = thresholdGate.consumed_event_ids;
+    }
+  }
+
   const incident = await dependencies.incidentStore.upsertIncident({
     event_id: job.event_id,
     event_type: job.event_type,
+    event_class: job.event_class,
     project_id: job.project_id,
     service_name: job.service_name,
     environment: job.environment,
@@ -95,8 +128,18 @@ export async function processNextGroupIncidentJob(
     title: incidentTitle,
     severity: job.severity,
     occurred_at: job.occurred_at,
+    ...(priorThresholdEvents !== undefined && priorThresholdEvents.length > 0
+      ? { prior_events: priorThresholdEvents }
+      : {}),
     ...(job.deploy_metadata !== undefined ? { deploy_metadata: job.deploy_metadata } : {})
   });
+  const createdNow = incident.created_now ?? incident.occurrence_count === 1;
+
+  if (consumedThresholdEventIds.length > 0) {
+    await dependencies.captureRuleThresholdStore?.consumeThresholdEvents({
+      event_ids: consumedThresholdEventIds
+    });
+  }
 
   if (incident.duplicate_event === true) {
     await dependencies.incidentStore.insertIncidentEvent({
@@ -118,6 +161,7 @@ export async function processNextGroupIncidentJob(
             event_class: job.event_class,
             occurred_at: job.occurred_at,
             occurrence_count: incident.occurrence_count,
+            retain_first: createdNow,
             severity: job.severity,
             ...(job.resource_route === undefined ? {} : { resource_route: job.resource_route }),
             level: null
@@ -202,7 +246,7 @@ export async function processNextGroupIncidentJob(
     }
   }
 
-  const reachedBundleThreshold = [1, 3, 10].includes(incident.occurrence_count);
+  const reachedBundleThreshold = createdNow || [1, 3, 10].includes(incident.occurrence_count);
   const shouldEnqueueBundleBuild =
     incident.duplicate_event !== true &&
     (reachedBundleThreshold ||
@@ -234,7 +278,7 @@ export async function processNextGroupIncidentJob(
       trigger
     });
 
-    if (incident.occurrence_count === 1) {
+    if (createdNow) {
       // First bundle build for this incident → emit bundle.created
       await dependencies.lifecycleWebhookPublisher.publish({
         event_type: "bundle.created",
@@ -294,7 +338,7 @@ export async function processNextGroupIncidentJob(
   }
 
   if (incident.duplicate_event !== true) {
-    if (incident.occurrence_count === 1) {
+    if (createdNow) {
       await enqueueAlertEvaluation(dependencies.alertEvaluationQueue, {
         project_id: job.project_id,
         incident_id: incident.incident_id,

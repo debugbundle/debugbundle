@@ -150,7 +150,7 @@ export function createIngestionMetadataService(
           if (severity === "critical") {
             deltas["incident_occurrences_critical_severity"] = 1;
           }
-          if (incident.occurrence_count === 1) {
+          if (incident.created_now ?? incident.occurrence_count === 1) {
             deltas["incidents_opened"] = 1;
           }
           if (incident.regressed_now) {
@@ -256,11 +256,12 @@ export function createIngestionPersistenceService(
         contentEncoding: "gzip"
       });
 
+      const effectiveReceivedAt = receipt ?? options?.receivedAt;
       await input.queue.enqueue("normalize-events", {
         project_id: projectId,
         event_id: event.event_id,
         object_key: objectKey,
-        ...(receipt === undefined ? {} : { received_at: receipt }),
+        ...(effectiveReceivedAt === undefined ? {} : { received_at: effectiveReceivedAt }),
         ...(options?.capturePreset === undefined ? {} : { capture_preset: options.capturePreset }),
         ...(options?.immediateClientErrorStatuses === undefined
           ? {}

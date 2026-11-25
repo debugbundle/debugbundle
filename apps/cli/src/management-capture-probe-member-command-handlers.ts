@@ -287,6 +287,9 @@ export async function handleCaptureRuleCommand(
       "matcher-json",
       "sample-rate",
       "sample-event-class",
+      "threshold-count",
+      "threshold-window-seconds",
+      "threshold-group-by",
       "expires-at"
     ]);
     ensureNoExtraPositionals(parsedArgv, 2);
@@ -303,7 +306,13 @@ export async function handleCaptureRuleCommand(
     if (actionValue === undefined) {
       throw new CliInputError("Missing required option --action.");
     }
-    if (actionValue !== "demote" && actionValue !== "sample" && actionValue !== "drop") {
+    if (
+      actionValue !== "demote" &&
+      actionValue !== "sample" &&
+      actionValue !== "drop" &&
+      actionValue !== "threshold" &&
+      actionValue !== "allow"
+    ) {
       throw new CliInputError("Invalid value for --action.");
     }
     const matcher = readJsonOption(parsedArgv, "matcher-json");
@@ -322,6 +331,9 @@ export async function handleCaptureRuleCommand(
       matcher,
       sample_rate: null as number | null,
       sample_event_class: null as "preserve" | "context" | null,
+      threshold_count: null as number | null,
+      threshold_window_seconds: null as number | null,
+      threshold_group_by: null as "resource" | "fingerprint" | null,
       created_by_user_id: null,
       created_from_incident_id: null,
       created_from_event_id: null,
@@ -345,6 +357,32 @@ export async function handleCaptureRuleCommand(
       create.sample_event_class = sampleEventClass;
     }
 
+    const thresholdCount = readStringOption(parsedArgv, "threshold-count");
+    if (thresholdCount !== undefined) {
+      const parsed = Number(thresholdCount);
+      if (!Number.isInteger(parsed)) {
+        throw new CliInputError("Invalid value for --threshold-count.");
+      }
+      create.threshold_count = parsed;
+    }
+
+    const thresholdWindowSeconds = readStringOption(parsedArgv, "threshold-window-seconds");
+    if (thresholdWindowSeconds !== undefined) {
+      const parsed = Number(thresholdWindowSeconds);
+      if (!Number.isInteger(parsed)) {
+        throw new CliInputError("Invalid value for --threshold-window-seconds.");
+      }
+      create.threshold_window_seconds = parsed;
+    }
+
+    const thresholdGroupBy = readStringOption(parsedArgv, "threshold-group-by");
+    if (thresholdGroupBy !== undefined) {
+      if (thresholdGroupBy !== "resource" && thresholdGroupBy !== "fingerprint") {
+        throw new CliInputError("Invalid value for --threshold-group-by.");
+      }
+      create.threshold_group_by = thresholdGroupBy;
+    }
+
     return await (dependencies.createCaptureRuleCommand ?? defaultCreateCaptureRuleCommand)(
       appendCommonAuthOptions(parsedArgv, { projectId, create })
     );
@@ -362,6 +400,9 @@ export async function handleCaptureRuleCommand(
       "matcher-json",
       "sample-rate",
       "sample-event-class",
+      "threshold-count",
+      "threshold-window-seconds",
+      "threshold-group-by",
       "expires-at",
       "project-scope"
     ]);
@@ -393,7 +434,13 @@ export async function handleCaptureRuleCommand(
     }
     const actionValue = readStringOption(parsedArgv, "action");
     if (actionValue !== undefined) {
-      if (actionValue !== "demote" && actionValue !== "sample" && actionValue !== "drop") {
+      if (
+        actionValue !== "demote" &&
+        actionValue !== "sample" &&
+        actionValue !== "drop" &&
+        actionValue !== "threshold" &&
+        actionValue !== "allow"
+      ) {
         throw new CliInputError("Invalid value for --action.");
       }
       update["action"] = actionValue;
@@ -419,6 +466,29 @@ export async function handleCaptureRuleCommand(
         throw new CliInputError("Invalid value for --sample-event-class.");
       }
       update["sample_event_class"] = sampleEventClass;
+    }
+    const thresholdCount = readStringOption(parsedArgv, "threshold-count");
+    if (thresholdCount !== undefined) {
+      const parsed = Number(thresholdCount);
+      if (!Number.isInteger(parsed)) {
+        throw new CliInputError("Invalid value for --threshold-count.");
+      }
+      update["threshold_count"] = parsed;
+    }
+    const thresholdWindowSeconds = readStringOption(parsedArgv, "threshold-window-seconds");
+    if (thresholdWindowSeconds !== undefined) {
+      const parsed = Number(thresholdWindowSeconds);
+      if (!Number.isInteger(parsed)) {
+        throw new CliInputError("Invalid value for --threshold-window-seconds.");
+      }
+      update["threshold_window_seconds"] = parsed;
+    }
+    const thresholdGroupBy = readStringOption(parsedArgv, "threshold-group-by");
+    if (thresholdGroupBy !== undefined) {
+      if (thresholdGroupBy !== "resource" && thresholdGroupBy !== "fingerprint") {
+        throw new CliInputError("Invalid value for --threshold-group-by.");
+      }
+      update["threshold_group_by"] = thresholdGroupBy;
     }
     const expiresAt = readStringOption(parsedArgv, "expires-at");
     if (expiresAt !== undefined) {

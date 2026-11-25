@@ -40,6 +40,7 @@ import type { ReferralConfig } from "./default-referrals.js";
 
 export interface CreateApiDependenciesInput {
   projectMergesEnabled?: boolean;
+  captureRuleV2WritesEnabled?: boolean;
   objectStore: ObjectStoreClient & ObjectStoreReader & ObjectStorePrefixDeleter;
   queue: QueueClient;
   db: Queryable;

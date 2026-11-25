@@ -13,6 +13,7 @@ import { normalizeEvent, parseStoredEvent } from "../../../packages/event-normal
 import {
   createPostgresAccountAnalyticsStore,
   createPostgresAnalyticsCorrelationStore,
+  createPostgresCaptureRuleThresholdStore,
   createPostgresImprovementOpportunityStore,
   createPostgresMetadataStore,
   type Queryable,
@@ -184,6 +185,7 @@ export function createDurableIncidentProcessing(input: {
               return metadata.upsertIncident(data);
             }
           },
+          captureRuleThresholdStore: createPostgresCaptureRuleThresholdStore(tx),
           analyticsCorrelationStore: createPostgresAnalyticsCorrelationStore(tx),
           frequencyCounter: {
             recordOccurrence: (event) => input.frequencyCounter.recordOccurrence(event, tx)

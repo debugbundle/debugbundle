@@ -113,4 +113,33 @@ describe("capture rule suggestion compatibility", () => {
     ])
       expect(findExistingCaptureRuleForSuggestion([changed], scoped)).toBeNull();
   });
+
+  it("distinguishes threshold parameters when matching existing rules", () => {
+    const thresholdSuggestion: CaptureRuleCreate = {
+      ...suggestion,
+      action: "threshold",
+      threshold_count: 10,
+      threshold_window_seconds: 3600,
+      threshold_group_by: "resource"
+    };
+    const matchingRule = CaptureRuleSchema.parse({
+      ...thresholdSuggestion,
+      id: "00000000-0000-4000-8000-000000000201",
+      project_id: "project",
+      hit_count: 0,
+      last_matched_at: null,
+      created_at: "2026-11-24T00:00:00.000Z",
+      updated_at: "2026-11-24T00:00:00.000Z"
+    });
+    const differentCount = { ...matchingRule, threshold_count: 20 };
+    const differentWindow = { ...matchingRule, threshold_window_seconds: 600 };
+    const differentGroup = { ...matchingRule, threshold_group_by: "fingerprint" as const };
+
+    expect(findExistingCaptureRuleForSuggestion([matchingRule], thresholdSuggestion)).toBe(
+      matchingRule
+    );
+    expect(findExistingCaptureRuleForSuggestion([differentCount], thresholdSuggestion)).toBeNull();
+    expect(findExistingCaptureRuleForSuggestion([differentWindow], thresholdSuggestion)).toBeNull();
+    expect(findExistingCaptureRuleForSuggestion([differentGroup], thresholdSuggestion)).toBeNull();
+  });
 });

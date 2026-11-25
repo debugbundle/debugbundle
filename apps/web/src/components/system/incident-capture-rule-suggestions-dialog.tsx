@@ -9,7 +9,10 @@ import {
   type CaptureRuleSuggestionsResponse
 } from "../../lib/capture-rules-api.js";
 import { showErrorToast, showSuccessToast } from "../../lib/notify.js";
-import { formatCaptureRuleMatcher } from "../../lib/capture-rule-copy.js";
+import {
+  formatCaptureRuleMatcher,
+  formatCaptureRuleThresholdSummary
+} from "../../lib/capture-rule-copy.js";
 import { Checkbox } from "../ui/checkbox.js";
 import { Field, FieldLabel } from "../ui/field.js";
 import { CalloutCard } from "./callout-card.js";
@@ -186,8 +189,9 @@ export function IncidentCaptureRuleSuggestionsDialog({
         ) : (
           <div className="flex flex-col gap-4">
             <p className="text-sm text-muted-foreground">
-              Keep useful evidence as context, or stop capturing future matches. Nothing changes
-              until you create a rule. Sampling and rule changes are available in project settings.
+              Wait for repeated failures, keep useful evidence as context, or stop capturing future
+              matches. Nothing changes until you create a rule. Sampling and rule changes are
+              available in project settings.
             </p>
             {readyResponse.access_mode === "preview" ? (
               <CalloutCard
@@ -209,6 +213,11 @@ export function IncidentCaptureRuleSuggestionsDialog({
                       <Badge variant={getActionVariant(suggestion.recommended_action)}>
                         {getActionLabel(suggestion.recommended_action)}
                       </Badge>
+                      {suggestion.recommended_action === "threshold" ? (
+                        <Badge variant="outline">
+                          {formatCaptureRuleThresholdSummary(suggestion.rule)}
+                        </Badge>
+                      ) : null}
                       {isCreated ? (
                         <Badge
                           variant={
@@ -283,21 +292,31 @@ export function IncidentCaptureRuleSuggestionsDialog({
 }
 
 function getActionLabel(action: CaptureRuleSuggestion["recommended_action"]): string {
-  return action === "demote"
-    ? "Keep as context"
-    : action === "drop"
-      ? "Stop capturing"
-      : "Sample events";
+  switch (action) {
+    case "demote":
+      return "Keep as context";
+    case "drop":
+      return "Stop capturing";
+    case "threshold":
+      return "Threshold repeated failures";
+    case "allow":
+      return "Allow immediately";
+    case "sample":
+      return "Sample events";
+  }
 }
 
 function getActionVariant(
   action: CaptureRuleSuggestion["recommended_action"]
-): "secondary" | "warning" | "destructive" {
+): "secondary" | "warning" | "destructive" | "success" {
   switch (action) {
     case "demote":
       return "secondary";
     case "sample":
+    case "threshold":
       return "warning";
+    case "allow":
+      return "success";
     case "drop":
       return "destructive";
   }
