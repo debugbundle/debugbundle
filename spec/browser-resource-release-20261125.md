@@ -15,7 +15,7 @@
 | Claude Code plugin                             | Publish                | 1.25.0 → 1.25.1         | Installed incident diagnosis and capture-rule guidance.                                |
 | Codex plugin                                   | Publish                | 1.9.0 → 1.9.1           | Installed incident diagnosis and capture-rule guidance.                                |
 | Gemini extension                               | Publish                | 1.8.0 → 1.8.1           | Installed incident diagnosis and capture-rule guidance.                                |
-| OpenAI skill archive                           | Publish candidate only | 1.1.0 → 1.1.1 candidate | Updated diagnosis and CLI handoff guidance within the frozen 23-tool contract.         |
+| OpenAI skill archive                           | Retain public version  | 1.1.0 candidate refresh | Updated diagnosis and CLI handoff guidance. Keep the existing tool contracts and scopes. |
 | OpenAI portal and listing                      | Retain                 | Existing                | Candidate archive preparation is the selected distribution action.                     |
 | Browser SDK                                    | Publish                | 3.2.4 → 3.3.0           | Teardown visibility and exact-key privacy before evidence retention.                   |
 | Node SDK                                       | Publish                | 3.2.4 → 3.3.0           | Exact-key privacy in capture, probes and delivery hooks.                               |
@@ -52,7 +52,7 @@ The standalone privacy update shipped from site commit `9fb3271cb0d0cd7c4bab9894
 
 Candidate qualification is in progress. Shared package source and versions are committed locally at `bccd0ca4`. The local package builds and publication preflight pass. Core lint, typecheck, guidance and plugin checks passed during preflight. The real-storage run passed 186 tests across 40 files with one test skipped. A focused Postgres rerun passed all seven browser-resource tests after fixing the threshold receipt-order regression. The updated mixed-version gate passes credential isolation, legacy capture-rule reads, and the compatible new API response after the additive migration.
 
-Once a new rule is saved, the deployed predecessor samples out threshold and allow matches and can broaden a multi-URL drop. This was reproduced with synthetic events using the exact deployed source. The hosted rollout needs a rollback-compatible activation sequence before new-rule writes are enabled.
+Once a new rule is saved, the deployed predecessor samples out threshold and allow matches and can broaden a multi-URL drop. This was reproduced with synthetic events using the exact deployed source. The two-step rehearsal verified that the paused bridge refuses new threshold writes and can read rows created by the enabled runtime. Cloud deployment tests verify the active and retained image gate.
 
 | Local candidate   | Verification                                                                                                                                         |
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
