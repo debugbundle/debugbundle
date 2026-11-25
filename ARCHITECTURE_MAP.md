@@ -1,4 +1,4 @@
-Local work (unreleased, 2026-11-24/25): `shared-types/capture-rule-schemas.ts`,
+In Core 1.32.0, `shared-types/capture-rule-schemas.ts`,
 `capture-rule-evaluation-context.ts`, `capture-rule-evaluation.ts`,
 `browser-resource-suggestions.ts`, and `capture-rule-suggestion-matching.ts`
 implement `threshold`, `allow`, `resource_urls`, server-only evaluation guards,
@@ -33,7 +33,8 @@ capture surfaces (`sdk-browser`, `sdk-node`, `sdk-php` + WordPress ZIP,
 `debugbundle-android/.../DebugBundleEventPrivacy.kt`, `debugbundle-swift/.../DebugBundleEventPrivacy.swift`,
 and `debugbundle-react-native/src/event-privacy.ts` + iOS/Android native bridges)
 implement exact-key redaction and `SEC-23a` protocol preservation verified
-locally against synced `privacy-conformance.json` `exact_key_cases`.
+locally against synced `privacy-conformance.json` `exact_key_cases`. The [release record](spec/browser-resource-release-20261125.md)
+tracks published SDK artifacts independently of hosted Core.
 
 Core 1.30.1 uses `components/ui/tabs.tsx` TabsScrollArea for horizontal
 navigation without vertical scrollbars. Site 1.11.3 clips homepage artwork at

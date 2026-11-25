@@ -22,8 +22,8 @@
 | PHP SDK                                        | Publish               | 2.1.4 → 2.2.0           | Exact-key privacy and allowlisted Laravel/Symfony rate-limit evidence.                   |
 | Python SDK                                     | Publish               | 3.0.0 → 3.1.0           | Exact-key privacy in capture and Django, FastAPI and Flask relays.                       |
 | Go SDK                                         | Publish               | 3.1.4 → 3.2.0           | Exact-key privacy in capture and relay evidence.                                         |
-| Rust SDK                                       | Publish               | 1.0.2 → 1.1.0           | Exact-key privacy at the event and relay wire boundaries.                                |
-| Ruby SDK                                       | Publish               | 2.1.4 → 2.2.0           | Exact-key privacy in capture, Rails and the relay handler.                               |
+| Rust SDK                                       | Publish               | 1.0.2 → 1.1.1           | Exact-key privacy at the event and relay wire boundaries with patched dependencies.      |
+| Ruby SDK                                       | Publish               | 2.1.4 → 2.2.1           | Exact-key privacy in capture, Rails and the relay handler, with bounded graph reuse.     |
 | Java family                                    | Publish               | 3.1.4 → 3.2.0           | Exact-key privacy in capture, the Web relay and Spring Boot configuration.               |
 | .NET family                                    | Publish               | 2.1.4 → 2.2.0           | Exact-key privacy in SDK capture and ASP.NET Core relay delivery.                        |
 | Android family                                 | Publish               | 3.1.4 → 3.2.0           | Exact-key privacy in retained native evidence and capture.                               |
@@ -67,9 +67,21 @@ Core 1.32.0 was released from `99f4301aeae59c504937707208061e6af1546ba8`. The pa
 
 The dashboard serves build `99f4301aeae59c504937707208061e6af1546ba8` after CloudFront invalidation. Its referenced JavaScript returned HTTP 200. [Dashboard workflow](https://github.com/debugbundle/debugbundle-cloud/actions/runs/45665384875)
 
+### Agent distributions
+
+CLI and MCP 1.30.0 were published from `d3505b12d3413e5ba11e048620b93b4283f45bf6`. Exact public npm installs passed on Node 22, 24 and 26. The official MCP Registry serves `com.debugbundle/mcp` 1.30.0. [CLI workflow](https://github.com/debugbundle/debugbundle/actions/runs/45666347848) · [MCP workflow](https://github.com/debugbundle/debugbundle/actions/runs/45666347355)
+
+The ClawHub skill and OpenClaw plugin resolve at 1.30.0 and passed final ClawScan review. The skill passed moderation and six of seven discovery queries. The exact public plugin installed normally on OpenClaw 2026.11.10, matched the qualified entry bytes and passed scoped runtime checks. The local archive also passed installed checks on the minimum OpenClaw 2026.6.9. [Skill](https://clawhub.ai/debugbundle/skills/debugbundle) · [Plugin audit](https://clawhub.ai/debugbundle/plugins/openclaw-plugin/security-audit?version=1.30.0)
+
+Codex 1.9.1 and Claude Code 1.25.1 were promoted at `f035d08ba45e046954da0963f3b66c7f69062241`. Gemini 1.8.1 was published at `c24d04a3e3bd817cf284cc514efbe6cb8ba15c0d` with a byte-matched ZIP. All three passed public native install, synthetic read and removal checks against MCP 1.30.0. Codex and Gemini also passed public update checks. [Core marketplace PR](https://github.com/debugbundle/debugbundle/pull/25) · [Gemini Release](https://github.com/debugbundle/debugbundle-gemini/releases/tag/v1.8.1)
+
+The OpenAI 1.1.0 candidate refresh uses the active API digest with the existing registered connection and the exact frozen 23-tool catalog and scopes. See [the distribution ledger](agent-distribution-ledger.md) for the eligibility and platform limits.
+
+### SDKs
+
 | Local candidate   | Verification                                                                                                                                         |
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Node and Browser  | 698 source tests against the packed shared candidates.                                                                                               |
+| Node and Browser  | 716 source tests, per-file coverage and packed runtime smoke with published shared-types 3.9.0 and redaction 2.8.0.                                   |
 | PHP, Python, Ruby | Language test suites and their local static or packaging checks pass.                                                                                |
 | Go                | Tests, vet, lint and the per-file coverage gate pass with invalid resource-observation cases.                                                        |
 | Rust              | Formatting, lint, typecheck, feature checks, tests and local crate packaging pass.                                                                   |
@@ -78,6 +90,31 @@ The dashboard serves build `99f4301aeae59c504937707208061e6af1546ba8` after Clou
 | React Native      | JavaScript and iOS bridge harness pass. Public Maven and Swift artifacts are prerequisites for installed wrapper, bare React Native and Expo checks. |
 | WordPress         | The PHP and Browser releases are prerequisites for the final ZIP and installed runtime checks.                                                       |
 
-The packed CLI candidate passes clean local installs on Node 22, 24 and 26. The packed OpenClaw candidate loads all 234 tools and passes installed scoped requests on the supported minimum host 2026.6.9 and current public host 2026.11.10. The current-host check uses source and capability acknowledgements for the reviewed local archive in a disposable profile. The public ClawHub install and ClawScan remain separate release gates.
+Node and Browser 3.3.0 were published from `191f222084e8ca30fdb24fd559b7a3dec6001f6a`. The release runner passed the exact registry install, delivery and privacy smoke. An independent fresh Docker install confirmed both package versions and their two shared pins after npm propagation. A second workflow attempt completed the interrupted GitHub asset upload without republishing npm packages. [GitHub release](https://github.com/debugbundle/debugbundle-js/releases/tag/v3.3.0) · [Release workflow](https://github.com/debugbundle/debugbundle-js/actions/runs/45675617683)
 
-Candidate site artifacts, SDK documentation checks, tests, static build and typecheck pass. Public SDK installs and the broader site rollout follow publication.
+| Public distribution | Published source SHA | Registry or tag | Installed verification |
+| ------------------- | -------------------- | --------------- | ---------------------- |
+| .NET 2.2.0 | `aac02164a7c0458cb3f14a5cee7cd14194af7af0` | [NuGet](https://www.nuget.org/packages/DebugBundle.Sdk/2.2.0) | All ten binaries resolved publicly. The release runner and independent fresh containers passed the exact NuGet consumer smoke on .NET 8 and 10. [Workflow](https://github.com/debugbundle/debugbundle-dotnet/actions/runs/45676864669) |
+| Android 3.2.0 | `0ecd1f353a8a4d64fc9288faf17392cca33d52e9` | [Maven Central](https://repo.maven.apache.org/maven2/com/debugbundle/debugbundle-android/3.2.0/) | Connected tests passed on API 23, 36 and 37.0. The published consumer smoke passed, and independent checks resolved all nine POMs and the public native AAR. [Workflow](https://github.com/debugbundle/debugbundle-android/actions/runs/45676864739) |
+| Go 3.2.0 | `c3a876ad523b1d78afcc2f19503064bfa8e72627` | [Go module proxy](https://proxy.golang.org/github.com/debugbundle/debugbundle-go/v3/@v/v3.2.0.info) | Clean public module smoke and independent exact source readback. [Workflow](https://github.com/debugbundle/debugbundle-go/actions/runs/45676866435) |
+| Java 3.2.0 | `10551fc072127abd9aa0d9866dc9117fd2e5418f` | [Maven Central](https://repo.maven.apache.org/maven2/com/debugbundle/debugbundle-java-core/3.2.0/) | All nine Maven POMs resolved publicly, and a clean public Maven consumer passed on Java 21. [Workflow](https://github.com/debugbundle/debugbundle-java/actions/runs/45676870371) |
+| PHP 2.2.0 | `65492e053e4587d74ba936a087d3373f90c4d4df` | [Packagist](https://packagist.org/packages/debugbundle/sdk-php#v2.2.0) | PHP-FPM and exact Composer install passed. The original coverage run found two files below 80%. Packagist indexed the tag automatically. Test-only follow-up `669af825c13f2e6fa9098f8c31e56254f5c62614` passed with unchanged shipped source and package metadata. [Workflow](https://github.com/debugbundle/debugbundle-php/actions/runs/45677934855) |
+| Python 3.1.0 | `dc009fc1960691f4908f77cc38ac7286a03966d5` | [PyPI](https://pypi.org/project/debugbundle-python/3.1.0/) | Wheel, source distribution and clean PyPI install passed. [Workflow](https://github.com/debugbundle/debugbundle-python/actions/runs/45676868524) |
+| React Native 3.2.0 | `988faca27a77cecde51b60962c8b2634c360bd72` | [npm](https://www.npmjs.com/package/@debugbundle/sdk-react-native/v/3.2.0) | The exact published Android Maven and Swift Git-pod dependencies passed bare Android, bare iOS and Expo iOS runtime delivery before npm publication. Clean npm installs passed on the release runner and independently, with both native pins confirmed. [Workflow](https://github.com/debugbundle/debugbundle-react-native/actions/runs/45681811581) |
+| Ruby 2.2.1 | `aa1bc6769ab4ecc6a519dd06e75e071b5ddc1139` | [RubyGems](https://rubygems.org/gems/debugbundle/versions/2.2.1) | Host-safety budget, compatibility matrix and exact public gem smoke passed. The 2.2.0 tag stopped at the performance gate and its gem was never published. [Workflow](https://github.com/debugbundle/debugbundle-ruby/actions/runs/45678561046) |
+| Rust 1.1.1 | `295a475c801e50d1dcabd17c3774e4fc4cf0c4e7` | [crates.io](https://crates.io/crates/debugbundle/1.1.1) | All eight platform and qualification jobs passed. The downloaded crate SHA-256 `cd4d5c7bf6e6fb2dfff0059723b96b477efc2218ba06b83d6d2b797b9800c631` matches the public index and the source commit matches the qualified artifact. Clean registry-installed apps passed. [Workflow](https://github.com/debugbundle/debugbundle-rust/actions/runs/45684317069) |
+| Swift 3.2.0 | `e2d6441908d9c3f48cff7c834a929adb58d99559` | [Immutable Git release](https://github.com/debugbundle/debugbundle-swift/releases/tag/v3.2.0) | Exact public SPM and Git-pod consumers, iOS deployment target and simulator suite passed. The independent Trunk gate was skipped. [Workflow](https://github.com/debugbundle/debugbundle-swift/actions/runs/45676863179) |
+| WordPress 2.2.0 | `26c76981530b6dbe65f3a4dda2384fb4e089f176` | [WordPress.org](https://wordpress.org/plugins/debugbundle/) · [GitHub ZIP](https://github.com/debugbundle/debugbundle-wordpress/releases/tag/v2.2.0) | Exact installed ZIP passed on local WordPress 7.1.1 and both publication runs. The directory ZIP matches all 239 GitHub distribution files and bundles PHP 2.2.0 and Browser 3.3.0. [Directory workflow](https://github.com/debugbundle/debugbundle-wordpress/actions/runs/45678500707) |
+
+The Rust 1.1.0 tag stopped before crate publication. The release audit found advisories in URL and Actix dependencies and reported Chrono as unmaintained. The 1.1.1 correction selects patched `url` 2.5.9 and `actix-http` 3.21.3. It also removes redundant graph copies. All 22 performance cases pass locally and on the exact release CI run. The affected case allocated 39,380,316 bytes over 512 calls on the hosted runner against the 41,612,797-byte budget. The approved temporary audit exception applies only to Chrono’s maintenance advisory because the public field `RecoveryObservation.occurred_at` uses `chrono::DateTime<Utc>`. The exception ends when that public dependency is replaced. [Rust audit advisory](https://rustsec.org/advisories/RUSTSEC-2026-0543.html) · [Original qualification](https://github.com/debugbundle/debugbundle-rust/actions/runs/45676862476) · [Corrected qualification](https://github.com/debugbundle/debugbundle-rust/actions/runs/45684317008)
+
+### Public documentation
+
+Site 1.13.0 was qualified from `faa5692151f8bd59d7fdd0aee1753fcf86f6ab80` after the final SDK appeared on its registry. The generated API and machine-readable reference artifacts were refreshed. All 51 SDK documentation contract tests and 137 site tests passed, as did the webpack static export and typecheck. The deployment and CDN readback are recorded separately below after publication.
+
+### Consumer adoption
+
+- Upgrade the relevant SDKs and refresh lockfiles in each separately authorised consumer. Re-run that application's build and local synthetic capture, privacy and delivery checks before release.
+- React Native 3.2.0 uses Android 3.2.0 and the Swift 3.2.0 Git pod. Bare iOS apps add the immutable Swift source before installing pods. Expo development builds rerun prebuild and rebuild the native app.
+- Existing WordPress sites adopt the directory’s 2.2.0 plugin through a separately approved site update. The ZIP bundles PHP 2.2.0 and Browser 3.3.0.
+- Review the exact scope and effect before authorising any live threshold, allow or drop rule. This release's validation used isolated synthetic rules.

@@ -1,6 +1,6 @@
 # Browser resource incidents
 
-Original release: published and verified in production on 2026-09-16 (core 1.10.0). The provider/control expansion below is local implementation work, not a published release.
+Core 1.10.0 introduced production browser resource incidents on 16 September 2026. Core 1.17.0 expanded provider recognition and scoped controls on 17 October. Core 1.32.0 added threshold, allow and multi-URL rules on 25 November. [Current release record](browser-resource-release-20261125.md)
 
 ## Objective and compatibility
 
@@ -62,7 +62,7 @@ The 2026-10-17 pre-release audit found and corrected two edge cases before relea
 
 Core 1.17.0 and site 1.6.6 are live after exact-source CI and independent runtime/asset checks. Shared 2.5.0, CLI/MCP/OpenClaw 1.16.0 and the updated developer plugins are published. See [release and listing evidence](browser-resource-release-20261017.md), including the remaining external discovery limits. Default capture and customer policies remain unchanged.
 
-### Release sequence
+### October 2026 release sequence
 
 After approval of the release actions, prepare independent versions and dated release metadata for the changed distributions. No SDK release, customer configuration change or new database migration is needed.
 
@@ -71,7 +71,7 @@ After approval of the release actions, prepare independent versions and dated re
 3. Publish the core release and deploy pinned core/site commits through the private cloud repository's standard rollout. Retain the verified previous API/worker images, keep readiness and migration-ledger checks, and deploy the dashboard and public documentation.
 4. Independently verify deployed versions, healthy API/worker processing, served dashboard/docs assets, and read-only suggestion behavior. Any live rule test must use an owned disposable project; do not rewrite customer policies. Record artifact/registry and live rollout evidence separately from local qualification.
 
-## Threshold rules, allow carve-outs, multi-URL dependencies, and browser/SDK context (local, 2026-11-24/25)
+## Threshold rules, allow carve-outs, multi-URL dependencies, and browser/SDK context (November 2026)
 
 Unified `capture_rules` extends existing noise management without a parallel policy engine, billing-class change (`INV-15`), or OpenAI catalog change (`INV-26`):
 
@@ -81,7 +81,9 @@ Unified `capture_rules` extends existing noise management without a parallel pol
 - **Server-only enforcement & migration**: `captureRuleRequiresServerEvaluation` returns `true` for `threshold`, `allow`, and `resource_urls`, withholding the rule set from older SDKs so hosted ingestion evaluates authoritatively. Additive forward migration `202611240001_add_capture_rule_thresholds` adds nullable threshold columns on `capture_rules` and creates `capture_rule_threshold_events` with fail-closed schema readiness, retention cleanup, and `retained_origin` merge-inventory ownership. Threshold evaluation selects a qualifying receipt window even when workers finish jobs out of receipt order.
 - **Suggestions & interfaces**: `browser-resource-suggestions` adds opt-in `resource_threshold` suggestions (excluding authentication providers even for `<link>` preloads or redacted tags) and allows scoped `resource_url` suggestions when `host + path + service + environment` are present even if legacy redaction removed `tag_name`. CLI, ordinary MCP, and the dashboard use `rule_schema=2` on rule lists and incident suggestion flows. The default response stays compatible with previous clients. `apps/cli/src/process-command.ts` keeps untyped resource errors out of generic trace merging.
 - **Browser teardown, honest cause/impact, and PHP 429 context**: `@debugbundle/sdk-browser` tracks bfcache-safe `pagehide` → `"unloaded"` / `pageshow` teardown state (no `beforeunload` listener) and documents relay `evidenceCapabilities`. `packages/bundle-engine` sets `customer_visible: false` for hidden/prerender/unloaded opaque `resource_error` events and integrates passive CSP/timing and explicit recovery observations into `buildSummaryGuidance()`, surfaced as concise badges/notes inside `BrowserResourceDetails`. `debugbundle/sdk-php` preserves validated `route_template`, strictly allowlisted rate-limit `response_headers` (`retry-after`, `x-ratelimit-limit`, `x-ratelimit-remaining`, `x-ratelimit-reset`), and unambiguous static Laravel `rate_limiter` context across returned and thrown HTTP 429s.
-- **Cross-SDK exact-key redaction & `SEC-23a` parity**: Optional exact-key redaction (`redactExactFields` / language-idiomatic equivalent) and `SEC-23a` schema-aware protocol field preservation are locally implemented and verified against synced `privacy-conformance.json` `exact_key_cases` across Core `@debugbundle/redaction` and all 13 maintained capture surfaces (including staged WordPress ZIP and both React Native native bridges). Published packages, hosted deployments, and consumer projects remain unchanged until separately authorized.
+- **Cross-SDK exact-key redaction & `SEC-23a` parity**: Optional exact-key redaction (`redactExactFields` / language-idiomatic equivalent) and `SEC-23a` schema-aware protocol field preservation are verified against synced `privacy-conformance.json` `exact_key_cases` across Core `@debugbundle/redaction` and all 13 maintained capture surfaces, including WordPress and both React Native native bridges. [SDK release evidence](browser-resource-release-20261125.md#release-receipts)
+
+Hosted Core 1.32.0 applied the forward migration before enabling writes and retained the compatible paused bridge for rollback. The dashboard and ordinary CLI/MCP clients expose the new controls. Live customer-rule mutation and consumer adoption require separate product-specific approval. [Hosted release evidence](browser-resource-release-20261125.md#release-receipts)
 
 ## Original release checklist (historical)
 

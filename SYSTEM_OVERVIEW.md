@@ -1,4 +1,4 @@
-Local work (unreleased, 2026-11-24/25): unified `capture_rules` now supports
+Core 1.32.0 (25 November 2026) extends unified `capture_rules` with
 `action: "threshold"` (`threshold_count` 2–1000, `threshold_window_seconds`
 60–86400, `threshold_group_by: "resource" | "fingerprint"`), `action: "allow"`
 high-specificity carve-outs, and bounded multi-URL `resource_urls` (1–10 exact
@@ -22,12 +22,12 @@ field preservation are implemented and locally verified against synced
 `privacy-conformance.json` `exact_key_cases` across Core `@debugbundle/redaction`
 and all 13 maintained capture surfaces (Browser, Node.js, PHP, staged WordPress
 ZIP, Python, Go, Rust, Ruby, Java, .NET, Android, Swift, and React Native with
-both iOS/Android native bridges); published packages and hosted deployments
-remain unchanged until explicitly authorized.
+both iOS/Android native bridges). The [dated release record](spec/browser-resource-release-20261125.md)
+tracks exact distribution versions, installed-artifact checks and hosted rollout.
 
-Hosted capture-rule activation uses a paused-write bridge. The bridge applies
-the forward migration and can enforce saved rules during rollback. Hosted
-activation waits for compatible API and worker images in both retained releases.
+The hosted rollout applied the forward migration with writes paused, then enabled
+advanced rule writes after verifying compatible API and worker images in both
+releases. The retained paused bridge enforces saved rules during rollback.
 
 Core 1.30.1 and site 1.11.3 contain shared tab-scroll containment, responsive
 offer-banner wording and homepage loading/overflow corrections. Installed APIs,

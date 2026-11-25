@@ -6,6 +6,10 @@ The public privacy policy discloses saved report summaries, structured facts and
 
 Core 1.32.0 is live with threshold, allow and multi-URL capture rules. The first hosted rollout applied the forward migration with writes paused. The second verified both compatible image pairs, activated writes and retained the paused bridge for rollback. Worker processing, public API and MCP readiness, and the exact dashboard build passed. Shared types 3.9.0 and redaction 2.8.0 are live on npm and pass clean registry installs. [Release receipts](spec/browser-resource-release-20261125.md#release-receipts)
 
+CLI and ordinary MCP 1.30.0, the Official MCP Registry, ClawHub skill and OpenClaw plugin, Claude Code 1.25.1, Codex 1.9.1 and Gemini 1.8.1 passed exact public installation or registry readback. The OpenAI 1.1.0 archive retains the frozen 23-tool surface and registered scopes. [Agent distribution evidence](spec/browser-resource-release-20261125.md#agent-distributions)
+
+All 13 maintained SDK capture surfaces shipped their coordinated privacy updates. React Native 3.2.0 passed bare Android, bare iOS and Expo runtime delivery against the published Android and Swift 3.2.0 dependencies. WordPress 2.2.0 passed the installed ZIP smoke and public directory readback with PHP 2.2.0 and Browser 3.3.0. [SDK release evidence](spec/browser-resource-release-20261125.md#sdks)
+
 # Core 1.31.0 and site 1.12.0 release
 
 The [release contract](spec/release-1.31.0.md) covers creator analytics, short-link

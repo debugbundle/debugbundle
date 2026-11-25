@@ -66,7 +66,7 @@
       "repository": "debugbundle/debugbundle-rust",
       "registry": "crates.io",
       "package": "debugbundle",
-      "version": "1.0.2",
+      "version": "1.1.1",
       "workflow": "release.yml"
     }
   }
