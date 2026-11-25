@@ -56,7 +56,16 @@ Core lint, typecheck, agent guidance and plugin checks passed. The full unit run
 
 Once a new rule is saved, the deployed predecessor samples out threshold and allow matches and can broaden a multi-URL drop. This was reproduced with synthetic events using the exact deployed source. The two-step rehearsal verified that the paused bridge refuses new threshold writes and can read rows created by the enabled runtime. Cloud deployment tests verify the active and retained image gate.
 
-The tested bridge automation was merged into DebugBundle Cloud at `f9284e357ea1af6668cadb13f444e5f44b633860`. The first hosted promotion is gated on core qualification and shared package publication. [Cloud pull request](https://github.com/debugbundle/debugbundle-cloud/pull/12)
+The tested bridge automation was merged into DebugBundle Cloud at `f9284e357ea1af6668cadb13f444e5f44b633860`. [Cloud pull request](https://github.com/debugbundle/debugbundle-cloud/pull/12)
+
+Core 1.32.0 was released from `99f4301aeae59c504937707208061e6af1546ba8`. The paused bridge applied migration `202611240001_add_capture_rule_thresholds` before promoting its API and worker. The activation rollout verified all 97 applied migrations, enabled advanced writes, and retained the bridge as the rollback release. Both rollouts activated processing on the worker and passed public API and MCP readiness. [Core release](https://github.com/debugbundle/debugbundle/releases/tag/v1.32.0) · [Paused bridge](https://github.com/debugbundle/debugbundle-cloud/actions/runs/45663024494) · [Activation](https://github.com/debugbundle/debugbundle-cloud/actions/runs/45664256572)
+
+| Hosted release                 | Release ID                    | API and worker manifest digest                                            |
+| ------------------------------ | ----------------------------- | ------------------------------------------------------------------------- |
+| Active, writes enabled         | `20261125172652-f29b359385df` | `sha256:b4de06110940e496f7b6551b2b94ddcec1262f9bd1b8f4396e1ce035b17c2e4e` |
+| Retained bridge, writes paused | `20261125171952-383ddf66cc5c` | `sha256:490ef1f3d64b6de9cd0013cd299c90507b43929fad2c606816618481ade6a2a1` |
+
+The dashboard serves build `99f4301aeae59c504937707208061e6af1546ba8` after CloudFront invalidation. Its referenced JavaScript returned HTTP 200. [Dashboard workflow](https://github.com/debugbundle/debugbundle-cloud/actions/runs/45665384875)
 
 | Local candidate   | Verification                                                                                                                                         |
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
