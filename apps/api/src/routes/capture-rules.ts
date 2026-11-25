@@ -22,7 +22,10 @@ import {
   type CaptureRule,
   type BundleV1
 } from "../../../../packages/shared-types/src/index.js";
-import { buildBundleObjectKey } from "../../../../packages/storage/src/index.js";
+import {
+  buildBundleObjectKey,
+  CaptureRuleValidationError
+} from "../../../../packages/storage/src/index.js";
 import { readSanitizedArtifact } from "../../../../packages/storage/src/artifact-privacy.js";
 import type { ApiDependencies } from "../api-types.js";
 import { recordAuditLog, resolveAuditActorType } from "../audit-logging.js";
@@ -33,10 +36,22 @@ import {
   requireRateLimitedProjectAccess
 } from "../api-helpers.js";
 import {
+  CaptureRuleSchemaQuery,
   IncidentParamsSchema,
   ProjectCaptureRuleParamsSchema,
   ProjectParamsSchema
 } from "../schemas.js";
+
+function requiresCurrentRuleSchema(rule: {
+  action?: CaptureRule["action"] | undefined;
+  matcher?: CaptureRule["matcher"] | undefined;
+}): boolean {
+  return (
+    rule.action === "threshold" ||
+    rule.action === "allow" ||
+    rule.matcher?.resource_urls !== undefined
+  );
+}
 
 function buildCaptureRulesResponse(input: {
   accessMode: CaptureRulesResponse["access_mode"];
@@ -174,11 +189,15 @@ export function registerCaptureRuleRoutes(
   app: FastifyInstance,
   dependencies: ApiDependencies
 ): void {
+  // A hosted bridge can read and enforce saved rules while creation of new rule types is paused.
+  const writesPaused = dependencies.captureRuleV2WritesEnabled === false;
   app.get("/v1/projects/:id/capture-rules", async (request, reply) => {
     const parsedParams = ProjectParamsSchema.safeParse(request.params);
     if (!parsedParams.success) {
       return reply.status(400).send({ error: "invalid_project_id" });
     }
+    const query = CaptureRuleSchemaQuery.safeParse(request.query);
+    if (!query.success) return reply.status(400).send({ error: "invalid_query" });
 
     const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
       bucket: "management-read",
@@ -211,7 +230,10 @@ export function registerCaptureRuleRoutes(
     return reply.status(200).send(
       buildCaptureRulesResponse({
         accessMode,
-        rules
+        rules:
+          query.data.rule_schema === "2"
+            ? rules
+            : rules.filter((rule) => !requiresCurrentRuleSchema(rule))
       })
     );
   });
@@ -236,6 +258,9 @@ export function registerCaptureRuleRoutes(
     const parsedBody = CaptureRuleCreateSchema.safeParse(request.body);
     if (!parsedBody.success) {
       return reply.status(400).send({ error: "invalid_payload" });
+    }
+    if (writesPaused && requiresCurrentRuleSchema(parsedBody.data)) {
+      return reply.status(503).send({ error: "capture_rule_v2_writes_paused" });
     }
 
     if (dependencies.captureRuleManagement === undefined) {
@@ -304,6 +329,8 @@ export function registerCaptureRuleRoutes(
     if (!parsedParams.success) {
       return reply.status(400).send({ error: "invalid_incident_id" });
     }
+    const query = CaptureRuleSchemaQuery.safeParse(request.query);
+    if (!query.success) return reply.status(400).send({ error: "invalid_query" });
 
     const incident = await dependencies.incidentRetrieval.getIncidentForOrganization({
       organization_id: member.organization_id,
@@ -393,13 +420,14 @@ export function registerCaptureRuleRoutes(
       projectId: access?.canonical_project_id ?? incident.project_id
     });
 
+    const annotated = annotateCaptureRuleSuggestions({ suggestions, existingRules });
+    const includeCurrentSuggestions = query.data.rule_schema === "2" && !writesPaused;
     return reply.status(200).send(
       buildCaptureRuleSuggestionsResponse({
         access_mode: accessMode,
-        suggestions: annotateCaptureRuleSuggestions({
-          suggestions,
-          existingRules
-        }),
+        suggestions: includeCurrentSuggestions
+          ? annotated
+          : annotated.filter((suggestion) => !requiresCurrentRuleSchema(suggestion.rule)),
         bundle_status: "ready"
       })
     );
@@ -420,6 +448,8 @@ export function registerCaptureRuleRoutes(
     if (!parsedParams.success) {
       return reply.status(400).send({ error: "invalid_incident_id" });
     }
+    const query = CaptureRuleSchemaQuery.safeParse(request.query);
+    if (!query.success) return reply.status(400).send({ error: "invalid_query" });
 
     const parsedBody = CreateCaptureRuleFromSuggestionSchema.safeParse(request.body);
     if (!parsedBody.success) {
@@ -497,7 +527,10 @@ export function registerCaptureRuleRoutes(
       }
     }).find((candidate) => candidate.suggestion_id === parsedBody.data.suggestion_id);
 
-    if (suggestion === undefined) {
+    if (
+      suggestion === undefined ||
+      (query.data.rule_schema !== "2" && requiresCurrentRuleSchema(suggestion.rule))
+    ) {
       return reply.status(404).send({ error: "capture_rule_suggestion_not_found" });
     }
 
@@ -512,6 +545,9 @@ export function registerCaptureRuleRoutes(
         ? {}
         : { expires_at: parsedBody.data.expires_at })
     };
+    if (writesPaused && requiresCurrentRuleSchema(create)) {
+      return reply.status(503).send({ error: "capture_rule_v2_writes_paused" });
+    }
 
     const existingRules = await listExistingCaptureRulesForSuggestions({
       dependencies,
@@ -521,6 +557,9 @@ export function registerCaptureRuleRoutes(
     });
     const existingRule = findExistingCaptureRuleForSuggestion(existingRules, create);
     if (existingRule !== null) {
+      if (query.data.rule_schema !== "2" && requiresCurrentRuleSchema(existingRule)) {
+        return reply.status(409).send({ error: "capture_rule_schema_required" });
+      }
       return reply.status(200).send(buildCaptureRuleResponse(existingRule));
     }
 
@@ -579,18 +618,29 @@ export function registerCaptureRuleRoutes(
     if (!parsedBody.success) {
       return reply.status(400).send({ error: "invalid_payload" });
     }
+    if (writesPaused && requiresCurrentRuleSchema(parsedBody.data)) {
+      return reply.status(503).send({ error: "capture_rule_v2_writes_paused" });
+    }
 
     if (dependencies.captureRuleManagement === undefined) {
       return reply.status(404).send({ error: "capture_rules_not_available" });
     }
 
-    const rule = await dependencies.captureRuleManagement.updateCaptureRuleForProject({
-      organization_id: auth.access.organization_id,
-      actor_user_id: auth.member.member_id,
-      project_id: parsedParams.data.id,
-      rule_id: parsedParams.data.ruleId,
-      update: parsedBody.data
-    });
+    let rule: CaptureRule | null;
+    try {
+      rule = await dependencies.captureRuleManagement.updateCaptureRuleForProject({
+        organization_id: auth.access.organization_id,
+        actor_user_id: auth.member.member_id,
+        project_id: parsedParams.data.id,
+        rule_id: parsedParams.data.ruleId,
+        update: parsedBody.data
+      });
+    } catch (error) {
+      if (error instanceof CaptureRuleValidationError) {
+        return reply.status(400).send({ error: "invalid_payload" });
+      }
+      throw error;
+    }
 
     if (rule === null) {
       await recordAuditLog(dependencies.auditLogging, {

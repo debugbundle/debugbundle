@@ -1,12 +1,10 @@
-import { CaptureRuleMatcherSchema } from "../../../../../packages/shared-types/src/capture-rule-schemas.js";
 import {
   type CaptureRuleAction,
   type CaptureRuleBrowserEventKind,
   type CaptureRuleClientKind,
   type CaptureRuleEventType,
-  type CaptureRuleMatcher,
   type CaptureRuleRuntime,
-  type ProjectCaptureRuleCreate
+  type CaptureRuleThresholdGroupBy
 } from "../../lib/capture-rules-api.js";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "../ui/field.js";
 import { Input } from "../ui/input.js";
@@ -21,10 +19,24 @@ import {
 import { Switch } from "../ui/switch.js";
 import { Textarea } from "../ui/textarea.js";
 import {
+  type CaptureRuleCreateDraft,
+  type ThresholdWindowPreset,
+  parseExactResourceUrlsText
+} from "./capture-rule-form-helpers.js";
+import {
   joinScopeValues,
   ProjectScopeMultiSelect,
   splitScopeValues
 } from "./project-scope-controls.js";
+
+export {
+  buildProjectCaptureRuleCreate,
+  createDefaultCaptureRuleCreateDraft,
+  getCaptureRuleCreateDraftValidationError,
+  THRESHOLD_WINDOW_PRESET_VALUES,
+  type CaptureRuleCreateDraft,
+  type ThresholdWindowPreset
+} from "./capture-rule-form-helpers.js";
 
 const NO_VALUE = "__none__";
 
@@ -41,8 +53,24 @@ const eventTypeOptions: Array<{ value: CaptureRuleEventType; label: string }> = 
 
 const actionOptions: Array<{ value: CaptureRuleAction; label: string }> = [
   { value: "demote", label: "Demote to context" },
+  { value: "threshold", label: "Open after repeated failures" },
+  { value: "allow", label: "Allow immediately" },
   { value: "sample", label: "Sample matching events" },
   { value: "drop", label: "Drop before storage" }
+];
+
+const thresholdWindowOptions: Array<{ value: ThresholdWindowPreset; label: string }> = [
+  { value: "300", label: "5 minutes" },
+  { value: "900", label: "15 minutes" },
+  { value: "3600", label: "1 hour" },
+  { value: "21600", label: "6 hours" },
+  { value: "86400", label: "24 hours" },
+  { value: "custom", label: "Custom seconds" }
+];
+
+const thresholdGroupByOptions: Array<{ value: CaptureRuleThresholdGroupBy; label: string }> = [
+  { value: "resource", label: "Resource host + path" },
+  { value: "fingerprint", label: "Incident fingerprint" }
 ];
 
 const runtimeOptions: Array<{ value: CaptureRuleRuntime; label: string }> = [
@@ -53,6 +81,11 @@ const runtimeOptions: Array<{ value: CaptureRuleRuntime; label: string }> = [
   { value: "java", label: "Java" },
   { value: "go", label: "Go" },
   { value: "ruby", label: "Ruby" },
+  { value: "dotnet", label: ".NET" },
+  { value: "rust", label: "Rust" },
+  { value: "android", label: "Android" },
+  { value: "swift", label: "iOS (Swift)" },
+  { value: "react-native", label: "React Native" },
   { value: "unknown", label: "Unknown runtime" }
 ];
 
@@ -67,153 +100,12 @@ const clientKindOptions: Array<{ value: CaptureRuleClientKind; label: string }> 
   { value: "unknown", label: "Unknown" }
 ];
 
-export interface CaptureRuleCreateDraft {
-  name: string;
-  description: string;
-  enabled: boolean;
-  action: CaptureRuleAction;
-  eventType: CaptureRuleEventType;
-  serviceNames: string;
-  environments: string;
-  runtime: CaptureRuleRuntime | "";
-  firstParty: "" | "true" | "false";
-  errorName: string;
-  messageContains: string;
-  messageEquals: string;
-  browserEventKind: CaptureRuleBrowserEventKind | "";
-  browserEventOpaque: boolean;
-  clientKind: CaptureRuleClientKind | "";
-  botFamily: string;
-  resourceHost: string;
-  resourcePathEquals: string;
-  requestPathEquals: string;
-  statusCodes: string;
-  fingerprintVersion: string;
-  fingerprintValue: string;
-  sampleRatePercent: string;
-  sampleEventClass: "preserve" | "context";
-  expiresAt: string;
-  advancedMatcherJson: string;
-  matcherJsonOnly?: boolean;
-}
-
 interface CaptureRuleCreateFormProps {
   draft: CaptureRuleCreateDraft;
   disabled: boolean;
   serviceOptions?: string[];
   environmentOptions?: string[];
   onDraftChange: (draft: CaptureRuleCreateDraft) => void;
-}
-
-export function createDefaultCaptureRuleCreateDraft(): CaptureRuleCreateDraft {
-  return {
-    name: "",
-    description: "",
-    enabled: true,
-    action: "demote",
-    eventType: "frontend_exception",
-    serviceNames: "",
-    environments: "",
-    runtime: "",
-    firstParty: "",
-    errorName: "",
-    messageContains: "",
-    messageEquals: "",
-    browserEventKind: "",
-    browserEventOpaque: false,
-    clientKind: "",
-    botFamily: "",
-    resourceHost: "",
-    resourcePathEquals: "",
-    requestPathEquals: "",
-    statusCodes: "",
-    fingerprintVersion: "",
-    fingerprintValue: "",
-    sampleRatePercent: "25",
-    sampleEventClass: "preserve",
-    expiresAt: "",
-    advancedMatcherJson: ""
-  };
-}
-
-export function getCaptureRuleCreateDraftValidationError(
-  draft: CaptureRuleCreateDraft
-): string | null {
-  if (draft.name.trim().length === 0) {
-    return "Rule name is required.";
-  }
-
-  if (draft.action === "sample") {
-    const sampleRate = Number(draft.sampleRatePercent);
-    if (
-      draft.sampleRatePercent.trim() === "" ||
-      !Number.isFinite(sampleRate) ||
-      sampleRate < 0 ||
-      sampleRate > 100
-    ) {
-      return "Sample rate must be between 0 and 100.";
-    }
-  }
-
-  if (draft.matcherJsonOnly) {
-    try {
-      const parsed = CaptureRuleMatcherSchema.safeParse(JSON.parse(draft.advancedMatcherJson));
-      return parsed.success ? null : "Matcher JSON must satisfy the capture rule matcher schema.";
-    } catch {
-      return "Matcher JSON must be valid JSON.";
-    }
-  }
-
-  if (draft.statusCodes.trim().length > 0 && parseNumberList(draft.statusCodes).length === 0) {
-    return "Status codes must be a comma-separated list of HTTP status codes.";
-  }
-
-  if (draft.fingerprintValue.trim().length > 0 && draft.fingerprintVersion.trim().length === 0) {
-    return "Fingerprint version is required when matching a fingerprint value.";
-  }
-
-  if (draft.advancedMatcherJson.trim().length > 0) {
-    try {
-      JSON.parse(draft.advancedMatcherJson);
-    } catch {
-      return "Advanced matcher JSON must be valid JSON.";
-    }
-  }
-
-  const matcher = buildCaptureRuleMatcher(draft);
-  const hasNarrowingField = Object.keys(matcher).some((key) => key !== "event_types");
-  if (!hasNarrowingField) {
-    return "Add at least one matcher field beyond event type.";
-  }
-
-  if (
-    matcher.browser_event_kind === "resource_error" &&
-    matcher.resource_url === undefined &&
-    matcher.fingerprint === undefined
-  ) {
-    return "Resource-error rules need a resource URL matcher or exact fingerprint.";
-  }
-
-  return null;
-}
-
-export function buildProjectCaptureRuleCreate(
-  draft: CaptureRuleCreateDraft
-): ProjectCaptureRuleCreate {
-  const expiresAt = parseDateTimeLocalValue(draft.expiresAt);
-  return {
-    name: draft.name.trim(),
-    description: draft.description.trim().length === 0 ? null : draft.description.trim(),
-    enabled: draft.enabled,
-    action: draft.action,
-    matcher: buildCaptureRuleMatcher(draft),
-    sample_rate: draft.action === "sample" ? Number(draft.sampleRatePercent) / 100 : null,
-    sample_event_class: draft.action === "sample" ? draft.sampleEventClass : null,
-    created_by_user_id: null,
-    created_from_incident_id: null,
-    created_from_event_id: null,
-    expires_at: expiresAt
-  };
 }
 
 export function CaptureRuleCreateForm({
@@ -229,6 +121,28 @@ export function CaptureRuleCreateForm({
   ): void {
     onDraftChange({ ...draft, [key]: value });
   }
+
+  function handleActionChange(nextAction: CaptureRuleAction): void {
+    if (nextAction === "threshold") {
+      const nextGroupBy: CaptureRuleThresholdGroupBy =
+        draft.matcherJsonOnly
+          ? draft.thresholdGroupBy
+          : draft.eventType === "frontend_exception" && draft.browserEventKind === "resource_error"
+            ? "resource"
+            : "fingerprint";
+      onDraftChange({ ...draft, action: nextAction, thresholdGroupBy: nextGroupBy });
+      return;
+    }
+    onDraftChange({ ...draft, action: nextAction });
+  }
+
+  const parsedResourceUrls = parseExactResourceUrlsText(draft.resourceUrlsText);
+  const resourceUrlsInlineError = !parsedResourceUrls.ok
+    ? parsedResourceUrls.error
+    : (draft.resourceHost.trim().length > 0 || draft.resourcePathEquals.trim().length > 0) &&
+        parsedResourceUrls.urls.length > 0
+      ? "Clear single Resource host/path fields when listing multiple exact resource URLs."
+      : null;
 
   return (
     <FieldGroup>
@@ -247,7 +161,7 @@ export function CaptureRuleCreateForm({
           <FieldLabel htmlFor="capture-rule-create-action">Action</FieldLabel>
           <Select
             value={draft.action}
-            onValueChange={(value) => update("action", value as CaptureRuleAction)}
+            onValueChange={(value) => handleActionChange(value as CaptureRuleAction)}
             disabled={disabled}
           >
             <SelectTrigger id="capture-rule-create-action" className="w-full">
@@ -265,6 +179,152 @@ export function CaptureRuleCreateForm({
           </Select>
         </Field>
       </div>
+
+      {draft.action === "threshold" ? (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <Field>
+              <FieldLabel htmlFor="capture-rule-create-threshold-count">
+                Occurrences before opening
+              </FieldLabel>
+              <Input
+                id="capture-rule-create-threshold-count"
+                aria-describedby="capture-rule-create-threshold-count-help"
+                type="number"
+                min="2"
+                max="1000"
+                step="1"
+                value={draft.thresholdCount}
+                onChange={(event) => update("thresholdCount", event.currentTarget.value)}
+                disabled={disabled}
+              />
+              <FieldDescription id="capture-rule-create-threshold-count-help">
+                2–1000 matching failures in the rolling window.
+              </FieldDescription>
+            </Field>
+
+            <Field>
+              <FieldLabel htmlFor="capture-rule-create-threshold-window">Rolling window</FieldLabel>
+              <Select
+                value={draft.thresholdWindowPreset}
+                onValueChange={(value) => {
+                  const preset = value as ThresholdWindowPreset;
+                  onDraftChange({
+                    ...draft,
+                    thresholdWindowPreset: preset,
+                    ...(preset === "custom" ? {} : { thresholdWindowCustomSeconds: preset })
+                  });
+                }}
+                disabled={disabled}
+              >
+                <SelectTrigger id="capture-rule-create-threshold-window" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {thresholdWindowOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              <FieldDescription>Window evaluated from server receipt time.</FieldDescription>
+            </Field>
+
+            <Field>
+              <FieldLabel htmlFor="capture-rule-create-threshold-group-by">
+                Group threshold by
+              </FieldLabel>
+              <Select
+                value={draft.thresholdGroupBy}
+                onValueChange={(value) =>
+                  update("thresholdGroupBy", value as CaptureRuleThresholdGroupBy)
+                }
+                disabled={disabled}
+              >
+                <SelectTrigger id="capture-rule-create-threshold-group-by" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {thresholdGroupByOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              <FieldDescription>
+                Resource counts per host + path across routes; fingerprint counts per incident key.
+              </FieldDescription>
+            </Field>
+          </div>
+
+          {draft.thresholdWindowPreset === "custom" ? (
+            <Field>
+              <FieldLabel htmlFor="capture-rule-create-threshold-custom-seconds">
+                Custom window (seconds)
+              </FieldLabel>
+              <Input
+                id="capture-rule-create-threshold-custom-seconds"
+                aria-describedby="capture-rule-create-threshold-custom-seconds-help"
+                type="number"
+                min="60"
+                max="86400"
+                step="1"
+                value={draft.thresholdWindowCustomSeconds}
+                onChange={(event) =>
+                  update("thresholdWindowCustomSeconds", event.currentTarget.value)
+                }
+                disabled={disabled}
+              />
+              <FieldDescription id="capture-rule-create-threshold-custom-seconds-help">
+                Between 60 seconds (1 minute) and 86400 seconds (24 hours).
+              </FieldDescription>
+            </Field>
+          ) : null}
+        </div>
+      ) : null}
+
+      {draft.action === "sample" ? (
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field>
+            <FieldLabel htmlFor="capture-rule-create-sample-rate">Sample rate percent</FieldLabel>
+            <Input
+              id="capture-rule-create-sample-rate"
+              type="number"
+              min="0"
+              max="100"
+              step="any"
+              value={draft.sampleRatePercent}
+              onChange={(event) => update("sampleRatePercent", event.currentTarget.value)}
+              disabled={disabled}
+            />
+          </Field>
+
+          <Field>
+            <FieldLabel htmlFor="capture-rule-create-sample-class">Sampled-in class</FieldLabel>
+            <Select
+              value={draft.sampleEventClass}
+              onValueChange={(value) => update("sampleEventClass", value as "preserve" | "context")}
+              disabled={disabled}
+            >
+              <SelectTrigger id="capture-rule-create-sample-class" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="preserve">Preserve original class</SelectItem>
+                  <SelectItem value="context">Store as context only</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </Field>
+        </div>
+      ) : null}
 
       <Field>
         <FieldLabel htmlFor="capture-rule-create-description">Description</FieldLabel>
@@ -539,6 +599,30 @@ export function CaptureRuleCreateForm({
             </Field>
           </div>
 
+          <Field>
+            <FieldLabel htmlFor="capture-rule-create-resource-urls">
+              Multiple exact resource URLs
+            </FieldLabel>
+            <Textarea
+              id="capture-rule-create-resource-urls"
+              aria-describedby="capture-rule-create-resource-urls-help"
+              value={draft.resourceUrlsText}
+              onChange={(event) => update("resourceUrlsText", event.currentTarget.value)}
+              disabled={disabled}
+              rows={3}
+              placeholder={"https://cdn.example.com/widget.js\nhttps://fallback.example.com/widget.js"}
+            />
+            <FieldDescription id="capture-rule-create-resource-urls-help">
+              Optional. One exact https://host/path URL per line (1–10 entries) for primary and
+              fallback CDN endpoints. Cannot be combined with single resource host/path fields.
+            </FieldDescription>
+            {resourceUrlsInlineError === null ? null : (
+              <p role="alert" className="text-xs text-destructive">
+                {resourceUrlsInlineError}
+              </p>
+            )}
+          </Field>
+
           <div className="grid gap-4 md:grid-cols-3">
             <Field>
               <FieldLabel htmlFor="capture-rule-create-status-codes">Status codes</FieldLabel>
@@ -578,43 +662,6 @@ export function CaptureRuleCreateForm({
           </div>
         </>
       )}
-
-      {draft.action === "sample" ? (
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field>
-            <FieldLabel htmlFor="capture-rule-create-sample-rate">Sample rate percent</FieldLabel>
-            <Input
-              id="capture-rule-create-sample-rate"
-              type="number"
-              min="0"
-              max="100"
-              step="any"
-              value={draft.sampleRatePercent}
-              onChange={(event) => update("sampleRatePercent", event.currentTarget.value)}
-              disabled={disabled}
-            />
-          </Field>
-
-          <Field>
-            <FieldLabel htmlFor="capture-rule-create-sample-class">Sampled-in class</FieldLabel>
-            <Select
-              value={draft.sampleEventClass}
-              onValueChange={(value) => update("sampleEventClass", value as "preserve" | "context")}
-              disabled={disabled}
-            >
-              <SelectTrigger id="capture-rule-create-sample-class" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value="preserve">Preserve original class</SelectItem>
-                  <SelectItem value="context">Store as context only</SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </Field>
-        </div>
-      ) : null}
 
       <div className="grid gap-4 md:grid-cols-2">
         <Field orientation="horizontal" className="items-center justify-between gap-4">
@@ -668,93 +715,4 @@ export function CaptureRuleCreateForm({
       </Field>
     </FieldGroup>
   );
-}
-
-function buildCaptureRuleMatcher(draft: CaptureRuleCreateDraft): CaptureRuleMatcher {
-  if (draft.matcherJsonOnly) return JSON.parse(draft.advancedMatcherJson) as CaptureRuleMatcher;
-  const matcher: CaptureRuleMatcher = {
-    event_types: [draft.eventType]
-  };
-  const services = parseStringList(draft.serviceNames);
-  const environments = parseStringList(draft.environments);
-  const statusCodes = parseNumberList(draft.statusCodes);
-
-  if (services.length > 0) matcher.services = services;
-  if (environments.length > 0) matcher.environments = environments;
-  if (draft.runtime !== "") matcher.runtime = [draft.runtime];
-  if (draft.firstParty !== "") matcher.first_party = draft.firstParty === "true";
-  if (draft.errorName.trim().length > 0) matcher.error_name = draft.errorName.trim();
-  if (draft.messageContains.trim().length > 0)
-    matcher.message_contains = draft.messageContains.trim();
-  if (draft.messageEquals.trim().length > 0) matcher.message_equals = draft.messageEquals.trim();
-  if (draft.browserEventKind !== "") matcher.browser_event_kind = draft.browserEventKind;
-  if (draft.browserEventOpaque) matcher.browser_event_opaque = true;
-  if (draft.clientKind !== "") matcher.client_kind = draft.clientKind;
-  if (draft.botFamily.trim().length > 0) matcher.bot_family = draft.botFamily.trim();
-  if (statusCodes.length > 0) matcher.status_codes = statusCodes;
-
-  const resourceUrl = buildUrlMatcher(draft.resourceHost, draft.resourcePathEquals);
-  if (resourceUrl !== null) matcher.resource_url = resourceUrl;
-  const requestUrl = buildUrlMatcher("", draft.requestPathEquals);
-  if (requestUrl !== null) matcher.request_url = requestUrl;
-  if (draft.fingerprintValue.trim().length > 0) {
-    matcher.fingerprint = {
-      version: draft.fingerprintVersion.trim(),
-      value: draft.fingerprintValue.trim()
-    };
-  }
-
-  if (draft.advancedMatcherJson.trim().length === 0) {
-    return matcher;
-  }
-
-  return {
-    ...matcher,
-    ...(JSON.parse(draft.advancedMatcherJson) as CaptureRuleMatcher)
-  };
-}
-
-function buildUrlMatcher(
-  host: string,
-  pathEquals: string
-): NonNullable<CaptureRuleMatcher["resource_url"]> | null {
-  const matcher: NonNullable<CaptureRuleMatcher["resource_url"]> = {};
-  if (host.trim().length > 0) matcher.host = host.trim().toLowerCase();
-  if (pathEquals.trim().length > 0) matcher.path_equals = normalizePath(pathEquals.trim());
-  return Object.keys(matcher).length === 0 ? null : matcher;
-}
-
-function parseStringList(value: string): string[] {
-  return Array.from(
-    new Set(
-      value
-        .split(",")
-        .map((entry) => entry.trim())
-        .filter((entry) => entry.length > 0)
-    )
-  );
-}
-
-function parseNumberList(value: string): number[] {
-  return Array.from(
-    new Set(
-      value
-        .split(",")
-        .map((entry) => Number(entry.trim()))
-        .filter((entry) => Number.isInteger(entry) && entry >= 100 && entry <= 599)
-    )
-  ).sort((left, right) => left - right);
-}
-
-function normalizePath(value: string): string {
-  return value.startsWith("/") ? value : `/${value}`;
-}
-
-function parseDateTimeLocalValue(value: string): string | null {
-  if (value.trim().length === 0) {
-    return null;
-  }
-
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.valueOf()) ? null : parsed.toISOString();
 }

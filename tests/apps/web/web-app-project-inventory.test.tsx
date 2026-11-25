@@ -175,6 +175,7 @@ describe("project inventory", () => {
     const rows = screen.getAllByRole("row");
     expect(within(rows[1] as HTMLTableRowElement).getByText(/alpha app/i)).toBeInTheDocument();
     expect(document.querySelector('[data-project-color-tag="lime"]')).not.toBeNull();
+    expect(document.querySelector('[data-project-color-tag="default"]')).not.toBeNull();
 
     const tableContainer = screen.getByRole("table").parentElement;
     expect(tableContainer).not.toBeNull();

@@ -38,7 +38,8 @@ export const POST_PREDECESSOR_MIGRATION_IDS = [
   "202611160002_add_referral_payout_preferences",
   "202611170001_add_creator_referral_emails",
   "202611180001_reconcile_offer_publication",
-  "202611210001_add_referral_link_visits"
+  "202611210001_add_referral_link_visits",
+  "202611240001_add_capture_rule_thresholds"
 ];
 
 /** Historical migration fixtures must start before the candidate, rather than

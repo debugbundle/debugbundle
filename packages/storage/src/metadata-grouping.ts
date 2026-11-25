@@ -162,6 +162,7 @@ export function createMetadataGrouping(
         matched_fields: string[] | null;
         status: "open" | "resolved" | "regressed";
         occurrence_count: number;
+        created_now?: boolean;
       }>(
         `
           INSERT INTO incidents (
@@ -233,7 +234,8 @@ export function createMetadataGrouping(
             id AS incident_id,
             matched_fields,
             status,
-            occurrence_count
+            occurrence_count,
+            (xmax = 0) AS created_now
         `,
         [
           randomUUID(),
@@ -257,12 +259,81 @@ export function createMetadataGrouping(
         throw new Error("incident_upsert_failed");
       }
 
+      const createdNow =
+        typeof row.created_now === "boolean" ? row.created_now : existingIncident === null;
+      let occurrenceCount = Number(row.occurrence_count);
+
+      const priorEvents =
+        !duplicateEvent && input.prior_events !== undefined && input.prior_events.length > 0
+          ? input.prior_events.filter((entry) => entry.event_id !== input.event_id)
+          : [];
+      if (priorEvents.length > 0) {
+        const eventType = input.event_type ?? "frontend_exception";
+        const eventClass = input.event_class ?? "incident_signal";
+        const params: unknown[] = [row.incident_id, eventType, eventClass];
+        const valueClauses: string[] = [];
+        for (const prior of priorEvents) {
+          const offset = params.length;
+          params.push(prior.event_id, prior.occurred_at, normalizeResourceRoute(prior.resource_route));
+          valueClauses.push(
+            `($1, $${offset + 1}::uuid, $2, $3, $${offset + 2}::timestamptz, false, NULL, $${offset + 3})`
+          );
+        }
+        const insertedPrior = await db.query<{ event_id: string; occurred_at: string | Date }>(
+          `
+            INSERT INTO incident_events (
+              incident_id,
+              event_id,
+              event_type,
+              event_class,
+              occurred_at,
+              is_sampled,
+              level,
+              resource_route
+            )
+            VALUES ${valueClauses.join(", ")}
+            ON CONFLICT (incident_id, event_id) DO NOTHING
+            RETURNING event_id::text AS event_id, occurred_at
+          `,
+          params
+        );
+        if (insertedPrior.rows.length > 0) {
+          let earliestMs = Number.POSITIVE_INFINITY;
+          let earliestIso = input.occurred_at;
+          for (const inserted of insertedPrior.rows) {
+            const iso = new Date(inserted.occurred_at).toISOString();
+            const ms = Date.parse(iso);
+            if (ms < earliestMs) {
+              earliestMs = ms;
+              earliestIso = iso;
+            }
+          }
+          const bumped = await db.query<{ occurrence_count: number }>(
+            `
+              UPDATE incidents
+              SET occurrence_count = occurrence_count + $2,
+                  first_seen_at = LEAST(first_seen_at, $3::timestamptz),
+                  updated_at = now()
+              WHERE id = $1
+              RETURNING occurrence_count
+            `,
+            [row.incident_id, insertedPrior.rows.length, earliestIso]
+          );
+          if (bumped.rows[0] !== undefined) {
+            occurrenceCount = Number(bumped.rows[0].occurrence_count);
+          } else {
+            occurrenceCount += insertedPrior.rows.length;
+          }
+        }
+      }
+
       return {
         incident_id: row.incident_id,
         matched_fields: row.matched_fields ?? [],
         status: row.status,
+        created_now: createdNow,
         regressed_now: regressedNow,
-        occurrence_count: row.occurrence_count,
+        occurrence_count: occurrenceCount,
         duplicate_event: duplicateEvent,
         ...(severityEscalated ? { severity_escalated: true } : {}),
         ...(newContextTypeAdded ? { new_context_type_added: true } : {}),
@@ -296,7 +367,7 @@ export function createMetadataGrouping(
     ): Promise<RecordIncidentEventRetentionResult> {
       return runInTransaction(db, async (db) => {
         const demotedEventReferences = new Map<string, DemotedIncidentEventReference>();
-        const retainFirst = input.occurrence_count === 1;
+        const retainFirst = input.retain_first ?? input.occurrence_count === 1;
         const retainDeployMetadata = input.event_type === "deploy_metadata";
         const severityRank = severityToRank(input.severity);
 

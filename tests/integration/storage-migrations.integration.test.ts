@@ -163,7 +163,8 @@ runIntegration("storage bootstrap integration", () => {
       "202611160002_add_referral_payout_preferences",
       "202611170001_add_creator_referral_emails",
       "202611180001_reconcile_offer_publication",
-      "202611210001_add_referral_link_visits"
+      "202611210001_add_referral_link_visits",
+      "202611240001_add_capture_rule_thresholds"
     ];
     const migrated = await migrateStorageSchema(db);
 
@@ -904,6 +905,68 @@ runIntegration("storage bootstrap integration", () => {
       { conname: "agent_webhooks_created_by_user_id_fkey" },
       { conname: "alert_rules_created_by_user_id_fkey" },
       { conname: "github_dispatch_rules_created_by_user_id_fkey" }
+    ]);
+  });
+
+  it("upgrades capture_rules with additive threshold columns and threshold event table while refusing readiness before migration", async (): Promise<void> => {
+    await pool.query("DROP SCHEMA IF EXISTS public CASCADE");
+    await pool.query("CREATE SCHEMA public");
+    const db = createQueryable(pool);
+    await bootstrapStorageSchema(db);
+    await migrateStorageSchema(db);
+
+    const projectId = randomUUID();
+    const ruleId = randomUUID();
+    await seedOwnedProject({
+      pool,
+      projectId,
+      organizationId: randomUUID(),
+      organizationName: "Threshold migration",
+      organizationSlug: `threshold-mig-${projectId}`,
+      projectName: "Threshold migration project",
+      projectSlug: `threshold-mig-${projectId}`
+    });
+    await pool.query(
+      `INSERT INTO capture_rules (id, project_id, name, enabled, action, matcher)
+       VALUES ($1, $2, 'Existing demote rule', true, 'demote', '{"services":["web"]}'::jsonb)`,
+      [ruleId, projectId]
+    );
+
+    const migrationId = "202611240001_add_capture_rule_thresholds";
+    await pool.query("DROP TABLE capture_rule_threshold_events");
+    await pool.query("ALTER TABLE capture_rules DROP CONSTRAINT IF EXISTS capture_rules_threshold_group_by_check");
+    await pool.query("ALTER TABLE capture_rules DROP CONSTRAINT IF EXISTS capture_rules_threshold_window_seconds_check");
+    await pool.query("ALTER TABLE capture_rules DROP CONSTRAINT IF EXISTS capture_rules_threshold_count_check");
+    await pool.query("ALTER TABLE capture_rules DROP COLUMN threshold_group_by");
+    await pool.query("ALTER TABLE capture_rules DROP COLUMN threshold_window_seconds");
+    await pool.query("ALTER TABLE capture_rules DROP COLUMN threshold_count");
+    await pool.query("DELETE FROM storage_migration_ledger WHERE id = $1", [migrationId]);
+
+    await expect(assertStorageSchemaMigrationsApplied(db)).rejects.toThrow(
+      `storage_schema_missing_migrations: ${migrationId}`
+    );
+
+    const migrated = await migrateStorageSchema(db);
+    expect(migrated.applied).toEqual([migrationId]);
+    await expect(assertStorageSchemaMigrationsApplied(db)).resolves.toBeUndefined();
+    expect((await migrateStorageSchema(db)).applied).toEqual([]);
+
+    const existing = await pool.query<{
+      action: string;
+      threshold_count: number | null;
+      threshold_window_seconds: number | null;
+      threshold_group_by: string | null;
+    }>(
+      "SELECT action, threshold_count, threshold_window_seconds, threshold_group_by FROM capture_rules WHERE id = $1",
+      [ruleId]
+    );
+    expect(existing.rows).toEqual([
+      {
+        action: "demote",
+        threshold_count: null,
+        threshold_window_seconds: null,
+        threshold_group_by: null
+      }
     ]);
   });
 });

@@ -5,7 +5,8 @@ import {
   readJson as readCaptureRuleJson
 } from "./api-client.js";
 
-export type CaptureRuleAction = "demote" | "sample" | "drop";
+export type CaptureRuleAction = "demote" | "sample" | "drop" | "threshold" | "allow";
+export type CaptureRuleThresholdGroupBy = "resource" | "fingerprint";
 export type CaptureRuleEventType =
   | "backend_exception"
   | "request_event"
@@ -23,6 +24,11 @@ export type CaptureRuleRuntime =
   | "java"
   | "go"
   | "ruby"
+  | "dotnet"
+  | "rust"
+  | "android"
+  | "swift"
+  | "react-native"
   | "unknown";
 export type CaptureRuleBrowserEventKind = "window_error" | "resource_error";
 export type CaptureRuleClientKind = "human" | "bot" | "unknown";
@@ -32,6 +38,11 @@ export interface CaptureRuleUrlMatcher {
   host_suffix?: string;
   path_prefix?: string;
   path_equals?: string;
+}
+
+export interface CaptureRuleExactResourceUrlMatcher {
+  host: string;
+  path_equals: string;
 }
 
 export interface CaptureRuleMatcher extends Pick<
@@ -54,6 +65,7 @@ export interface CaptureRuleMatcher extends Pick<
   client_kind?: CaptureRuleClientKind;
   bot_family?: string;
   resource_url?: CaptureRuleUrlMatcher;
+  resource_urls?: CaptureRuleExactResourceUrlMatcher[];
   request_url?: CaptureRuleUrlMatcher;
   status_codes?: number[];
   status_ranges?: Array<{ start: number; end: number }>;
@@ -73,6 +85,9 @@ export interface ProjectCaptureRule {
   matcher: CaptureRuleMatcher;
   sample_rate: number | null;
   sample_event_class: "preserve" | "context" | null;
+  threshold_count?: number | null;
+  threshold_window_seconds?: number | null;
+  threshold_group_by?: CaptureRuleThresholdGroupBy | null;
   created_by_user_id: string | null;
   created_from_incident_id: string | null;
   created_from_event_id: string | null;
@@ -96,6 +111,9 @@ export interface ProjectCaptureRuleUpdate {
   matcher?: CaptureRuleMatcher;
   sample_rate?: number | null;
   sample_event_class?: "preserve" | "context" | null;
+  threshold_count?: number | null;
+  threshold_window_seconds?: number | null;
+  threshold_group_by?: CaptureRuleThresholdGroupBy | null;
   expires_at?: string | null;
 }
 
@@ -107,6 +125,9 @@ export interface ProjectCaptureRuleCreate {
   matcher: CaptureRuleMatcher;
   sample_rate?: number | null;
   sample_event_class?: "preserve" | "context" | null;
+  threshold_count?: number | null;
+  threshold_window_seconds?: number | null;
+  threshold_group_by?: CaptureRuleThresholdGroupBy | null;
   created_by_user_id?: string | null;
   created_from_incident_id?: string | null;
   created_from_event_id?: string | null;
@@ -130,6 +151,9 @@ export interface CaptureRuleSuggestion {
     matcher: CaptureRuleMatcher;
     sample_rate: number | null;
     sample_event_class: "preserve" | "context" | null;
+    threshold_count?: number | null;
+    threshold_window_seconds?: number | null;
+    threshold_group_by?: CaptureRuleThresholdGroupBy | null;
     created_by_user_id: string | null;
     created_from_incident_id: string | null;
     created_from_event_id: string | null;
@@ -148,7 +172,7 @@ export async function listProjectCaptureRules(
   projectId: string
 ): Promise<ProjectCaptureRulesResponse> {
   return await readCaptureRuleJson<ProjectCaptureRulesResponse>(
-    await fetch(buildApiUrl(`/v1/projects/${projectId}/capture-rules`), {
+    await fetch(buildApiUrl(`/v1/projects/${projectId}/capture-rules?rule_schema=2`), {
       credentials: "include"
     })
   );
@@ -201,7 +225,7 @@ export async function suggestCaptureRulesFromIncident(
   incidentId: string
 ): Promise<CaptureRuleSuggestionsResponse> {
   return await readCaptureRuleJson<CaptureRuleSuggestionsResponse>(
-    await fetch(buildApiUrl(`/v1/incidents/${incidentId}/capture-rule-suggestion`), {
+    await fetch(buildApiUrl(`/v1/incidents/${incidentId}/capture-rule-suggestion?rule_schema=2`), {
       method: "POST",
       credentials: "include",
       headers: buildBrowserSessionHeaders()
@@ -220,7 +244,7 @@ export async function createCaptureRuleFromIncidentSuggestion(
   }
 ): Promise<ProjectCaptureRule> {
   const body = await readCaptureRuleJson<{ rule: ProjectCaptureRule }>(
-    await fetch(buildApiUrl(`/v1/incidents/${incidentId}/capture-rules`), {
+    await fetch(buildApiUrl(`/v1/incidents/${incidentId}/capture-rules?rule_schema=2`), {
       method: "POST",
       credentials: "include",
       headers: buildBrowserSessionHeaders(true),

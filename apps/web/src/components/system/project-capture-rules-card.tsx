@@ -1,5 +1,8 @@
 import { PendingButton } from "./pending-button.js";
-import { formatCaptureRuleMatcher } from "../../lib/capture-rule-copy.js";
+import {
+  formatCaptureRuleMatcher,
+  formatCaptureRuleThresholdSummary
+} from "../../lib/capture-rule-copy.js";
 import {
   LinkIcon,
   PauseIcon,
@@ -45,7 +48,9 @@ import {
   CaptureRuleCreateForm,
   createDefaultCaptureRuleCreateDraft,
   getCaptureRuleCreateDraftValidationError,
-  type CaptureRuleCreateDraft
+  THRESHOLD_WINDOW_PRESET_VALUES,
+  type CaptureRuleCreateDraft,
+  type ThresholdWindowPreset
 } from "./capture-rule-create-form.js";
 import { CursorPaginationControls } from "./cursor-pagination-controls.js";
 import { Dialog } from "../ui/dialog.js";
@@ -61,6 +66,14 @@ interface ProjectCaptureRulesCardProps {
 }
 
 function buildDraft(rule: ProjectCaptureRule): CaptureRuleCreateDraft {
+  const windowSeconds = rule.threshold_window_seconds ?? 3600;
+  const windowString = String(windowSeconds);
+  const windowPreset: ThresholdWindowPreset = (
+    THRESHOLD_WINDOW_PRESET_VALUES as readonly string[]
+  ).includes(windowString)
+    ? (windowString as ThresholdWindowPreset)
+    : "custom";
+
   return {
     ...createDefaultCaptureRuleCreateDraft(),
     name: rule.name,
@@ -69,6 +82,12 @@ function buildDraft(rule: ProjectCaptureRule): CaptureRuleCreateDraft {
     action: rule.action,
     sampleRatePercent: rule.sample_rate === null ? "25" : String(rule.sample_rate * 100),
     sampleEventClass: rule.sample_event_class ?? "preserve",
+    thresholdCount: rule.threshold_count == null ? "10" : String(rule.threshold_count),
+    thresholdWindowPreset: windowPreset,
+    thresholdWindowCustomSeconds: windowString,
+    thresholdGroupBy:
+      rule.threshold_group_by ??
+      (rule.matcher.browser_event_kind === "resource_error" ? "resource" : "fingerprint"),
     expiresAt: toDateTimeLocalInputValue(rule.expires_at),
     advancedMatcherJson: JSON.stringify(rule.matcher, null, 2),
     matcherJsonOnly: true
@@ -269,6 +288,7 @@ export function ProjectCaptureRulesCard({
 
     try {
       const create = buildProjectCaptureRuleCreate(editDraft);
+      const initialDraft = buildDraft(editingRule);
       const updated = await updateProjectCaptureRule(projectId, editingRule.id, {
         name: create.name,
         description: create.description ?? null,
@@ -278,19 +298,34 @@ export function ProjectCaptureRulesCard({
         ...(create.action === "sample"
           ? {
               sample_rate:
-                editDraft.sampleRatePercent === buildDraft(editingRule).sampleRatePercent &&
+                editDraft.sampleRatePercent === initialDraft.sampleRatePercent &&
                 editingRule.action === "sample"
                   ? editingRule.sample_rate
                   : (create.sample_rate ?? null),
               sample_event_class:
-                editDraft.sampleEventClass === buildDraft(editingRule).sampleEventClass &&
+                editDraft.sampleEventClass === initialDraft.sampleEventClass &&
                 editingRule.action === "sample"
                   ? editingRule.sample_event_class
                   : (create.sample_event_class ?? null)
             }
-          : {}),
+          : editingRule.action === "sample"
+            ? { sample_rate: null, sample_event_class: null }
+            : {}),
+        ...(create.action === "threshold"
+          ? {
+              threshold_count: create.threshold_count ?? null,
+              threshold_window_seconds: create.threshold_window_seconds ?? null,
+              threshold_group_by: create.threshold_group_by ?? null
+            }
+          : editingRule.action === "threshold"
+            ? {
+                threshold_count: null,
+                threshold_window_seconds: null,
+                threshold_group_by: null
+              }
+            : {}),
         // The datetime-local control displays minutes; untouched expiry must retain exact stored seconds.
-        ...(editDraft.expiresAt === buildDraft(editingRule).expiresAt
+        ...(editDraft.expiresAt === initialDraft.expiresAt
           ? {}
           : { expires_at: create.expires_at ?? null })
       });
@@ -352,7 +387,7 @@ export function ProjectCaptureRulesCard({
     <>
       <CollapsibleCard
         title="Capture rules"
-        description="Review which noisy patterns are being demoted, sampled, or dropped before they keep reopening incidents."
+        description="Review which noisy patterns are being demoted, thresholded, allowed, sampled, or dropped before they keep reopening incidents."
         contentClassName="space-y-6"
       >
         <div className="rounded-lg border border-border/80 bg-background/60 p-4 text-sm text-muted-foreground">
@@ -363,7 +398,7 @@ export function ProjectCaptureRulesCard({
           <p className="mt-2 leading-6">
             {showPreviewOnly
               ? "Members can review project capture rules here. Owners and admins create and manage these rules from incident detail pages and project settings."
-              : "Create rules from noisy incident suggestions or define a manual rule here when you already know the exact structured condition to demote, sample, or drop."}
+              : "Create rules from noisy incident suggestions or define a manual rule here when you already know the exact structured condition to demote, threshold, allow, sample, or drop."}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             {showPreviewOnly ? null : (
@@ -458,9 +493,7 @@ export function ProjectCaptureRulesCard({
                     </TableCell>
                     <TableCell className="align-top">
                       <Badge variant={getActionVariant(rule.action)}>
-                        {rule.action === "sample"
-                          ? `sample ${formatSampleRate(rule.sample_rate)}`
-                          : rule.action}
+                        {formatActionLabel(rule)}
                       </Badge>
                     </TableCell>
                     <TableCell className="align-top text-muted-foreground">
@@ -646,14 +679,30 @@ export function ProjectCaptureRulesCard({
   );
 }
 
+function formatActionLabel(rule: ProjectCaptureRule): string {
+  switch (rule.action) {
+    case "sample":
+      return `sample ${formatSampleRate(rule.sample_rate)}`;
+    case "threshold":
+      return formatCaptureRuleThresholdSummary(rule);
+    case "allow":
+      return "Allow";
+    default:
+      return rule.action;
+  }
+}
+
 function getActionVariant(
   action: ProjectCaptureRule["action"]
-): "secondary" | "warning" | "destructive" {
+): "secondary" | "warning" | "destructive" | "success" {
   switch (action) {
     case "demote":
       return "secondary";
     case "sample":
+    case "threshold":
       return "warning";
+    case "allow":
+      return "success";
     case "drop":
       return "destructive";
   }

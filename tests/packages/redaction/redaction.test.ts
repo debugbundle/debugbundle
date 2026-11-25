@@ -6,6 +6,13 @@ import { redact, sanitizeTelemetry, type JsonValue } from "../../../packages/red
 const privacyFixtures = JSON.parse(readFileSync(new URL("../../fixtures/privacy-conformance.json", import.meta.url), "utf8")) as {
   policy: string;
   cases: Array<{ id: string; input: JsonValue; expected: JsonValue }>;
+  exact_key_cases: Array<{
+    id: string;
+    additional_keys?: string[];
+    exact_keys?: string[];
+    input: JsonValue;
+    expected: JsonValue;
+  }>;
 };
 
 describe("mandatory telemetry sanitization", () => {
@@ -26,6 +33,44 @@ describe("mandatory telemetry sanitization", () => {
       expect(sanitizeTelemetry(result.value)).toMatchObject({ ok: true, value: result.value });
     });
   }
+
+  for (const fixture of privacyFixtures.exact_key_cases) {
+    it(`sanitizes exact-key case ${fixture.id} idempotently`, () => {
+      const original = JSON.stringify(fixture.input);
+      const options = {
+        ...(fixture.additional_keys === undefined ? {} : { additionalKeys: fixture.additional_keys }),
+        ...(fixture.exact_keys === undefined ? {} : { exactKeys: fixture.exact_keys })
+      };
+      const result = sanitizeTelemetry(fixture.input, options);
+      expect(result).toMatchObject({ ok: true });
+      if (!result.ok) {
+        return;
+      }
+      expect(result.value).toEqual(fixture.expected);
+      expect(JSON.stringify(fixture.input)).toBe(original);
+      expect(sanitizeTelemetry(result.value, options)).toMatchObject({ ok: true, value: result.value });
+    });
+  }
+
+  it("enforces combined custom key count and key length bounds across additionalKeys and exactKeys", () => {
+    const halfA = Array.from({ length: 64 }, (_, index) => `broad_${index}`);
+    const halfB = Array.from({ length: 64 }, (_, index) => `exact_${index}`);
+    expect(sanitizeTelemetry({ safe: 1 }, { additionalKeys: halfA, exactKeys: halfB })).toMatchObject({
+      ok: true,
+      value: { safe: 1 }
+    });
+    expect(
+      sanitizeTelemetry({ safe: 1 }, { additionalKeys: halfA, exactKeys: [...halfB, "exact_64"] })
+    ).toEqual({ ok: false, reason: "unsafe_input" });
+    expect(sanitizeTelemetry({ safe: 1 }, { exactKeys: ["   "] })).toEqual({
+      ok: false,
+      reason: "unsafe_input"
+    });
+    expect(sanitizeTelemetry({ safe: 1 }, { exactKeys: ["x".repeat(65)] })).toEqual({
+      ok: false,
+      reason: "unsafe_input"
+    });
+  });
 
   it("adds custom fields without replacing credential protection", () => {
     expect(sanitizeTelemetry({ password: "SYNTHETIC_SECRET", businessField: "SYNTHETIC_SECRET" }, {
@@ -278,5 +323,30 @@ describe("redaction", () => {
       "sessionId",
       "verificationCode"
     ]);
+  });
+
+  it("supports exactKeys in redact() without matching compound siblings", (): void => {
+    const payload = {
+      tag: "payout-tag-secret",
+      tag_name: "script",
+      tagName: "link",
+      nested: {
+        TAG: "nested-secret",
+        payout_tag: "compound-kept"
+      }
+    };
+
+    const result = redact(payload, { exactKeys: ["tag"] });
+
+    expect(result.redacted).toEqual({
+      tag: "[REDACTED]",
+      tag_name: "script",
+      tagName: "link",
+      nested: {
+        TAG: "[REDACTED]",
+        payout_tag: "compound-kept"
+      }
+    });
+    expect(result.redacted_fields).toEqual(["tag", "nested.TAG"]);
   });
 });

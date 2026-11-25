@@ -12,6 +12,7 @@ describe("mcp capture-rule tools", () => {
   it.each([
     ["https://www.googletagmanager.com/gtm.js", "resource_context"],
     ["https://www.googletagmanager.com/gtm.js", "resource_drop"],
+    ["https://www.googletagmanager.com/gtm.js", "resource_threshold"],
     ["https://www.googletagmanager.com/gtag/js", "resource_context"],
     ["https://cdn.example.com/unknown.js", "resource_drop"],
     [null, "exact_fingerprint_demote"],

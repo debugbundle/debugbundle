@@ -3,15 +3,26 @@ import type {
   CaptureRuleAction,
   CaptureRuleMatcher,
   CaptureRuleSampleEventClass,
+  CaptureRuleThresholdGroupBy,
   CaptureRuleUpdate
 } from "../../shared-types/src/index.js";
 import type { Queryable } from "./types.js";
 
 type CaptureRuleRow = Omit<
   CaptureRule,
-  "sample_rate" | "hit_count" | "expires_at" | "last_matched_at" | "created_at" | "updated_at"
+  | "sample_rate"
+  | "threshold_count"
+  | "threshold_window_seconds"
+  | "hit_count"
+  | "expires_at"
+  | "last_matched_at"
+  | "created_at"
+  | "updated_at"
 > & {
   sample_rate: number | string | null;
+  threshold_count?: number | string | null;
+  threshold_window_seconds?: number | string | null;
+  threshold_group_by?: CaptureRuleThresholdGroupBy | null;
   hit_count: number | string;
   expires_at: string | Date | null;
   last_matched_at: string | Date | null;
@@ -36,6 +47,9 @@ export interface CaptureRuleStore {
     matcher: CaptureRuleMatcher;
     sample_rate?: number | null;
     sample_event_class?: CaptureRuleSampleEventClass | null;
+    threshold_count?: number | null;
+    threshold_window_seconds?: number | null;
+    threshold_group_by?: CaptureRuleThresholdGroupBy | null;
     created_by_user_id?: string | null;
     created_from_incident_id?: string | null;
     created_from_event_id?: string | null;
@@ -65,6 +79,9 @@ function selectColumns(viewParameter?: string): string {
     ${viewParameter ? `debugbundle_rule_view_matcher(${viewParameter}::uuid,COALESCE(filter_project_id,project_id),matcher) AS matcher` : "matcher"},
     sample_rate,
     sample_event_class,
+    threshold_count,
+    threshold_window_seconds,
+    threshold_group_by,
     created_by_user_id,
     created_from_incident_id,
     created_from_event_id,
@@ -88,6 +105,10 @@ function normalizeCaptureRuleRow(row: CaptureRuleRow): CaptureRule {
   return {
     ...row,
     sample_rate: row.sample_rate === null ? null : Number(row.sample_rate),
+    threshold_count: row.threshold_count == null ? null : Number(row.threshold_count),
+    threshold_window_seconds:
+      row.threshold_window_seconds == null ? null : Number(row.threshold_window_seconds),
+    threshold_group_by: row.threshold_group_by ?? null,
     hit_count: Number(row.hit_count),
     expires_at: toIsoString(row.expires_at),
     last_matched_at: toIsoString(row.last_matched_at),
@@ -164,6 +185,9 @@ export function createPostgresCaptureRuleStore(db: Queryable): CaptureRuleStore 
             matcher,
             sample_rate,
             sample_event_class,
+            threshold_count,
+            threshold_window_seconds,
+            threshold_group_by,
             created_by_user_id,
             created_from_incident_id,
             created_from_event_id,
@@ -173,7 +197,7 @@ export function createPostgresCaptureRuleStore(db: Queryable): CaptureRuleStore 
             created_at,
             updated_at
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13, 0, NULL, NOW(), NOW())
+          VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13, $14, $15, $16, 0, NULL, NOW(), NOW())
           RETURNING ${selectColumns()}
         `,
         [
@@ -186,6 +210,9 @@ export function createPostgresCaptureRuleStore(db: Queryable): CaptureRuleStore 
           JSON.stringify(input.matcher),
           input.sample_rate ?? null,
           input.sample_event_class ?? null,
+          input.threshold_count ?? null,
+          input.threshold_window_seconds ?? null,
+          input.threshold_group_by ?? null,
           input.created_by_user_id ?? null,
           input.created_from_incident_id ?? null,
           input.created_from_event_id ?? null,
@@ -240,6 +267,24 @@ export function createPostgresCaptureRuleStore(db: Queryable): CaptureRuleStore 
       if (input.sample_event_class !== undefined) {
         updates.push(`sample_event_class = $${paramIndex}`);
         params.push(input.sample_event_class);
+        paramIndex += 1;
+      }
+
+      if (input.threshold_count !== undefined) {
+        updates.push(`threshold_count = $${paramIndex}`);
+        params.push(input.threshold_count);
+        paramIndex += 1;
+      }
+
+      if (input.threshold_window_seconds !== undefined) {
+        updates.push(`threshold_window_seconds = $${paramIndex}`);
+        params.push(input.threshold_window_seconds);
+        paramIndex += 1;
+      }
+
+      if (input.threshold_group_by !== undefined) {
+        updates.push(`threshold_group_by = $${paramIndex}`);
+        params.push(input.threshold_group_by);
         paramIndex += 1;
       }
 

@@ -1,10 +1,21 @@
-import type { CaptureRuleMatcher } from "./capture-rules-api.js";
+import type {
+  CaptureRuleMatcher,
+  CaptureRuleThresholdGroupBy
+} from "./capture-rules-api.js";
 
 export function formatCaptureRuleMatcher(matcher: CaptureRuleMatcher): string {
   const parts: string[] = [];
 
   if (matcher.resource_url !== undefined) {
     parts.push(`resource: ${formatUrlMatcher(matcher.resource_url)}`);
+  }
+  if (matcher.resource_urls !== undefined && matcher.resource_urls.length > 0) {
+    const formatted = matcher.resource_urls.map((entry) => `${entry.host}${entry.path_equals}`);
+    parts.push(
+      matcher.resource_urls.length === 1
+        ? `resource: ${formatted[0]}`
+        : `resources (${matcher.resource_urls.length}): ${formatted.join(", ")}`
+    );
   }
   if (matcher.fingerprint !== undefined) {
     parts.push(`fingerprint: ${matcher.fingerprint.version}:${matcher.fingerprint.value}`);
@@ -81,4 +92,30 @@ function formatUrlMatcher(matcher: NonNullable<CaptureRuleMatcher["resource_url"
   if (matcher.path_equals !== undefined) parts.push(matcher.path_equals);
   if (matcher.path_prefix !== undefined) parts.push(`${matcher.path_prefix}*`);
   return parts.join(" ");
+}
+
+export function formatCaptureRuleThresholdWindow(seconds: number): string {
+  if (seconds % 3600 === 0) {
+    return `${seconds / 3600}h`;
+  }
+  if (seconds % 60 === 0) {
+    return `${seconds / 60}m`;
+  }
+  return `${seconds}s`;
+}
+
+export function formatCaptureRuleThresholdSummary(input: {
+  threshold_count?: number | null;
+  threshold_window_seconds?: number | null;
+  threshold_group_by?: CaptureRuleThresholdGroupBy | null;
+}): string {
+  if (
+    input.threshold_count == null ||
+    input.threshold_window_seconds == null ||
+    input.threshold_group_by == null
+  ) {
+    return "threshold";
+  }
+
+  return `${input.threshold_count}× / ${formatCaptureRuleThresholdWindow(input.threshold_window_seconds)} · ${input.threshold_group_by}`;
 }

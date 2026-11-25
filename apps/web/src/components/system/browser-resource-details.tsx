@@ -1,14 +1,21 @@
-import type { BundleV1 } from "../../../../../packages/shared-types/src/index.js";
+import type {
+  BundleV1,
+  EvidenceInterpretation
+} from "../../../../../packages/shared-types/src/index.js";
 import { Badge } from "../ui/badge.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table.js";
 import { CalloutCard } from "./callout-card.js";
 
 export function BrowserResourceDetails({
-  resource
+  resource,
+  evidence
 }: {
   resource: NonNullable<BundleV1["context"]["resource_failure"]>;
+  evidence?: EvidenceInterpretation;
 }): JSX.Element {
   const routes = resource.routes;
+  const passive = evidence?.passive;
+  const recovery = evidence?.recovery ?? "unknown";
   return (
     <CalloutCard
       className="break-words"
@@ -30,7 +37,42 @@ export function BrowserResourceDetails({
               ? "Same origin"
               : "External origin"}
         </Badge>
+        {passive && passive.enforced_csp_count > 0 ? (
+          <Badge variant="warning">Enforced CSP observed</Badge>
+        ) : null}
+        {passive && passive.report_only_csp_count > 0 ? (
+          <Badge variant="outline">Report-only CSP (non-blocking)</Badge>
+        ) : null}
+        {passive && passive.observed_statuses.length > 0 ? (
+          <Badge variant="outline">
+            Timing HTTP {passive.observed_statuses.join(", ")}
+          </Badge>
+        ) : null}
+        {recovery !== "unknown" ? (
+          <Badge
+            variant={
+              recovery === "recovered"
+                ? "success"
+                : recovery === "conflicting"
+                  ? "warning"
+                  : "secondary"
+            }
+          >
+            Recovery: {recovery}
+          </Badge>
+        ) : null}
       </div>
+      {evidence && evidence.possible_causes.length > 0 ? (
+        <div className="space-y-1 text-sm text-muted-foreground">
+          {evidence.possible_causes.map((cause) => (
+            <p key={cause}>{cause}</p>
+          ))}
+        </div>
+      ) : passive && passive.report_only_csp_count > 0 && passive.enforced_csp_count === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          Report-only CSP observations do not block resource loads; cause remains unknown.
+        </p>
+      ) : null}
       {resource.optional_candidate ? (
         <p className="text-sm text-muted-foreground">
           This service may be optional for your app. Use Reduce noise to review a rule for this

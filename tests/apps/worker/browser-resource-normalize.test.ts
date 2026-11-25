@@ -133,3 +133,96 @@ it("does not coalesce visible asset failures with hidden speculative loads", () 
   event.payload.browser_event!.page!.visibility_state = "visible";
   expect(context().coalescing_key).not.toBe(hidden.coalescing_key);
 });
+
+it("attaches capture_rule_threshold and stabilizes legacy redacted-tag opaque resources across routes", async () => {
+  const firstEvent = browserResourceEvent({
+    url: "https://cdn.openai.com/chat/embed.js",
+    route: "/gallery/1",
+    tag: "[REDACTED]"
+  });
+  const secondEvent = browserResourceEvent({
+    url: "https://cdn.openai.com/chat/embed.js",
+    route: "/checkout/2",
+    tag: "[REDACTED]"
+  });
+  const captureRule = {
+    rule_id: "00000000-0000-4000-8000-000000000201",
+    action: "threshold" as const,
+    outcome: "threshold" as const,
+    sample_rate: null,
+    sample_event_class: null,
+    threshold_count: 10,
+    threshold_window_seconds: 3600,
+    threshold_group_by: "resource" as const,
+    rule_updated_at: "2026-11-24T09:00:00.000Z"
+  };
+
+  const enqueued: Record<string, unknown>[] = [];
+  for (const event of [firstEvent, secondEvent]) {
+    const queue = {
+      dequeue: vi.fn().mockResolvedValue({
+        project_id: "proj_test",
+        event_id: event.event_id,
+        object_key: `raw/${event.event_id}`,
+        received_at: "2026-11-24T10:00:00.000Z",
+        capture_rule: captureRule
+      }),
+      enqueue: vi.fn().mockImplementation(async (_name: string, job: Record<string, unknown>) => {
+        enqueued.push(job);
+      })
+    };
+    await processNextNormalizeEventsJob({
+      queue,
+      objectStore: { getObject: vi.fn().mockResolvedValue(gzipSync(JSON.stringify(event))) },
+      processedEventStore: { upsertProcessedEvent: vi.fn().mockResolvedValue({ inserted: true }) }
+    });
+  }
+
+  expect(enqueued).toHaveLength(2);
+  expect(enqueued[0]?.["fingerprint_version"]).toBe("v3");
+  expect(enqueued[0]?.["fingerprint"]).toBe(enqueued[1]?.["fingerprint"]);
+  expect(enqueued[0]?.["resource_route"]).toBe("/gallery/{param}");
+  expect(enqueued[1]?.["resource_route"]).toBe("/checkout/{param}");
+  expect(enqueued[0]?.["matched_fields"]).toContain("capture_rule_threshold");
+  expect(enqueued[0]?.["capture_rule_threshold"]).toEqual({
+    rule_id: captureRule.rule_id,
+    threshold_count: 10,
+    threshold_window_seconds: 3600,
+    threshold_group_by: "resource",
+    bucket_key: JSON.stringify(["resource", "cdn.openai.com", "/chat/embed.js"]),
+    rule_updated_at: "2026-11-24T09:00:00.000Z",
+    received_at: "2026-11-24T10:00:00.000Z"
+  });
+});
+
+it("bypasses resource threshold gating when a resource error lacks a concrete host/path", async () => {
+  const event = browserResourceEvent({ url: null });
+  const queue = {
+    dequeue: vi.fn().mockResolvedValue({
+      project_id: "proj_test",
+      event_id: event.event_id,
+      object_key: "raw/missing",
+      received_at: "2026-11-24T10:00:00.000Z",
+      capture_rule: {
+        rule_id: "00000000-0000-4000-8000-000000000201",
+        action: "threshold" as const,
+        outcome: "threshold" as const,
+        sample_rate: null,
+        sample_event_class: null,
+        threshold_count: 10,
+        threshold_window_seconds: 3600,
+        threshold_group_by: "resource" as const,
+        rule_updated_at: "2026-11-24T09:00:00.000Z"
+      }
+    }),
+    enqueue: vi.fn().mockResolvedValue(undefined)
+  };
+  await processNextNormalizeEventsJob({
+    queue,
+    objectStore: { getObject: vi.fn().mockResolvedValue(gzipSync(JSON.stringify(event))) },
+    processedEventStore: { upsertProcessedEvent: vi.fn().mockResolvedValue({ inserted: true }) }
+  });
+
+  const job = queue.enqueue.mock.calls[0]?.[1] as Record<string, unknown>;
+  expect(job["capture_rule_threshold"]).toBeUndefined();
+});

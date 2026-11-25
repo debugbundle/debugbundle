@@ -1,5 +1,6 @@
 import { ArrowLeftIcon, ClipboardCopyIcon, DownloadIcon, LoaderCircleIcon } from "lucide-react";
 import { BrowserResourceContextSchema } from "../../../../packages/shared-types/src/browser-resource-context.js";
+import { interpretBundleEvidence } from "../../../../packages/shared-types/src/evidence-interpretation.js";
 import { BrowserResourceDetails } from "../components/system/browser-resource-details.js";
 import { useEffect, useRef, useState } from "react";
 import { Link, Navigate, useLocation, useParams } from "react-router-dom";
@@ -345,7 +346,12 @@ function BundleTab({ incidentId }: { incidentId: string }): JSX.Element {
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        {resource.success ? <BrowserResourceDetails resource={resource.data} /> : null}
+        {resource.success ? (
+          <BrowserResourceDetails
+            resource={resource.data}
+            evidence={interpretBundleEvidence(bundleState.bundle)}
+          />
+        ) : null}
         <HighlightedCodeBlock code={bundleJson} />
       </CardContent>
     </Card>

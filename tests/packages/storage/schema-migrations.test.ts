@@ -3,6 +3,7 @@ import { OFFER_PUBLICATION_MIGRATION } from "../../../packages/storage/src/offer
 import { PAYOUT_PREFERENCE_MIGRATION } from "../../../packages/storage/src/payout-preference-schema.js";
 import { CREATOR_EMAIL_MIGRATION } from "../../../packages/storage/src/creator-email-schema.js";
 import { REFERRAL_VISIT_MIGRATION } from "../../../packages/storage/src/referral-visit-schema.js";
+import { CAPTURE_RULE_THRESHOLD_MIGRATION } from "../../../packages/storage/src/capture-rule-threshold-schema.js";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -465,7 +466,8 @@ describe("storage schema migrations", () => {
       PAYOUT_PREFERENCE_MIGRATION.id,
       CREATOR_EMAIL_MIGRATION.id,
       OFFER_PUBLICATION_MIGRATION.id,
-      REFERRAL_VISIT_MIGRATION.id
+      REFERRAL_VISIT_MIGRATION.id,
+      CAPTURE_RULE_THRESHOLD_MIGRATION.id
     ]);
     expect(result.already_applied).toEqual(
       STORAGE_SCHEMA_MIGRATIONS.filter(
@@ -475,7 +477,8 @@ describe("storage schema migrations", () => {
             PAYOUT_PREFERENCE_MIGRATION.id,
             CREATOR_EMAIL_MIGRATION.id,
             OFFER_PUBLICATION_MIGRATION.id,
-            REFERRAL_VISIT_MIGRATION.id
+            REFERRAL_VISIT_MIGRATION.id,
+            CAPTURE_RULE_THRESHOLD_MIGRATION.id
           ].includes(migration.id)
       ).map((migration) => migration.id)
     );

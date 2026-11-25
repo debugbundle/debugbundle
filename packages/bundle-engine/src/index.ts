@@ -260,6 +260,21 @@ function buildDependenciesContext(
   };
 }
 
+function formatPassiveRecoveryNote(
+  recoveryContext: BundleV1["context"]["recovery"] | undefined
+): string {
+  if (recoveryContext === undefined || recoveryContext.outcome === "unknown") {
+    return "";
+  }
+  if (recoveryContext.outcome === "recovered") {
+    return " Explicit application recovery was later observed within the failure scope; incident status remains unchanged.";
+  }
+  if (recoveryContext.outcome === "persisted") {
+    return " An explicit persistent-failure observation was later recorded within the failure scope.";
+  }
+  return " Conflicting recovery and persistent-failure observations were recorded within the failure scope.";
+}
+
 function buildSummaryGuidance(input: {
   errorContext: BundleErrorContext | null;
   requestContext: BundleRequestContext | null;
@@ -269,6 +284,8 @@ function buildSummaryGuidance(input: {
   browserEvent: BrowserExceptionEventContext | null;
   opaqueBrowserError: boolean;
   resourceContext: BundleV1["context"]["resource_failure"];
+  resourceObservations?: BundleV1["context"]["resource_observations"];
+  recoveryContext?: BundleV1["context"]["recovery"];
 }): Pick<BundleV1["summary"], "likely_cause" | "confidence" | "recommended_action"> {
   if (input.errorContext === null) {
     return {
@@ -280,10 +297,11 @@ function buildSummaryGuidance(input: {
 
   if (input.opaqueBrowserError) {
     if (input.browserEvent?.kind === "resource_error") {
+      const recoveryNote = formatPassiveRecoveryNote(input.recoveryContext);
       const recoveryFailure = input.resourceContext?.recovery_failures?.[0];
       if (recoveryFailure !== undefined) {
         return {
-          likely_cause: `The browser resource failure was followed by ${recoveryFailure.method} ${recoveryFailure.path} returning HTTP ${recoveryFailure.status_code}. This correlated recovery failure is the most actionable captured signal; it does not establish why the original resource load was interrupted.`,
+          likely_cause: `The browser resource failure was followed by ${recoveryFailure.method} ${recoveryFailure.path} returning HTTP ${recoveryFailure.status_code}. This correlated recovery failure is the most actionable captured signal; it does not establish why the original resource load was interrupted.${recoveryNote}`,
           confidence: 0.65,
           recommended_action: `Inspect the ${recoveryFailure.path} recovery route and its HTTP ${recoveryFailure.status_code} response, including any refresh, retry, or signed-URL handling, before investigating the generic resource error.`
         };
@@ -291,15 +309,74 @@ function buildSummaryGuidance(input: {
       if (input.resourceContext?.interruption !== undefined) {
         const interruption = input.resourceContext.interruption;
         return {
-          likely_cause: `The browser reported an opaque ${interruption.rel} failure while the page was ${interruption.visibility_state} and ${interruption.ready_state}. This is consistent with a browser-aborted speculative load, but the captured lifecycle state does not prove the cause.`,
+          likely_cause: `The browser reported an opaque ${interruption.rel} failure while the page was ${interruption.visibility_state} and ${interruption.ready_state}. This is consistent with a browser-aborted speculative load, but the captured lifecycle state does not prove the cause.${recoveryNote}`,
           confidence: 0.55,
           recommended_action:
             "Confirm whether the page was navigating or suspended, then review only lifecycle-scoped demotion if the asset succeeds during active page loads."
         };
       }
+      const observationItems = input.resourceObservations?.items ?? [];
+      const enforcedCspDirectives = Array.from(
+        new Set(
+          observationItems.flatMap(({ observation }) =>
+            observation.kind === "csp" && observation.disposition === "enforce"
+              ? [observation.effective_directive]
+              : []
+          )
+        )
+      ).sort();
+      if (enforcedCspDirectives.length > 0) {
+        const directiveLabel = enforcedCspDirectives.join(", ");
+        return {
+          likely_cause: `An enforced Content Security Policy observation (${directiveLabel}) was captured alongside this resource failure. Temporal association does not prove causation, and document HTTP status is separate from resource status.${recoveryNote}`,
+          confidence: 0.55,
+          recommended_action: `Review the enforced ${directiveLabel} Content Security Policy directive for the affected resource host and confirm whether the asset should be permitted.`
+        };
+      }
+      const observedFailureStatuses = Array.from(
+        new Set(
+          observationItems.flatMap(({ observation }) =>
+            observation.kind === "timing" &&
+            observation.availability === "observed" &&
+            observation.response_status !== null &&
+            observation.response_status >= 400
+              ? [observation.response_status]
+              : []
+          )
+        )
+      ).sort((left, right) => left - right);
+      if (observedFailureStatuses.length > 0) {
+        const statusLabel = observedFailureStatuses.map((code) => `HTTP ${code}`).join(", ");
+        return {
+          likely_cause: `Passive resource timing observed ${statusLabel} for a matching resource load around this failure. Association is passive and does not prove the root cause.${recoveryNote}`,
+          confidence: 0.55,
+          recommended_action: `Check server or CDN availability, permissions, and asset deployment for the affected resource returning ${statusLabel}.`
+        };
+      }
+      const reportOnlyCspDirectives = Array.from(
+        new Set(
+          observationItems.flatMap(({ observation }) =>
+            observation.kind === "csp" && observation.disposition === "report"
+              ? [observation.effective_directive]
+              : []
+          )
+        )
+      ).sort();
       const resource = describeBrowserResource(input.browserEvent);
+      if (reportOnlyCspDirectives.length > 0) {
+        const directiveLabel = reportOnlyCspDirectives.join(", ");
+        return {
+          likely_cause: `A report-only Content Security Policy observation (${directiveLabel}) was captured alongside this resource failure. Report-only policies do not block resource loads, so the cause and application impact remain unknown.${recoveryNote}`,
+          confidence: 0.35,
+          recommended_action:
+            "Check the affected resource and routes, browser network failures, CSP and provider availability." +
+            (resource?.optional_candidate === true
+              ? " If the dependency is optional for your app, review a resource-scoped noise rule."
+              : " Verify whether application functionality is affected.")
+        };
+      }
       return {
-        likely_cause: browserResourceDiagnosis(resource),
+        likely_cause: `${browserResourceDiagnosis(resource)}${recoveryNote}`,
         confidence: 0.35,
         recommended_action:
           "Check the affected resource and routes, browser network failures, CSP and provider availability." +
@@ -644,7 +721,13 @@ export function buildBundle(input: BuildBundleInput): BundleV1 {
     selectLatestEnvelope(sourceEnvelopes, (envelope) => envelope.event_type !== "probe_event")
       ?.service.framework ??
     null;
-  const customerVisible = frontendContext !== null;
+  const hiddenOrUnloadedOpaqueResourceError =
+    opaqueBrowserError &&
+    browserEvent?.kind === "resource_error" &&
+    (browserEvent.page?.visibility_state === "hidden" ||
+      browserEvent.page?.visibility_state === "prerender" ||
+      browserEvent.page?.visibility_state === "unloaded");
+  const customerVisible = frontendContext !== null && !hiddenOrUnloadedOpaqueResourceError;
   const firstApplicationFrame = opaqueBrowserError
     ? null
     : deriveFirstApplicationFrame(errorContext);
@@ -656,7 +739,11 @@ export function buildBundle(input: BuildBundleInput): BundleV1 {
     firstApplicationFrame,
     browserEvent,
     opaqueBrowserError,
-    resourceContext
+    resourceContext,
+    ...(diagnostics.resources === undefined
+      ? {}
+      : { resourceObservations: diagnostics.resources }),
+    ...(diagnostics.recovery === undefined ? {} : { recoveryContext: diagnostics.recovery })
   });
 
   const candidate = {

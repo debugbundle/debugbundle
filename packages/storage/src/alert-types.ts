@@ -96,6 +96,7 @@ export interface DemotedIncidentEventReference {
 
 export interface RecordIncidentEventRetentionInput {
   resource_route?: string;
+  retain_first?: boolean;
   incident_id: string;
   event_id: string;
   event_type: EventEnvelope["event_type"];

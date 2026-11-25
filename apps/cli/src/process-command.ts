@@ -599,7 +599,7 @@ export async function processCommand(
 
       const traceId = getTraceId(event);
       // A resource and an application exception may share a trace without sharing a failure.
-      if (traceId !== null && normalizedEvent.resource_type === undefined) {
+      if (traceId !== null && normalizedEvent.browser_event_kind !== "resource_error") {
         aggregate.traceIds.add(traceId);
         const traceKey = buildTraceCorrelationKey(projectId, event.service.environment, traceId);
         const traceCorrelationGroup = traceCorrelationGroups.get(traceKey) ?? {

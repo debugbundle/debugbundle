@@ -623,6 +623,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
         });
       }
     },
+    captureRuleV2WritesEnabled: input.captureRuleV2WritesEnabled ?? true,
     captureRuleManagement: createCaptureRuleManagement(rootDb, {
       ...(accountAnalyticsStore ? { accountAnalyticsStore } : {})
     }),

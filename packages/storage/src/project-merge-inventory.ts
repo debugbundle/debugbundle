@@ -60,6 +60,7 @@ export const PROJECT_MERGE_TABLE_DISPOSITIONS = {
     "alert_email_digests",
     "alert_email_digest_items",
     "capture_rules",
+    "capture_rule_threshold_events",
     "probe_activations",
     "github_dispatch_rules",
     "github_dispatch_deliveries",

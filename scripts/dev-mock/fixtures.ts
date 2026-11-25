@@ -173,11 +173,75 @@ export function createDevMockFixtures() {
     bundle_created_at: now,
     bundle_updated_at: now
   }));
-  const captureRules = repeat(base.captureRules, 8, "id", "rule").map((record, i) => ({
-    ...record,
-    name: `Demote analytics resource errors ${i + 1}`,
-    last_matched_at: now
-  }));
+  const captureRules: MockRecord[] = repeat(base.captureRules, 8, "id", "rule").map((record, i): MockRecord => {
+    if (i === 0) {
+      return {
+        ...record,
+        name: "Threshold transient /assets/ resource failures",
+        description: "Hold single-visitor hashed asset failures until 10 occur within 1 hour.",
+        action: "threshold",
+        threshold_count: 10,
+        threshold_window_seconds: 3600,
+        threshold_group_by: "resource",
+        matcher: {
+          event_types: ["frontend_exception"],
+          services: ["saycheese-frontend"],
+          environments: ["production"],
+          first_party: true,
+          browser_event_kind: "resource_error",
+          browser_event_opaque: true,
+          resource_url: { host: "app.example.test", path_prefix: "/assets/" }
+        },
+        hit_count: 27,
+        last_matched_at: now
+      };
+    }
+    if (i === 1) {
+      return {
+        ...record,
+        name: "Allow immediate capture for checkout assets",
+        description: "High-specificity carve-out overriding the broader /assets/ threshold rule.",
+        action: "allow",
+        matcher: {
+          event_types: ["frontend_exception"],
+          services: ["saycheese-frontend"],
+          environments: ["production"],
+          first_party: true,
+          browser_event_kind: "resource_error",
+          browser_event_opaque: true,
+          resource_url: { host: "app.example.test", path_prefix: "/assets/checkout-" }
+        },
+        hit_count: 3,
+        last_matched_at: now
+      };
+    }
+    if (i === 2) {
+      return {
+        ...record,
+        name: "Demote optional embed across primary & fallback CDNs",
+        description: "Confirmed optional dependency grouped across primary and fallback URLs.",
+        action: "demote",
+        matcher: {
+          event_types: ["frontend_exception"],
+          services: ["saycheese-frontend"],
+          environments: ["production"],
+          browser_event_kind: "resource_error",
+          browser_event_opaque: true,
+          resource_urls: [
+            { host: "cdn-primary.example.test", path_equals: "/embed.js" },
+            { host: "cdn-fallback.example.test", path_equals: "/embed.js" }
+          ]
+        },
+        hit_count: 41,
+        last_matched_at: now
+      };
+    }
+    return {
+      ...record,
+      name: `Demote analytics resource errors ${i + 1}`,
+      last_matched_at: now
+    };
+  });
   const githubRules = repeat(base.githubRules, 2, "rule_id", "ghr").map((record, i) => ({
     ...record,
     name: i ? "Production alerts" : "Default triage rule"

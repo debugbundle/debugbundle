@@ -301,4 +301,56 @@ describe("local trace correlation scope", () => {
       })
     );
   });
+
+  it("never merges an untyped browser resource_error with a backend exception sharing a trace id", async () => {
+    const rootDirectory = await createProcessFixtureRepository();
+    try {
+      const resourceEvent = createFrontendExceptionEvent({
+        eventId: "00000000-0000-4000-8000-000000000811",
+        occurredAt: "2026-03-20T00:00:00.000Z",
+        serviceName: "checkout-web",
+        traceId: "trace_resource_untyped_1"
+      });
+      resourceEvent.payload = {
+        ...resourceEvent.payload,
+        name: "ResourceLoadError",
+        message: "Failed to load resource",
+        browser_event: {
+          kind: "resource_error",
+          message: null,
+          file_name: null,
+          line_number: null,
+          column_number: null,
+          opaque: true,
+          target: {
+            tag_name: "[REDACTED]",
+            source_url: "https://cdn.example.com/widget.js"
+          },
+          page: {
+            url: "https://app.example.com/checkout",
+            referrer: null,
+            visibility_state: "visible",
+            ready_state: "complete"
+          }
+        }
+      };
+
+      await writeEventBatch(rootDirectory, "1700000000000-1-untyped-resource.events.json", [
+        resourceEvent,
+        createBackendExceptionEvent({
+          eventId: "00000000-0000-4000-8000-000000000812",
+          occurredAt: "2026-03-20T00:00:01.000Z",
+          serviceName: "checkout-api",
+          traceId: "trace_resource_untyped_1"
+        })
+      ]);
+
+      const result = await processCommand({ json: true }, { cwd: () => rootDirectory });
+      expect(result.exitCode).toBe(0);
+      const localState = await readLocalState({ cwd: () => rootDirectory });
+      expect(Object.values(localState.incidents)).toHaveLength(2);
+    } finally {
+      await rm(rootDirectory, { recursive: true, force: true });
+    }
+  });
 });

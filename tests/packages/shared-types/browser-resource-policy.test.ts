@@ -89,6 +89,7 @@ describe("resource noise policy", () => {
       suggestions(tracker, undefined, signIn).map((item) => item.rule.matcher.resource_url)
     ).toEqual([
       { host: "www.googletagmanager.com", path_equals: "/gtm.js" },
+      { host: "www.googletagmanager.com", path_equals: "/gtm.js" },
       { host: "www.googletagmanager.com", path_equals: "/gtm.js" }
     ]);
     const signInControls = suggestions(signIn, undefined, tracker);
@@ -161,18 +162,24 @@ describe("resource noise policy", () => {
   });
 
   it.each([
-    "https://accounts.google.com/gsi/client",
-    "https://app.example.com/assets/main.js",
-    "https://cdn.example.com/unknown.js",
-    "https://www.googletagmanager.com.evil.example/gtm.js"
+    ["https://accounts.google.com/gsi/client", ["resource_context", "resource_drop"]],
+    [
+      "https://app.example.com/assets/main.js",
+      ["resource_context", "resource_drop", "resource_threshold"]
+    ],
+    [
+      "https://cdn.example.com/unknown.js",
+      ["resource_context", "resource_drop", "resource_threshold"]
+    ],
+    [
+      "https://www.googletagmanager.com.evil.example/gtm.js",
+      ["resource_context", "resource_drop", "resource_threshold"]
+    ]
   ])(
     "offers explicit controls without declaring a functional or unknown resource harmless: %s",
-    (url) => {
+    (url, expectedIds) => {
       const result = suggestions(url);
-      expect(result.map((item) => item.suggestion_id)).toEqual([
-        "resource_context",
-        "resource_drop"
-      ]);
+      expect(result.map((item) => item.suggestion_id)).toEqual(expectedIds);
       expect(result.every((item) => item.requires_confirmation)).toBe(true);
       expect(result[0]?.rule.matcher).toMatchObject({
         services: ["web"],
@@ -371,7 +378,8 @@ describe("resource noise policy", () => {
     expect(result.map((item) => item.suggestion_id)).toEqual([
       "hidden_preload_demote",
       "resource_context",
-      "resource_drop"
+      "resource_drop",
+      "resource_threshold"
     ]);
     expect(result[0]).toMatchObject({
       suggestion_id: "hidden_preload_demote",
@@ -398,11 +406,11 @@ describe("resource noise policy", () => {
   });
 
   it.each([
-    ["https://accounts.google.com/gsi/client", "https://accounts.google.com/login"],
-    ["https://app.example.com/api/session", "https://app.example.com/gallery"]
+    ["https://accounts.google.com/gsi/client", "https://accounts.google.com/login", ["resource_context", "resource_drop"]],
+    ["https://app.example.com/api/session", "https://app.example.com/gallery", ["resource_context", "resource_drop", "resource_threshold"]]
   ])(
     "does not infer a safe asset suppression rule for a hidden non-asset preload: %s",
-    (url, page) => {
+    (url, page, expectedIds) => {
       const event = browserResourceEvent({
         url,
         page,
@@ -425,10 +433,7 @@ describe("resource noise policy", () => {
           matched_fields: []
         }
       });
-      expect(result.map((item) => item.suggestion_id)).toEqual([
-        "resource_context",
-        "resource_drop"
-      ]);
+      expect(result.map((item) => item.suggestion_id)).toEqual(expectedIds);
       expect(result.every((item) => item.requires_confirmation)).toBe(true);
       expect(result[0]?.rule.matcher.resource_url).toEqual({
         host: new URL(url).hostname,
@@ -436,4 +441,45 @@ describe("resource noise policy", () => {
       });
     }
   );
+
+  it("offers scoped URL controls and threshold when legacy SDK redacted tag_name", () => {
+    const event = browserResourceEvent({
+      url: "https://cdn.openai.com/chat-widget.js",
+      tag: "[REDACTED]"
+    });
+    const result = buildBrowserResourceSuggestions({
+      browserEvent: event.payload.browser_event,
+      service: "web",
+      environment: "production",
+      incident: {
+        incident_id: "incident",
+        project_id: "project",
+        fingerprint: "hash",
+        fingerprint_version: "v2",
+        title: "Resource failed",
+        occurrence_count: 10,
+        matched_fields: []
+      }
+    });
+    expect(result.map((item) => item.suggestion_id)).toEqual([
+      "resource_context",
+      "resource_drop",
+      "resource_threshold"
+    ]);
+    expect(result[0]?.rule.matcher).toEqual({
+      event_types: ["frontend_exception"],
+      browser_event_kind: "resource_error",
+      browser_event_opaque: true,
+      services: ["web"],
+      environments: ["production"],
+      resource_url: { host: "cdn.openai.com", path_equals: "/chat-widget.js" }
+    });
+    expect(result[0]?.reason).toContain("redacted by an older SDK");
+    expect(result[2]?.rule).toMatchObject({
+      action: "threshold",
+      threshold_count: 10,
+      threshold_window_seconds: 3600,
+      threshold_group_by: "resource"
+    });
+  });
 });

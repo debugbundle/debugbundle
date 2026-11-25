@@ -27,31 +27,32 @@
 - `debugbundle capture-rule suggest <incident-id> [--auth-file <path>] [--json]`
 - `debugbundle capture-rule create-from-suggestion <incident-id> --suggestion-id <id> [--name <name>] [--expires-at <ISO8601>] [--auth-file <path>] [--json]`
 - `debugbundle capture-rule list --project-id <id> [--auth-file <path>] [--json]`
-- `debugbundle capture-rule create --project-id <id> --name <name> --action <demote|sample|drop> --matcher-json <json> [--auth-file <path>] [--json]`
+- `debugbundle capture-rule create --project-id <id> --name <name> --action <demote|sample|drop|threshold|allow> --matcher-json <json> [--threshold-count <2-1000>] [--threshold-window-seconds <60-86400>] [--threshold-group-by <resource|fingerprint>] [--expires-at <ISO8601>] [--auth-file <path>] [--json]`
+- `debugbundle capture-rule update <rule-id> --project-id <id> [--name <name>] [--action <demote|sample|drop|threshold|allow>] [--matcher-json <json>] [--threshold-count <2-1000>] [--threshold-window-seconds <60-86400>] [--threshold-group-by <resource|fingerprint>] [--enabled <true|false>] [--expires-at <ISO8601|null>] [--auth-file <path>] [--json]`
 - `debugbundle capture-policy get [--project <id>] [--json]`
 - `debugbundle capture-policy set [--project <id>] --client-error-path-rule <404=/path/*@GET,POST> [--json]`
 
-Use capture-rule suggestions for repeated operational noise after inspecting an incident bundle. Use capture-policy client-error path rules for route-scoped 4xx incidents instead of promoting all client errors.
+Use capture-rule suggestions for repeated operational noise after inspecting an incident bundle. Prefer `threshold` (`resource_threshold` suggestion) for single-visitor transient resource failures and deploy-hashed assets, pair broader prefix rules with higher-specificity `allow` carve-outs for critical paths, and use `matcher.resource_urls` (1–10 exact `{ host, path_equals }` entries) for multi-CDN optional dependencies. Use capture-policy client-error path rules for route-scoped 4xx incidents instead of promoting all client errors.
 For browser resource failures, follow the skill's Browser resource failures guidance. Use the current response's suggestion ID, inspect `bundle_status`, `access_mode` and existing-rule state, and review the complete matcher before applying.
 
 ## Probes
 
-- `debugbundle probe activate <project-id> --label-pattern <pattern> [--service <name>] [--environment <name>] [--ttl-seconds <n>] [--trigger-ttl-seconds <n>] [--auth-file <path>] [--json]`
+- `debugbundle probe activate <project-id> --label-pattern <pattern> [--service <name>] [--environment <name>] [--ttl-seconds <n>] [--trigger-ttl-seconds <n>] [--sdk-project-id <issuer-id>] [--sdk-token-id <token-id>] [--sdk-service <deployed-name>] [--auth-file <path>] [--json]`
 - `debugbundle probe list <project-id> [--auth-file <path>] [--json]`
 - `debugbundle probe deactivate <project-id> <activation-id> [--auth-file <path>] [--json]`
 
-Use probes for targeted evidence gathering when bundle context is insufficient. Prefer narrow label patterns, scoped service/environment values, and explicit TTLs.
+Use probes for future observations from labels and bounded data already instrumented and deployed in the application. Prefer narrow patterns, service/environment scope, and explicit TTLs. Empty data proves no matching retained observation, not delivery to every SDK or label execution.
 
 ## Notifications
 
-- `debugbundle alert list --project-id <id> [--limit <n>] [--auth-file <path>] [--json]`
+- `debugbundle alert list --project-id <id> [--limit <n>] [--include-scope <true|false>] [--auth-file <path>] [--json]`
 - `debugbundle alert groups --project-id <id> [--limit <n>] [--cursor <cursor>] [--auth-file <path>] [--json]` lists safe alert delivery and email digest groups; `debugbundle alert group <direct|email_digest> <group-id> --project-id <id> [--cursor <cursor>] --json` pages their incident IDs.
 - `debugbundle alert create --project-id <id> --channel <channel> --condition <condition> [--service-id <id>] [--severity-min <level>] [--cooldown <seconds>] --config-json <json> [--is-enabled <true|false>] [--auth-file <path>] [--json]`
-- `debugbundle alert update <alert-id> --project-id <id> [--service-id <id|null>] [--channel <channel>] [--condition <condition>] [--severity-min <level|null>] [--cooldown <seconds>] [--config-json <json|null>] [--is-enabled <true|false>] [--auth-file <path>] [--json]`
+- `debugbundle alert update <alert-id> --project-id <id> [--service-id <id|null>] [--channel <channel>] [--condition <condition>] [--severity-min <level|null>] [--cooldown <seconds>] [--config-json <json|null>] [--is-enabled <true|false>] [--project-scope current_project] [--auth-file <path>] [--json]`
 - `debugbundle alert delete <alert-id> --project-id <id> [--auth-file <path>] [--json]`
 - `debugbundle webhook list --project-id <id> [--limit <n>] [--auth-file <path>] [--json]`
 - `debugbundle webhook create --project-id <id> --url <url> --event <event[,event]> [--environment <env[,env]>] [--service <svc[,svc]>] [--severity-min <level>] [--bundle-type <type[,type]>] [--verification <true|false>] [--is-enabled <true|false>] [--auth-file <path>] [--json]`
-- `debugbundle webhook update <webhook-id> --project-id <id> [--url <url>] [--event <event[,event]>] [--environment <env[,env]>] [--service <svc[,svc]>] [--severity-min <level>] [--bundle-type <type[,type]>] [--verification <true|false>] [--is-enabled <true|false>] [--auth-file <path>] [--json]`
+- `debugbundle webhook update <webhook-id> --project-id <id> [--url <url>] [--event <event[,event]>] [--environment <env[,env]>] [--service <svc[,svc]>] [--severity-min <level>] [--bundle-type <type[,type]>] [--verification <true|false>] [--is-enabled <true|false>] [--project-scope current_project] [--auth-file <path>] [--json]`
 - `debugbundle webhook delete <webhook-id> --project-id <id> [--auth-file <path>] [--json]`
 - `debugbundle webhook test <webhook-id> --project-id <id> [--event <verification.passed|verification.failed>] [--auth-file <path>] [--json]`
 - `debugbundle webhook deliveries <webhook-id> --project-id <id> [--limit <n>] [--auth-file <path>] [--json]`
@@ -61,7 +62,7 @@ Use alert commands for notification routing and webhook commands for signed even
 
 ## Product Analytics
 
-Use member-authenticated analytics commands for connected projects. Start with direct metrics and generate an analytics bundle only when a bounded analysis question needs a durable artifact.
+Use access-token-authenticated analytics commands for connected projects. Start with direct metrics and generate an analytics bundle only when a bounded analysis question needs a durable artifact.
 
 - `debugbundle analytics summary --project <id> --last 7d [--json]`
 - `debugbundle analytics routes --project <id> --last 30d [--json]`

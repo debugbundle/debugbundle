@@ -1,3 +1,40 @@
+Local work (unreleased, 2026-11-24/25): `shared-types/capture-rule-schemas.ts`,
+`capture-rule-evaluation-context.ts`, `capture-rule-evaluation.ts`,
+`browser-resource-suggestions.ts`, and `capture-rule-suggestion-matching.ts`
+implement `threshold`, `allow`, `resource_urls`, server-only evaluation guards,
+and `resource_threshold` / redacted-tag suggestions.
+`api/routes/capture-rules.ts` applies `CAPTURE_RULE_V2_WRITES_ENABLED` to new rule
+writes and suggestions during hosted activation. The Cloud rollout guard checks
+compatible API and worker images on both sides of the rollback pair.
+`storage/capture-rule-threshold-schema.ts` owns forward migration
+`202611240001_add_capture_rule_thresholds` and fail-closed readiness checks;
+`storage/capture-rule-threshold-store.ts`, `metadata-grouping.ts` (`created_now`
+and `prior_events` backfill), `retention-store.ts`, and
+`project-merge-inventory.ts` own transactional threshold storage, cleanup, and
+origin retention. `worker/processor-normalize.ts`, `processor-group.ts`, and
+`durable-incident-processing.ts` enforce the rolling-window gate and redacted-tag
+`v3` grouping; `cli/process-command.ts` guards trace merging by
+`browser_event_kind !== "resource_error"`. `apps/web/src/lib/{capture-rules-api,capture-rule-copy}.ts`
+and `apps/web/src/components/system/{capture-rule-form-helpers,capture-rule-create-form,project-capture-rules-card,incident-capture-rule-suggestions-dialog}`
+provide dashboard parity for `threshold`, `allow`, `resource_urls`, and
+`resource_threshold` suggestions. `sdk-browser/src/{index,runtime,native-error-hooks}.ts`
+tracks bfcache-safe `pagehide`/`pageshow` teardown state; `packages/bundle-engine/src/index.ts`
+and `apps/web/src/components/system/browser-resource-details.tsx` (`incident-detail-page.tsx`)
+connect passive CSP/timing, explicit recovery, and honest hidden/unloaded
+`customer_visible: false` signals. `sdk-php/src/Framework/HttpRateLimitContext.php`,
+`DebugBundleSdk.php`, `Laravel/DebugBundleMiddleware.php`, and
+`Symfony/DebugBundleEventSubscriber.php` capture post-routing `route_template`,
+allowlisted rate-limit `response_headers`, and unambiguous static Laravel
+`rate_limiter` labels. `packages/redaction` adds `exactKeys`, and all 13 SDK
+capture surfaces (`sdk-browser`, `sdk-node`, `sdk-php` + WordPress ZIP,
+`debugbundle-python/event_privacy.py`, `debugbundle-go/internal/evidence/protocol_privacy*.go`,
+`debugbundle-rust/src/wire/`, `debugbundle-ruby/lib/debugbundle/{event_privacy,browser_event_privacy}.rb`,
+`debugbundle-java/.../ProtocolPrivacyBoundary.java`, `debugbundle-dotnet/.../TelemetryPrivacy.Protocol*.cs`,
+`debugbundle-android/.../DebugBundleEventPrivacy.kt`, `debugbundle-swift/.../DebugBundleEventPrivacy.swift`,
+and `debugbundle-react-native/src/event-privacy.ts` + iOS/Android native bridges)
+implement exact-key redaction and `SEC-23a` protocol preservation verified
+locally against synced `privacy-conformance.json` `exact_key_cases`.
+
 Core 1.30.1 uses `components/ui/tabs.tsx` TabsScrollArea for horizontal
 navigation without vertical scrollbars. Site 1.11.3 clips homepage artwork at
 the page shell and loads the existing canvas engine through a near-viewport

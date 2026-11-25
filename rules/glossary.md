@@ -108,6 +108,14 @@ time under `telemetry-privacy-v1`. Certified responses carry the matching respon
 consumers such as `debugbundle/action@v2` can reject legacy or unknown server output before writing
 an artifact.
 
+### Exact-Key Redaction
+
+Optional additive SDK configuration (`redactExactFields` / language-idiomatic equivalent) that
+redacts matching field names, query parameters, and text assignments by exact ASCII
+case-insensitive key equality with punctuation significant (for example masking `tag` and `TAG`
+without masking `tag_name`, `tagName`, or `tag-name`). It never weakens mandatory credential
+protection and shares the bounded 128-key / 64-character custom limit with broad `redactFields`.
+
 ## Bundle Evidence Terms
 
 ### Structured Exception Evidence
@@ -196,6 +204,15 @@ actionable but does not prove the cause of the original resource failure.
 ### Optional Tracker Candidate
 
 A recognized analytics, advertising or tag-manager script eligible for an operator-reviewed resource noise suggestion. Recognition neither proves the dependency is optional for that application nor automatically lowers severity or suppresses capture. Authentication and application assets are excluded from these suggestions.
+
+### Threshold Capture Rule
+
+A project capture rule (`action: "threshold"`) that holds matching incident signals inside a
+transactional rolling window (`threshold_count` occurrences within `threshold_window_seconds`,
+grouped by `resource` or `fingerprint`) before opening or reopening an incident. Below threshold,
+events persist as `threshold_pending` without alert, webhook, or GitHub dispatch; once the
+threshold is crossed, prior-window occurrences and normalized routes backfill into the opened
+incident. Higher-specificity `action: "allow"` carve-outs bypass broader threshold or demote rules.
 
 ## Hosted Health-Check Terms
 

@@ -46,7 +46,7 @@ it.each([false, true])(
         return failed
           ? jsonResponse(503, { error: "unavailable" })
           : jsonResponse(200, { success: true });
-      return url.endsWith("/capture-rules")
+      return url.endsWith("/capture-rules?rule_schema=2")
         ? jsonResponse(200, { access_mode: "manage", rules: [rule] })
         : jsonResponse(200, { services: [] });
     });
@@ -85,7 +85,7 @@ function mock() {
         saved = parseRequestBody(init.body);
         return jsonResponse(200, { rule: { ...rule, ...saved } });
       }
-      if (url.endsWith("/capture-rules"))
+      if (url.endsWith("/capture-rules?rule_schema=2"))
         return jsonResponse(200, { access_mode: "manage", rules: [rule] });
       return jsonResponse(200, { services: [] });
     })
@@ -157,7 +157,7 @@ it("discards an old project's pending capture-rule edit after the context change
         return new Promise<Response>((resolve) => {
           finish = resolve;
         });
-      if (url.endsWith("/capture-rules"))
+      if (url.endsWith("/capture-rules?rule_schema=2"))
         return jsonResponse(200, {
           access_mode: "manage",
           rules: [
@@ -194,4 +194,102 @@ it("discards an old project's pending capture-rule edit after the context change
   );
   expect(screen.queryByText("Delayed old project rule")).not.toBeInTheDocument();
   expect(screen.getByText("Other project rule")).toBeInTheDocument();
+});
+
+it("displays threshold, allow, and multi-URL rules and saves edited threshold settings", async () => {
+  const thresholdRule = {
+    ...rule,
+    id: "rule_threshold",
+    name: "Optional widget threshold",
+    enabled: true,
+    action: "threshold" as const,
+    matcher: {
+      event_types: ["frontend_exception" as const],
+      browser_event_kind: "resource_error" as const,
+      services: ["web"],
+      environments: ["production"],
+      resource_urls: [
+        { host: "cdn.example.com", path_equals: "/widget.js" },
+        { host: "fallback.example.com", path_equals: "/widget.js" }
+      ]
+    },
+    sample_rate: null,
+    sample_event_class: null,
+    threshold_count: 10,
+    threshold_window_seconds: 3600,
+    threshold_group_by: "resource" as const,
+    expires_at: null
+  };
+  const allowRule = {
+    ...rule,
+    id: "rule_allow",
+    name: "Checkout carve-out",
+    enabled: true,
+    action: "allow" as const,
+    matcher: {
+      event_types: ["frontend_exception" as const],
+      browser_event_kind: "resource_error" as const,
+      resource_url: { host: "app.example.com", path_prefix: "/assets/checkout-" }
+    },
+    sample_rate: null,
+    sample_event_class: null,
+    threshold_count: null,
+    threshold_window_seconds: null,
+    threshold_group_by: null,
+    expires_at: null
+  };
+
+  let saved: Record<string, unknown> | undefined;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+      if (url.endsWith("/capture-rules/rule_threshold") && init?.method === "PATCH") {
+        saved = parseRequestBody(init.body);
+        return jsonResponse(200, { rule: { ...thresholdRule, ...saved } });
+      }
+      if (url.endsWith("/capture-rules?rule_schema=2")) {
+        return jsonResponse(200, {
+          access_mode: "manage",
+          rules: [thresholdRule, allowRule]
+        });
+      }
+      return jsonResponse(200, { services: [] });
+    })
+  );
+
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <TooltipProvider>
+        <ProjectCaptureRulesCard projectId="proj_123" environmentDefault="production" canEdit />
+      </TooltipProvider>
+    </MemoryRouter>
+  );
+
+  await user.click(screen.getByRole("button", { name: /^capture rules$/i }));
+  expect(await screen.findByText("10× / 1h · resource")).toBeInTheDocument();
+  expect(screen.getByText("Allow")).toBeInTheDocument();
+  expect(
+    screen.getByText(
+      /resources \(2\): cdn\.example\.com\/widget\.js, fallback\.example\.com\/widget\.js/
+    )
+  ).toBeInTheDocument();
+
+  const editButtons = screen.getAllByRole("button", { name: /^edit$/i });
+  await user.click(editButtons[1]!);
+  const countInput = screen.getByLabelText(/^occurrences before opening$/i);
+  expect(countInput).toHaveValue(10);
+  await user.clear(countInput);
+  await user.type(countInput, "25");
+  await user.click(screen.getByRole("button", { name: /^save capture rule$/i }));
+
+  await waitFor(() =>
+    expect(saved).toMatchObject({
+      action: "threshold",
+      threshold_count: 25,
+      threshold_window_seconds: 3600,
+      threshold_group_by: "resource"
+    })
+  );
 });

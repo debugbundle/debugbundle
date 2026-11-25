@@ -2,6 +2,7 @@ import {
   AvailabilityCheckCreateBodySchema,
   AvailabilityCheckTestBodySchema,
   AvailabilityCheckUpdateBodySchema,
+  CaptureRuleSchemaQuery,
   IncidentParamsSchema,
   ProjectCaptureRuleParamsSchema,
   ProjectParamsSchema,
@@ -241,6 +242,7 @@ export function configurationOperations(): OperationSpec[] {
       tags: ["Capture Rules"],
       security: anyMemberAuth,
       params: IncidentParamsSchema,
+      query: CaptureRuleSchemaQuery,
       responses: {
         "200": { description: "Capture rule suggestions.", schema: captureRuleSuggestionsResponse },
         "400": { description: "Invalid incident id.", schema: apiError },
@@ -257,6 +259,7 @@ export function configurationOperations(): OperationSpec[] {
       tags: ["Capture Rules"],
       security: anyMemberAuth,
       params: IncidentParamsSchema,
+      query: CaptureRuleSchemaQuery,
       requestBody: createCaptureRuleFromSuggestion,
       responses: {
         "201": { description: "Capture rule created.", schema: captureRuleResponse },
@@ -269,9 +272,10 @@ export function configurationOperations(): OperationSpec[] {
         },
         "404": { description: "Incident, suggestion, or project was not found.", schema: apiError },
         "409": {
-          description: "Suggestion generation is unavailable until a bundle is ready.",
+          description: "A ready bundle or a compatible capture rule schema is required.",
           schema: apiError
-        }
+        },
+        "503": { description: "Writes for new capture rule types are paused.", schema: apiError }
       }
     },
 
@@ -283,6 +287,7 @@ export function configurationOperations(): OperationSpec[] {
       tags: ["Capture Rules"],
       security: anyMemberAuth,
       params: ProjectParamsSchema,
+      query: CaptureRuleSchemaQuery,
       responses: {
         "200": { description: "Project capture rules.", schema: captureRulesResponse },
         "400": { description: "Invalid project id.", schema: apiError },
@@ -308,7 +313,8 @@ export function configurationOperations(): OperationSpec[] {
         "404": {
           description: "Project was not found or capture rules are unavailable.",
           schema: apiError
-        }
+        },
+        "503": { description: "Writes for new capture rule types are paused.", schema: apiError }
       }
     },
 
@@ -329,7 +335,8 @@ export function configurationOperations(): OperationSpec[] {
         "404": {
           description: "Capture rule was not found or capture rules are unavailable.",
           schema: apiError
-        }
+        },
+        "503": { description: "Writes for new capture rule types are paused.", schema: apiError }
       }
     },
 

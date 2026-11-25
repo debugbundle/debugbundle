@@ -1,3 +1,7 @@
+# 25 November privacy policy update
+
+The public privacy policy discloses saved report summaries, structured facts and saved narrative. The copy states that OpenAI needs separate reports access and a linked account with access to every project in the report. Site commit `9fb3271c` passed local checks, GitHub CI, hosted deployment and public readback after CloudFront invalidation. [Release receipt](spec/browser-resource-release-20261125.md#release-receipts)
+
 # Core 1.31.0 and site 1.12.0 release
 
 The [release contract](spec/release-1.31.0.md) covers creator analytics, short-link

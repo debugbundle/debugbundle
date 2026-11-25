@@ -1,4 +1,5 @@
 import { pruneOfferTransientState } from "./offer-transient-retention.js";
+import { createPostgresCaptureRuleThresholdStore } from "./capture-rule-threshold-store.js";
 import { createReportHealthStore } from "./report-health-store.js";
 import { createReportLifecycleStore } from "./report-lifecycle-store.js";
 import { createReportSourceTextStore } from "./report-source-text-store.js";
@@ -110,8 +111,11 @@ export function createPostgresRetentionStore(db: Queryable): RetentionStore {
   const reportFacts = createReportLifecycleStore(db);
   const reportText = createReportSourceTextStore(db);
   const reportAvailability = createReportAvailabilityStore(db);
+  const captureRuleThreshold = createPostgresCaptureRuleThresholdStore(db);
   return {
     ...createEvidenceContextRetentionStore(db),
+    pruneExpiredCaptureRuleThresholdEvents: (input) =>
+      captureRuleThreshold.pruneExpiredCaptureRuleThresholdEvents(input),
     pruneOfferTransientState: (input) => pruneOfferTransientState(db, input),
     pruneExpiredReportLifecycleFacts: (input) => reportFacts.prune(input),
     pruneExpiredReportSourceText: (input) => reportText.prune(input),
@@ -553,6 +557,7 @@ export function createRetentionCleanupService(input: {
     async runCleanup(job): Promise<RetentionCleanupResult> {
       let reportFactsHaveMore = false;
       for (const method of [
+        "pruneExpiredCaptureRuleThresholdEvents",
         "pruneExpiredReportLifecycleFacts",
         "pruneExpiredReportAvailability",
         "pruneExpiredReportSourceText",

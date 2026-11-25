@@ -253,5 +253,136 @@
         "safe": 1
       }
     }
+  ],
+  "exact_key_cases": [
+    {
+      "id": "exact_key_preserves_compound_siblings",
+      "exact_keys": ["tag"],
+      "input": {
+        "tag": "SYNTHETIC_SECRET",
+        "TAG": "SYNTHETIC_SECRET_UPPER",
+        "payout": {
+          "tag": "SYNTHETIC_NESTED",
+          "tag_name": "script"
+        },
+        "tag_name": "script",
+        "tagName": "link",
+        "tag-name": "img",
+        "payout_tag": "keep-compound"
+      },
+      "expected": {
+        "tag": "[REDACTED]",
+        "TAG": "[REDACTED]",
+        "payout": {
+          "tag": "[REDACTED]",
+          "tag_name": "script"
+        },
+        "tag_name": "script",
+        "tagName": "link",
+        "tag-name": "img",
+        "payout_tag": "keep-compound"
+      }
+    },
+    {
+      "id": "exact_key_url_query",
+      "exact_keys": ["tag"],
+      "input": {
+        "url": "https://example.test/api?tag=SYNTHETIC_SECRET&tag_name=script&tag-name=img"
+      },
+      "expected": {
+        "url": "https://example.test/api?tag=%5BREDACTED%5D&tag_name=script&tag-name=img"
+      }
+    },
+    {
+      "id": "exact_key_text_assignments",
+      "exact_keys": ["tag"],
+      "input": {
+        "message": "tag=SYNTHETIC_SECRET tag_name=script tag-name=img tagName=link"
+      },
+      "expected": {
+        "message": "tag=[REDACTED] tag_name=script tag-name=img tagName=link"
+      }
+    },
+    {
+      "id": "exact_key_json_string",
+      "exact_keys": ["tag"],
+      "input": {
+        "body": "{\"tag\":\"SYNTHETIC_SECRET\",\"tag_name\":\"script\"}"
+      },
+      "expected": {
+        "body": "{\"tag\":\"[REDACTED]\",\"tag_name\":\"script\"}"
+      }
+    },
+    {
+      "id": "exact_key_hyphenated_punctuation_significant",
+      "exact_keys": ["x-tag"],
+      "input": {
+        "x-tag": "SYNTHETIC_SECRET",
+        "X-TAG": "SYNTHETIC_SECRET_UPPER",
+        "x_tag": "preserve-underscore",
+        "my-x-tag": "preserve-prefixed",
+        "x-tag-name": "preserve-suffixed",
+        "message": "x-tag=SYNTHETIC_SECRET my-x-tag=keep x_tag=keep x-tag-name=keep"
+      },
+      "expected": {
+        "x-tag": "[REDACTED]",
+        "X-TAG": "[REDACTED]",
+        "x_tag": "preserve-underscore",
+        "my-x-tag": "preserve-prefixed",
+        "x-tag-name": "preserve-suffixed",
+        "message": "x-tag=[REDACTED] my-x-tag=keep x_tag=keep x-tag-name=keep"
+      }
+    },
+    {
+      "id": "exact_key_overlapping_with_broad",
+      "additional_keys": ["reference"],
+      "exact_keys": ["tag"],
+      "input": {
+        "tag": "SYNTHETIC_SECRET",
+        "tag_name": "script",
+        "payout_reference": "SYNTHETIC_REF",
+        "safe": "ok"
+      },
+      "expected": {
+        "tag": "[REDACTED]",
+        "tag_name": "script",
+        "payout_reference": "[REDACTED]",
+        "safe": "ok"
+      }
+    },
+    {
+      "id": "exact_key_cannot_downgrade_mandatory_secrets",
+      "exact_keys": ["token"],
+      "input": {
+        "token": "SYNTHETIC_SECRET",
+        "user_token": "SYNTHETIC_USER_TOKEN",
+        "accessToken": "SYNTHETIC_ACCESS",
+        "tag_name": "script"
+      },
+      "expected": {
+        "token": "[REDACTED]",
+        "user_token": "[REDACTED]",
+        "accessToken": "[REDACTED]",
+        "tag_name": "script"
+      }
+    },
+    {
+      "id": "exact_key_reason_and_reference",
+      "exact_keys": ["reason", "reference"],
+      "input": {
+        "reason": "SYNTHETIC_REASON",
+        "reference": "SYNTHETIC_REF",
+        "rejection_reason": "preserve-sibling",
+        "evidence_reference": "preserve-sibling",
+        "unavailable_reason": "preserve-sibling"
+      },
+      "expected": {
+        "reason": "[REDACTED]",
+        "reference": "[REDACTED]",
+        "rejection_reason": "preserve-sibling",
+        "evidence_reference": "preserve-sibling",
+        "unavailable_reason": "preserve-sibling"
+      }
+    }
   ]
 }

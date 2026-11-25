@@ -230,6 +230,61 @@ runIntegration("retention cleanup integration", () => {
       expect(incidentResult.rows).toHaveLength(1);
     }
   });
+
+  it("prunes expired capture_rule_threshold_events while preserving active window rows", async (): Promise<void> => {
+    await resetRetentionTables(pool);
+
+    const organizationId = randomUUID();
+    const projectId = randomUUID();
+    const ruleId = randomUUID();
+    const expiredEventId = randomUUID();
+    const activeEventId = randomUUID();
+    await seedOwnedProject({
+      pool,
+      organizationId,
+      projectId,
+      organizationName: "Threshold retention org",
+      organizationSlug: `threshold-ret-${organizationId.slice(0, 8)}`,
+      projectName: "Threshold retention project",
+      projectSlug: `threshold-ret-${projectId.slice(0, 8)}`
+    });
+    await pool.query(
+      `INSERT INTO capture_rules (
+        id, project_id, name, enabled, action, matcher,
+        threshold_count, threshold_window_seconds, threshold_group_by
+      ) VALUES (
+        $1, $2, 'Threshold assets', true, 'threshold',
+        '{"event_types":["frontend_exception"],"browser_event_kind":"resource_error","resource_url":{"host":"app.example.com","path_prefix":"/assets/"}}'::jsonb,
+        10, 3600, 'resource'
+      )`,
+      [ruleId, projectId]
+    );
+    await pool.query(
+      `INSERT INTO capture_rule_threshold_events (
+        event_id, project_id, rule_id, service_name, environment,
+        bucket_key, resource_route, occurred_at, received_at, expires_at
+      ) VALUES
+        ($1, $2, $3, 'web', 'production', '["resource","app.example.com","/assets/a.js"]', '/home',
+          '2026-04-04T10:00:00.000Z', '2026-04-04T10:00:00.000Z', '2026-04-04T11:00:00.000Z'),
+        ($4, $2, $3, 'web', 'production', '["resource","app.example.com","/assets/a.js"]', '/checkout',
+          '2026-04-04T11:30:00.000Z', '2026-04-04T11:30:00.000Z', '2026-04-04T12:30:00.000Z')`,
+      [expiredEventId, projectId, ruleId, activeEventId]
+    );
+
+    const retentionCleanup = createRetentionCleanupService({
+      retentionStore: createPostgresRetentionStore(createQueryable(pool)),
+      objectStore: createTestObjectStore(),
+      batchSize: 20,
+      maxBatches: 2
+    });
+    await retentionCleanup.runCleanup({ scheduled_at: "2026-04-04T12:00:00.000Z" });
+
+    const remaining = await pool.query<{ event_id: string }>(
+      "SELECT event_id::text AS event_id FROM capture_rule_threshold_events WHERE project_id = $1",
+      [projectId]
+    );
+    expect(remaining.rows).toEqual([{ event_id: activeEventId }]);
+  });
 });
 
 function daysBefore(referenceIso: string, days: number): string {

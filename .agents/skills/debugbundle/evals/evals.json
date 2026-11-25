@@ -73,6 +73,15 @@
       ]
     },
     {
+      "name": "transient_hashed_asset_threshold_review",
+      "prompt": "Single-visitor deploy-hashed CSS/JS failures under /assets/ keep opening one-off incidents, while checkout assets under /assets/checkout- must stay immediate. A separate resource incident has a redacted tag_name because the app put tag in redactFields. Explain how to handle both safely.",
+      "expected_behavior": [
+        "Inspect bundle evidence first, including passive CSP disposition, resource timing status, recovery observations, and unloaded teardown state.",
+        "Recommend a scoped threshold rule (or resource_threshold suggestion) for transient /assets/ failures instead of broad demote/drop or whole-host suppression, paired with a higher-specificity allow carve-out for /assets/checkout-.",
+        "Recommend moving narrow private domain keys such as tag to exact-key redactExactFields alongside a protected SDK release so protocol fields like tag_name stay intact."
+      ]
+    },
+    {
       "name": "protected_resource_noise_review",
       "prompt": "A checkout TypeError has related GTM evidence. Separate incidents show Google sign-in and an unknown script failing. The user asks whether ignoring all Google or third-party hosts would clean this up.",
       "expected_behavior": [
@@ -114,7 +123,7 @@
       "expected_behavior": [
         "Start with direct aggregate usage and funnel reads, then inspect bounded journey evidence only when needed.",
         "Do not generate one analytics bundle per visit; generate a durable artifact only for a bounded analysis question.",
-        "Use member authentication for analytics reads and require explicit intent for settings, saved-funnel, or bundle-generation mutations.",
+        "Use access-token authentication for analytics reads and require explicit intent for settings, saved-funnel, or bundle-generation mutations.",
         "Preserve consent, redaction, and custom-dimension privacy constraints."
       ]
     },

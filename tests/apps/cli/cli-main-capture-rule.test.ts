@@ -201,6 +201,9 @@ describe("cli main capture-rule routing", () => {
         },
         sample_rate: null,
         sample_event_class: null,
+        threshold_count: null,
+        threshold_window_seconds: null,
+        threshold_group_by: null,
         created_by_user_id: null,
         created_from_incident_id: null,
         created_from_event_id: null,
@@ -260,5 +263,61 @@ describe("cli main capture-rule routing", () => {
     expect(missingMatcher.output).toContain("Missing required option --matcher-json.");
     expect(emptyUpdate.output).toContain("At least one capture rule field must be provided.");
     expect(invalidSampleRate.output).toContain("Invalid value for --sample-rate.");
+  });
+
+  it("parses threshold and allow flags for capture-rule create and update", async () => {
+    const createCaptureRuleCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "created" });
+    const updateCaptureRuleCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "updated" });
+
+    const created = await runCli(
+      [
+        "capture-rule",
+        "create",
+        "--project-id",
+        "proj_123",
+        "--name",
+        "Threshold hashed assets",
+        "--action",
+        "threshold",
+        "--threshold-count",
+        "10",
+        "--threshold-window-seconds",
+        "3600",
+        "--threshold-group-by",
+        "resource",
+        "--matcher-json",
+        '{"event_types":["frontend_exception"],"browser_event_kind":"resource_error","resource_url":{"host":"app.example.com","path_prefix":"/assets/"}}'
+      ],
+      { createCaptureRuleCommand }
+    );
+    expect(created.exitCode).toBe(0);
+    expect(createCaptureRuleCommand).toHaveBeenCalledWith({
+      projectId: "proj_123",
+      create: expect.objectContaining({
+        action: "threshold",
+        threshold_count: 10,
+        threshold_window_seconds: 3600,
+        threshold_group_by: "resource"
+      })
+    });
+
+    const updated = await runCli(
+      [
+        "capture-rule",
+        "update",
+        "00000000-0000-4000-8000-000000000101",
+        "--project-id",
+        "proj_123",
+        "--action",
+        "allow"
+      ],
+      { updateCaptureRuleCommand }
+    );
+    expect(updated.exitCode).toBe(0);
+    expect(updateCaptureRuleCommand).toHaveBeenCalledWith({
+      projectId: "proj_123",
+      ruleId: "00000000-0000-4000-8000-000000000101",
+      update: { action: "allow" }
+    });
   });
 });

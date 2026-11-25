@@ -1,3 +1,34 @@
+Local work (unreleased, 2026-11-24/25): unified `capture_rules` now supports
+`action: "threshold"` (`threshold_count` 2–1000, `threshold_window_seconds`
+60–86400, `threshold_group_by: "resource" | "fingerprint"`), `action: "allow"`
+high-specificity carve-outs, and bounded multi-URL `resource_urls` (1–10 exact
+`{ host, path_equals }` entries) via forward migration
+`202611240001_add_capture_rule_thresholds`, fail-closed schema readiness checks,
+transactional worker threshold gating with `created_now` incident tracking and
+prior-event route backfill, retention cleanup, `resource_threshold` and legacy
+redacted-tag suggestions, full API/CLI/ordinary MCP/Web UI parity (preserving
+the frozen 23-tool OpenAI catalog), and a local CLI trace-merge guard for
+untyped resource errors. `@debugbundle/sdk-browser` tracks bfcache-safe
+`pagehide` → `"unloaded"` / `pageshow` state and documents relay
+`evidenceCapabilities`; `bundle-engine` sets `customer_visible: false` for
+hidden/prerender/unloaded opaque `resource_error` events and integrates passive
+CSP/timing and explicit recovery observations into `buildSummaryGuidance()`,
+surfaced in `BrowserResourceDetails`. `debugbundle/sdk-php` adds validated
+`route_template`, strictly allowlisted rate-limit `response_headers`, and
+Laravel/Symfony HTTP 429 context (`HttpRateLimitContext`). Optional exact-key
+redaction (`exactKeys` / `redactExactFields` / language-idiomatic equivalent,
+additive to mandatory SEC-21/22 rules) plus `SEC-23a` schema-aware protocol
+field preservation are implemented and locally verified against synced
+`privacy-conformance.json` `exact_key_cases` across Core `@debugbundle/redaction`
+and all 13 maintained capture surfaces (Browser, Node.js, PHP, staged WordPress
+ZIP, Python, Go, Rust, Ruby, Java, .NET, Android, Swift, and React Native with
+both iOS/Android native bridges); published packages and hosted deployments
+remain unchanged until explicitly authorized.
+
+Hosted capture-rule activation uses a paused-write bridge. The bridge applies
+the forward migration and can enforce saved rules during rollback. Hosted
+activation waits for compatible API and worker images in both retained releases.
+
 Core 1.30.1 and site 1.11.3 contain shared tab-scroll containment, responsive
 offer-banner wording and homepage loading/overflow corrections. Installed APIs,
 SDKs and client packages retain their versions. See `spec/release-1.30.1.md`;
