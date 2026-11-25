@@ -423,11 +423,19 @@ describe("cli capture-rule commands", () => {
         projectId: "proj_1",
         create: {
           name: "Threshold analytics resources",
+          description: null,
+          enabled: true,
           action: "threshold",
           matcher: rule.matcher,
+          sample_rate: null,
+          sample_event_class: null,
           threshold_count: 5,
           threshold_window_seconds: 3600,
-          threshold_group_by: "resource"
+          threshold_group_by: "resource",
+          created_by_user_id: null,
+          created_from_incident_id: null,
+          created_from_event_id: null,
+          expires_at: null
         }
       },
       createCaptureRuleApi({ request })
