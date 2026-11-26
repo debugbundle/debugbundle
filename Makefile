@@ -179,6 +179,25 @@ infra-bootstrap: db-migrate s3-bootstrap
 install:
 	$(NODE_RUN) "corepack enable && $(PNPM_INSTALL)"
 
+# Managed project guidance uses the current checkout without rebuilding a client package.
+.PHONY: debugbundle-guidance-refresh debugbundle-guidance-check
+debugbundle-guidance-refresh:
+	$(NODE_RUN) "node --import tsx apps/cli/src/entrypoint.ts validate --fix --json"
+
+debugbundle-guidance-check:
+	$(NODE_RUN) "node --import tsx apps/cli/src/entrypoint.ts validate --json && node --import tsx apps/cli/src/entrypoint.ts profile validate --json"
+
+.PHONY: debugbundle-sdk-check
+debugbundle-sdk-check:
+	docker run --rm --network none -v "$(PWD):$(WORKDIR):ro" -w "$(WORKDIR)" $(NODE_IMAGE) node scripts/check-dogfooding-sdk.mjs
+
+# The host-only operator CLI exception is documented in rules/local-tooling.md.
+DEBUGBUNDLE_CLI_VERSION := 1.30.0
+.PHONY: debugbundle-cli-update
+debugbundle-cli-update:
+	npm install --global --ignore-scripts --no-audit --no-fund @debugbundle/cli@$(DEBUGBUNDLE_CLI_VERSION)
+	debugbundle --version
+
 .PHONY: lint
 lint:
 	$(NODE_RUN) "corepack enable && NODE_OPTIONS=--max-old-space-size=6144 corepack pnpm lint"

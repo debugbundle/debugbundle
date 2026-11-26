@@ -1,3 +1,8 @@
+Core 1.32.1 and site 1.13.1 pin Node and Browser 3.3.0 for DebugBundle's
+API, worker, dashboard and companion site. Release qualification is in progress;
+[the adoption record](spec/debugbundle-sdk-adoption-20261126.md) separates local
+qualification from the applied production resource rule and incident lifecycle.
+
 Core 1.32.0 (25 November 2026) extends unified `capture_rules` with
 `action: "threshold"` (`threshold_count` 2–1000, `threshold_window_seconds`
 60–86400, `threshold_group_by: "resource" | "fingerprint"`), `action: "allow"`

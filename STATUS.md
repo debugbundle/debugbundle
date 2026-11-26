@@ -1,3 +1,12 @@
+# Core 1.32.1 and site 1.13.1 release in progress
+
+The owner authorised publication and deployment of the SDK adoption update.
+Local dependency, guidance, privacy/delivery, typecheck and frontend build checks
+pass, including 102 focused core tests and 137 site tests. Exact-source CI,
+canonical releases and hosted verification are pending. See
+[the release plan](spec/release-1.32.1.md). The hero-image threshold is already
+saved and its false incident resolved; the other incident lifecycles are unchanged.
+
 # 25 November privacy policy update
 
 The public privacy policy discloses saved report summaries, structured facts and saved narrative. The copy states that OpenAI needs separate reports access and a linked account with access to every project in the report. Site commit `9fb3271c` passed local checks, GitHub CI, hosted deployment and public readback after CloudFront invalidation. [Release receipt](spec/browser-resource-release-20261125.md#release-receipts)

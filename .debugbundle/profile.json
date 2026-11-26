@@ -3,15 +3,9 @@
   "project": {
     "name": "debugbundle",
     "repo_url": "https://github.com/debugbundle/debugbundle",
-    "primary_languages": [
-      "TypeScript"
-    ],
-    "package_managers": [
-      "pnpm"
-    ],
-    "deployment_targets": [
-      "docker-compose"
-    ]
+    "primary_languages": ["TypeScript"],
+    "package_managers": ["pnpm"],
+    "deployment_targets": ["docker-compose"]
   },
   "services": [
     {
@@ -19,12 +13,8 @@
       "kind": "backend",
       "runtime": "Node.js",
       "framework": "Fastify",
-      "paths": [
-        "apps/api"
-      ],
-      "owns_routes": [
-        "apps/api/src/routes"
-      ],
+      "paths": ["apps/api"],
+      "owns_routes": ["apps/api/src/routes"],
       "depends_on": [
         "packages/auth",
         "packages/storage",
@@ -38,13 +28,8 @@
       "kind": "backend",
       "runtime": "Node.js",
       "framework": "Node.js CLI",
-      "paths": [
-        "apps/cli"
-      ],
-      "owns_routes": [
-        "apps/cli/src/main.ts",
-        "apps/cli/src/*-command.ts"
-      ],
+      "paths": ["apps/cli"],
+      "owns_routes": ["apps/cli/src/main.ts", "apps/cli/src/*-command.ts"],
       "depends_on": [
         "packages/retrieval-client",
         "packages/log-parser",
@@ -57,45 +42,35 @@
       "kind": "backend",
       "runtime": "Node.js",
       "framework": "MCP stdio server",
-      "paths": [
-        "apps/mcp"
-      ],
-      "owns_routes": [
-        "apps/mcp/src/tool-catalog.ts",
-        "apps/mcp/src/*-tools.ts"
-      ],
-      "depends_on": [
-        "apps/cli",
-        "packages/retrieval-client"
-      ]
+      "paths": ["apps/mcp"],
+      "owns_routes": ["apps/mcp/src/tool-catalog.ts", "apps/mcp/src/*-tools.ts"],
+      "depends_on": ["apps/cli", "packages/retrieval-client"]
     },
     {
       "name": "web",
       "kind": "frontend",
       "runtime": "Node.js",
       "framework": "React + Vite",
-      "paths": [
-        "apps/web"
-      ],
-      "owns_routes": [
-        "apps/web/src/app.tsx",
-        "apps/web/src/pages"
-      ],
-      "depends_on": [
-        "apps/api"
-      ]
+      "paths": ["apps/web"],
+      "owns_routes": ["apps/web/src/app.tsx", "apps/web/src/pages"],
+      "depends_on": ["apps/api"]
+    },
+    {
+      "name": "site",
+      "kind": "frontend",
+      "runtime": "Node.js",
+      "framework": "Next.js static export",
+      "paths": ["site"],
+      "owns_routes": ["site/app"],
+      "depends_on": ["apps/api"]
     },
     {
       "name": "worker",
       "kind": "worker",
       "runtime": "Node.js",
       "framework": "BullMQ",
-      "paths": [
-        "apps/worker"
-      ],
-      "owns_routes": [
-        "apps/worker/src"
-      ],
+      "paths": ["apps/worker"],
+      "owns_routes": ["apps/worker/src"],
       "depends_on": [
         "packages/storage",
         "packages/event-normalizer",
@@ -106,15 +81,9 @@
     }
   ],
   "infrastructure": {
-    "databases": [
-      "PostgreSQL"
-    ],
-    "queues": [
-      "Redis"
-    ],
-    "object_storage": [
-      "S3-compatible"
-    ],
+    "databases": ["PostgreSQL"],
+    "queues": ["Redis"],
+    "object_storage": ["S3-compatible"],
     "external_services": []
   },
   "critical_paths": [
@@ -144,6 +113,11 @@
       "notes": "MCP tools mirror CLI/API retrieval, lifecycle, project, billing, probe, capture-policy, webhook, Slack, GitHub, and analysis capabilities through thin adapters."
     },
     {
+      "name": "Public site and documentation",
+      "owner_service": "site",
+      "notes": "The companion site checkout owns marketing, documentation, public offers and browser capture. Use make -C site install, test, typecheck and build-webpack for its independent Docker-backed workflow."
+    },
+    {
       "name": "Dashboard and project management",
       "owner_service": "web",
       "notes": "React SPA owns authenticated project/account/billing/settings/incidents UI while business behavior remains API/package owned."
@@ -165,10 +139,7 @@
       "starter-kit",
       "tests"
     ],
-    "generated_paths": [
-      ".debugbundle",
-      ".agents/skills/debugbundle"
-    ],
+    "generated_paths": [".debugbundle", ".agents/skills/debugbundle"],
     "do_not_edit_paths": [
       ".debugbundle/bundles",
       ".debugbundle/local/events",
@@ -184,9 +155,9 @@
   },
   "debugbundle": {
     "profile_owner": "debugbundle-maintainers",
-    "last_reviewed_at": "2026-07-28T23:30:00.000Z",
+    "last_reviewed_at": "2026-11-26T00:00:00.000Z",
     "validation_status": "agent-validated",
     "skill_path": ".agents/skills/debugbundle",
-    "notes": "Agent-validated profile for the DebugBundle core repo. Keep services, critical paths, and workflows aligned when architecture or public interfaces change."
+    "notes": "Reviewed core services, public site, critical paths and Docker-backed workflows on 2026-11-26. The canonical skill is discoverable by Codex; the connected cloud project and SDK credential input names remain unchanged."
   }
 }

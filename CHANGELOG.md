@@ -6,6 +6,13 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.32.1] - 2026-11-26
+
+### Changed
+
+- Adopt the published Node and Browser 3.3.0 SDKs in DebugBundle's API, worker and dashboard capture. The public site adopts Browser 3.3.0 in its companion checkout.
+- Refresh the repository profile and add Docker-backed project-guidance maintenance commands.
+
 ## [1.32.0] - 2026-11-25
 
 ### Added

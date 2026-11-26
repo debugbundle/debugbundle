@@ -1,3 +1,11 @@
+Core 1.32.1 dogfooding adoption pins `@debugbundle/sdk-node` 3.3.0 at the root for
+API/worker adapters and `@debugbundle/sdk-browser` 3.3.0 in `apps/web` and the
+companion `site` 1.13.1 checkout. The profile includes the existing public site service.
+`make debugbundle-guidance-refresh` and `make debugbundle-guidance-check` use
+source CLI templates in Docker; `rules/local-tooling.md` documents the pinned
+host operator CLI installer. See [the adoption record](spec/debugbundle-sdk-adoption-20261126.md)
+for qualification and the separate production noise-rule receipt.
+
 In Core 1.32.0, `shared-types/capture-rule-schemas.ts`,
 `capture-rule-evaluation-context.ts`, `capture-rule-evaluation.ts`,
 `browser-resource-suggestions.ts`, and `capture-rule-suggestion-matching.ts`
