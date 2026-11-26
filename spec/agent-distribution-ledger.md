@@ -1,5 +1,14 @@
 # Agent distribution ledger
 
+## GitHub status client patch — 1.30.1
+
+CLI and ordinary MCP 1.30.1 are live on npm. Official MCP Registry, ClawHub
+skill and OpenClaw plugin resolve the same patch version. Clean public installs
+exercise the corrected GitHub status path. Both ClawHub final reviews and skill
+moderation pass, and skill discovery passes six of seven queries. Existing
+developer marketplaces retain their independent versions and MCP 1.30.0 pins.
+[Exact publication and verification receipts](github-status-client-release-1.30.1.md#publication-receipts)
+
 ## Browser resource controls — 25 November 2026
 
 CLI and MCP 1.30.0 are live on npm from `d3505b12d3413e5ba11e048620b93b4283f45bf6`. Fresh registry installs exercise both packages on Node 22, 24, and 26. The official MCP Registry resolves `com.debugbundle/mcp` at 1.30.0. [CLI workflow](https://github.com/debugbundle/debugbundle/actions/runs/45666347848) · [MCP workflow](https://github.com/debugbundle/debugbundle/actions/runs/45666347355)

@@ -1,3 +1,11 @@
+# GitHub status client patch 1.30.1 released
+
+CLI, ordinary MCP, OpenClaw and the portable ClawHub skill are public at 1.30.1.
+The client status read accepts an unconnected GitHub App or an unassigned
+repository. npm provenance and clean install checks, the official Registry,
+ClawHub security/moderation and public OpenClaw installation passed. Core
+1.32.1 remains live. [Release receipts](spec/github-status-client-release-1.30.1.md)
+
 # Core 1.32.1 and site 1.13.1 released
 
 Core and site are published and live from `66e8a15e` / `f0a88e4b`, with Node and
