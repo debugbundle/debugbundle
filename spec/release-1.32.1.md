@@ -29,8 +29,10 @@ hero-image threshold/incident receipt.
 
 ## Release and rollback plan
 
-1. Publish reviewed source commits and require successful exact-source core/site CI.
-2. Publish canonical core `v1.32.1` and site `v1.13.1` through their existing workflows.
+1. Publish reviewed source commits and require successful exact-source CI for each release.
+2. Publish canonical core `v1.32.1` and site `v1.13.1` through their existing workflows
+   after their respective source checks pass. The independent site publication may
+   finish while core CI runs; the combined deployment waits for both releases.
 3. Dispatch `deploy-hosted-stack.yml` from trusted cloud `main`, with immutable
    product/site SHAs and `deploy_assets=true`. Preserve MCP routing, project merge
    activation and capture-rule-v2 write settings.
@@ -48,3 +50,12 @@ actions remain outside this release.
 
 Local qualification passed before release authorisation. Exact-source CI,
 canonical release and hosted receipts will be recorded after verification.
+
+The final follow-up CI from 25 November failed on two stale bookkeeping checks:
+the current agent ledger table still listed the previous plugin versions, and
+the Rust release test fixture still expected 1.0.2. Both failures were reproduced
+locally. The ledger now matches the unchanged published manifests and MCP pins;
+the fixture now explicitly expects the published 1.1.1 crate. Independent
+crates.io metadata, index and archive readback agree on SHA-256
+`cd4d5c7bf6e6fb2dfff0059723b96b477efc2218ba06b83d6d2b797b9800c631`.
+No production logic, registry-check enforcement or assertion is weakened.

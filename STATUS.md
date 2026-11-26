@@ -6,6 +6,8 @@ pass, including 102 focused core tests and 137 site tests. Exact-source CI,
 canonical releases and hosted verification are pending. See
 [the release plan](spec/release-1.32.1.md). The hero-image threshold is already
 saved and its false incident resolved; the other incident lifecycles are unchanged.
+Qualification also repairs two inherited release-bookkeeping failures from the
+25 November follow-up CI: stale agent-ledger rows and the old Rust fixture version.
 
 # 25 November privacy policy update
 

@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { readRustRelease, verifyRustRelease } from "../../scripts/check-rust-release.mjs";
 
-const releaseVersion = "1.0.2";
+const releaseVersion = "1.1.1";
 const specification = {
   repository: "debugbundle/debugbundle-rust",
   registry: "crates.io",
