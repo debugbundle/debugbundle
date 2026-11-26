@@ -1,13 +1,20 @@
-# Core 1.32.1 and site 1.13.1 release in progress
+# Core 1.32.1 and site 1.13.1 released
 
-The owner authorised publication and deployment of the SDK adoption update.
-Local dependency, guidance, privacy/delivery, typecheck and frontend build checks
-pass, including 102 focused core tests and 137 site tests. Exact-source CI,
-canonical releases and hosted verification are pending. See
-[the release plan](spec/release-1.32.1.md). The hero-image threshold is already
-saved and its false incident resolved; the other incident lifecycles are unchanged.
-Qualification also repairs two inherited release-bookkeeping failures from the
-25 November follow-up CI: stale agent-ledger rows and the old Rust fixture version.
+Core and site are published and live from `66e8a15e` / `f0a88e4b`, with Node and
+Browser SDK 3.3.0 in the API, worker, dashboard and public site. Exact-source CI,
+all 146 coverage shards, five CLI runtime versions and both release workflows
+passed. Hosted rollout `45890994946` passed with no new migration (97 already
+applied); independent checks confirm healthy containers, active worker processing,
+API/MCP readiness, the exact dashboard build and the served SDK versions.
+The previous stable release and its compatible images remain available; 62
+protected settings match. [Release receipts](spec/release-1.32.1.md)
+
+Guidance/profile checks and the operator CLI 1.30.0 are healthy. The false
+hero-image incident remains resolved with its exact threshold enabled; incident
+counts remain 3 open, 2 regressed and 94 resolved. All three endpoint monitors pass.
+The optional GitHub repository read returns `404:installation_not_found`; no
+integration setting was changed. Qualification also repairs stale agent-ledger
+rows and the old Rust fixture version inherited from the 25 November follow-up CI.
 
 # 25 November privacy policy update
 

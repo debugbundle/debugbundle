@@ -48,8 +48,63 @@ actions remain outside this release.
 
 ## Receipts
 
-Local qualification passed before release authorisation. Exact-source CI,
-canonical release and hosted receipts will be recorded after verification.
+### Qualified sources and canonical releases
+
+- Core `66e8a15e6f1f54ef610a29e9063d94aa38428949` passes
+  [source CI](https://github.com/debugbundle/debugbundle/actions/runs/45882032809),
+  including all 146 coverage shards, and
+  [CLI runtime compatibility](https://github.com/debugbundle/debugbundle/actions/runs/45882032744)
+  on Node 22, 24, 26.0.0, 26.2.0 and latest 26.
+  The [canonical release workflow](https://github.com/debugbundle/debugbundle/actions/runs/45889425205)
+  passes and publishes [v1.32.1](https://github.com/debugbundle/debugbundle/releases/tag/v1.32.1)
+  at that exact commit, independently verified by tag readback.
+- Site `f0a88e4b1958a07236e33208f57667c1e9fc30e5` passes
+  [source CI](https://github.com/debugbundle/site/actions/runs/45878659541) and
+  [release](https://github.com/debugbundle/site/actions/runs/45882039030).
+  Published [v1.13.1](https://github.com/debugbundle/site/releases/tag/v1.13.1)
+  resolves to that exact commit. Local qualification also includes 137 site
+  tests, static export, typecheck and installed Browser SDK privacy/delivery checks.
+
+### Hosted rollout and independent readback
+
+The [combined deployment](https://github.com/debugbundle/debugbundle-cloud/actions/runs/45890994946)
+passes from trusted cloud source `f9284e357ea1af6668cadb13f444e5f44b633860`,
+using the two immutable release commits above. Migration validation reports
+`applied=0; already_applied=97`. The workflow verifies worker activation,
+publishes both frontend exports, completes CloudFront invalidations and verifies
+real HTTP 404 responses for missing pages/assets with GET and HEAD.
+
+- Active release: `20261126203056-e456b9df6cc9`.
+- Active API and worker immutable image digest:
+  `sha256:b91c9db0b18ebf3379f41542d8c334d585541c1943cb9586afc8f11da84df048`.
+- Previous stable release: `20261125172652-f29b359385df`, retaining API and worker
+  images at `sha256:b4de06110940e496f7b6551b2b94ddcec1262f9bd1b8f4396e1ce035b17c2e4e`.
+- Independent on-host inspection confirms exactly those two releases, both
+  compatible image pairs, root version 1.32.1 and installed Node SDK 3.3.0 in
+  healthy API/worker containers with zero restarts and no OOM kills. Active image
+  revision labels match the core source; both rollback sides retain
+  `capture-rules-v2`. Worker readiness reports active `postgres-v1` processing.
+- All 62 selected protected credentials/settings match the previous release;
+  merge and capture-rule-v2 write activation remain enabled. Root disk usage is
+  23%, with 46,478,544 KiB available at readback.
+- Public API/MCP `/ready` return `ready`; dashboard and site return HTTP 200.
+  Dashboard `/version.json` identifies the exact core release SHA. Its served
+  `/assets/index-CGNlZ8o3.js` and the site's
+  `/_next/static/chunks/2sihbq-k7fo1p.js` contain Browser SDK 3.3.0 and no 3.2.4
+  version literal. All 16 referenced same-origin site scripts were fetched
+  successfully. Public reference data reports core 1.32.1.
+- CLI doctor is healthy. Existing API-ready, site-homepage and app-login monitors
+  are passing with HTTP 200 and no consecutive failures. Scoped readback remains
+  3 open, 2 regressed and 94 resolved; the exact hero-image threshold is enabled
+  with zero natural matches at verification. No further lifecycle mutation or
+  synthetic production event was performed.
+
+The optional scoped GitHub repository read returns
+`404:installation_not_found`. This is recorded as an integration verification
+limitation; no GitHub installation or configuration was changed. Browser/device,
+provider and customer-journey acceptance remain separate from these release checks.
+
+### Inherited qualification repair
 
 The final follow-up CI from 25 November failed on two stale bookkeeping checks:
 the current agent ledger table still listed the previous plugin versions, and

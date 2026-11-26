@@ -3,7 +3,9 @@ API/worker adapters and `@debugbundle/sdk-browser` 3.3.0 in `apps/web` and the
 companion `site` 1.13.1 checkout. The profile includes the existing public site service.
 `make debugbundle-guidance-refresh` and `make debugbundle-guidance-check` use
 source CLI templates in Docker; `rules/local-tooling.md` documents the pinned
-host operator CLI installer. See [the adoption record](spec/debugbundle-sdk-adoption-20261126.md)
+host operator CLI installer. The API, worker, dashboard and site adoption is live;
+see [the release receipt](spec/release-1.32.1.md) for immutable source/image and
+runtime verification, and [the adoption record](spec/debugbundle-sdk-adoption-20261126.md)
 for qualification and the separate production noise-rule receipt.
 
 In Core 1.32.0, `shared-types/capture-rule-schemas.ts`,

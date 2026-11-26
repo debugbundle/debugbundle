@@ -67,5 +67,18 @@ subsequent natural matches before claiming a measured reduction.
 - Focused script lint and formatting checks passed; existing SDK configuration,
   consent, relay and credential boundaries remain unchanged.
 
-Production adoption ships through the authorised core 1.32.1/site 1.13.1 rollout;
-no new SDK, CLI or MCP package publication is needed for this consumer update.
+## Production qualification
+
+Core 1.32.1 and site 1.13.1 are published and live. The
+[release receipt](release-1.32.1.md) records the exact source CI, canonical
+releases, hosted workflow, immutable image and rollback pair. Both live
+containers report Node SDK 3.3.0; the served dashboard and site SDK chunks
+contain Browser 3.3.0 and no 3.2.4 version literal. The dashboard build ID matches
+the core release commit. Public API/MCP readiness, all three existing endpoint
+monitors and authenticated CLI doctor checks pass.
+
+Post-deployment readback confirms the same incident lifecycles and enabled
+10-per-hour resource threshold, with zero natural matches so far. The optional
+GitHub repository read returns `404:installation_not_found`; no integration
+configuration was changed. No production synthetic capture or browser/device
+acceptance is claimed. Existing SDK, CLI and MCP distribution versions are retained.
