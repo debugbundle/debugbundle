@@ -3524,6 +3524,8 @@ debugbundle github deliveries retry <delivery-id> [--project-id <id>] [--auth-fi
 
 `github status` shows the organization's GitHub App installation status and any assigned repo for the current project. `github repos` lists repositories available to the installation for owner/admin callers. `github repo set` assigns a primary repo to the project for owner/admin callers. `github rules create` is available to any authorized collaborator on an eligible shared project, while rule update/delete and delivery retry obey creator ownership for plain members. `github deliveries` lists recent delivery history for a project, and `github deliveries retry` retries a failed delivery within that project scope when the caller owns the underlying rule or has admin rights. Multi-value flags (`--event`, `--environment`, `--service`) accept comma-separated values. Eligibility is determined from the target project's owner plan, not the acting collaborator's personal plan.
 
+`github status` exits successfully before an App is connected or a project repository is assigned. In JSON output, `installation` is `null` when unconnected and `repo` is present when the requested project has an assignment.
+
 Incident/improvement lifecycle mutations can return an explicit `mutation_outcome_unconfirmed` error when the client cannot confirm the result after dispatch (unreadable HTTP success, transport failure, or HTTP 5xx). CLI JSON error output has `error`, `outcome: "unknown"`, `retry_safe: false`, and a fixed `message`; it retains exit code 1 and the existing error stream. Ordinary MCP preserves the same code and no-retry guidance. Never automatically repeat the write; use a read to check current state first. A confirmed cloud lifecycle result remains successful if only the optional local cache fails; CLI/MCP attach the fixed incident field `cache_warning: "cloud_cache_update_unavailable"`. This does not alter the hosted read-only OpenAI catalog.
 
 Doctor exits 1 when its structured report has `status: "error"`; healthy and warning-only reports still exit 0. Its JSON report shape is unchanged. `--auth-file <path>` selects an explicit saved login.
@@ -3764,6 +3766,8 @@ debugbundle_delete_github_dispatch_rule → same result as DELETE /v1/projects/{
 debugbundle_list_github_deliveries      → same result as GET /v1/projects/{id}/github/deliveries
 debugbundle_retry_github_delivery       → same result as POST /v1/projects/{id}/github/deliveries/{id}/retry
 ```
+
+`get_github_status` also includes the repository assignment when called with a project ID. Its `repo` field is `null` if the project has no assigned repository.
 
 These tools manage GitHub repository automation. Project-scoped read operations use the target project's owner plan for eligibility; repository connection management requires owner/admin access; dispatch-rule create is available to authorized project collaborators, while update/delete and delivery retry obey creator ownership for plain members.
 

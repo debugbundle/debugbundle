@@ -6,6 +6,10 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Fixed
+
+- CLI, ordinary MCP and OpenClaw 1.30.1 report GitHub status successfully before a GitHub App or project repository is connected.
+
 ## [1.32.1] - 2026-11-26
 
 ### Changed

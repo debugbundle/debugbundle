@@ -64,7 +64,7 @@ describe("github management api client", () => {
     });
     await api.removeProjectRepo({ bearerToken: "dbundle_mem_x", projectId: "proj_1" });
 
-    expect(installation.installation_id).toBe(123);
+    expect(installation?.installation_id).toBe(123);
     expect(repositories[0]?.full_name).toBe("debugbundle/app");
     expect(repo.repo_name).toBe("app");
     expect(request).toHaveBeenNthCalledWith(1, {
@@ -91,6 +91,23 @@ describe("github management api client", () => {
       path: "/v1/projects/proj_1/github/repo",
       bearerToken: "dbundle_mem_x"
     });
+  });
+
+  it("rejects a null repo in a successful assignment response", async () => {
+    const request = vi.fn<HttpClient["request"]>().mockResolvedValue({
+      status: 200,
+      body: { repo: null }
+    });
+    const api = createGitHubManagementApi({ request });
+
+    await expect(
+      api.setProjectRepo({
+        bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
+        owner: "org",
+        repo: "app"
+      })
+    ).rejects.toEqual(new GitHubManagementApiError(200, "invalid_response_shape"));
   });
 
   it("throws structured api and shape errors", async () => {

@@ -88,7 +88,11 @@ function mapErrorToExitCode(error: unknown): number {
   return 1;
 }
 
-function formatInstallation(installation: InstallationLike): string {
+function formatInstallation(installation: InstallationLike | null): string {
+  if (installation === null) {
+    return "No GitHub App installation connected.";
+  }
+
   return [
     `GitHub installation: ${installation.account_login}`,
     `Installation ID: ${installation.installation_id}`,
@@ -135,8 +139,14 @@ export async function getGitHubStatusCommand(
     json?: boolean;
   },
   api: {
-    getInstallation(input: { bearerToken: string; projectId?: string }): Promise<InstallationLike>;
-    getProjectRepo?(input: { bearerToken: string; projectId: string }): Promise<ProjectRepoLike>;
+    getInstallation(input: {
+      bearerToken: string;
+      projectId?: string;
+    }): Promise<InstallationLike | null>;
+    getProjectRepo?(input: {
+      bearerToken: string;
+      projectId: string;
+    }): Promise<ProjectRepoLike | null>;
   }
 ): Promise<CliCommandResult> {
   try {

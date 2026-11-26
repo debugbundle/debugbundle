@@ -54,11 +54,20 @@ function handler(req, res) {
     req.headers.authorization,
     req.url === "/health" ? undefined : "Bearer synthetic-member-token"
   );
-  const path = new URL(req.url, "http://localhost").pathname;
+  const url = new URL(req.url, "http://localhost");
+  const path = url.pathname;
   let body;
   if (path === "/health") body = { status: "ok", version: "fixture", uptime: 1 };
   else if (path === "/v1/incidents")
     body = fault === "invalid-list" ? {} : { incidents: [incident], next_cursor: null };
+  else if (
+    req.method === "GET" &&
+    path === "/v1/github/installation" &&
+    url.searchParams.get("project_id") === projectId
+  )
+    body = { installation: null };
+  else if (req.method === "GET" && path === `/v1/projects/${projectId}/github/repo`)
+    body = { repo: null };
   else if (path.endsWith("/capture-rule-suggestion")) body = { suggestions: [] };
   else if (path.endsWith("/capture-rules")) body = { access_mode: "manage", rules: [] };
   else if (path.endsWith("/resolve") || path.endsWith("/reopen")) {
@@ -218,6 +227,10 @@ try {
       assert.equal(writes, before + 2);
       console.log(JSON.stringify({ node: process.version, transport, encoding, result: "pass" }));
     }
+    encoding = "gzip";
+    assert.deepEqual(await run(["github", "status", "--project-id", projectId]), {
+      installation: null
+    });
     for (fault of ["invalid-json", "invalid-shape", "disconnect", "server-error"]) {
       const before = writes;
       const outcome = await run(["resolve", incidentId, "--source", "cloud"], 1);
@@ -251,6 +264,7 @@ try {
       JSON.stringify({
         node: process.version,
         transport,
+        githubStatusUnconnected: "pass",
         mutationFaults: "pass",
         doctorExit: "pass",
         confirmedCacheFailure: "pass"

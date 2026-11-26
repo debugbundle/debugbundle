@@ -16,6 +16,7 @@ const entry =
 const { default: plugin, DEBUGBUNDLE_OPENCLAW_TOOL_NAMES: names } = await import(entry);
 const originalCwd = process.cwd();
 const root = await mkdtemp(join(tmpdir(), "debugbundle-openclaw-runtime-"));
+const fixtureProjectId = "00000000-0000-4000-8000-000000000001";
 const requests = [];
 const server = createServer((request, response) => {
   requests.push({
@@ -24,6 +25,18 @@ const server = createServer((request, response) => {
     authorization: request.headers.authorization
   });
   const url = new URL(request.url, "http://127.0.0.1");
+  if (
+    url.pathname === "/v1/github/installation" ||
+    url.pathname === `/v1/projects/${fixtureProjectId}/github/repo`
+  ) {
+    response.setHeader("content-type", "application/json");
+    response.end(
+      JSON.stringify(
+        url.pathname === "/v1/github/installation" ? { installation: null } : { repo: null }
+      )
+    );
+    return;
+  }
   const nextCursor =
     url.searchParams.has("limit") || url.searchParams.has("cursor") ? null : "fixture-page-2";
   const body = gzipSync(
@@ -216,6 +229,27 @@ try {
   );
   assert.equal(await readFile(marker, "utf8"), '{"private_marker":"unrelated"}');
   assert.equal(requests.length, 5, "unsafe local metadata must make no cloud request");
+
+  const githubStatus = await tools
+    .get("debugbundle_get_github_status")
+    .execute("fixture-github-status", {
+      bearerToken: "synthetic-member-token",
+      projectId: fixtureProjectId
+    });
+  assert.equal(githubStatus.isError, undefined);
+  assert.deepEqual(JSON.parse(githubStatus.content[0].text), { installation: null, repo: null });
+  assert.deepEqual(requests.slice(5), [
+    {
+      url: `/v1/github/installation?project_id=${fixtureProjectId}`,
+      method: "GET",
+      authorization: "Bearer synthetic-member-token"
+    },
+    {
+      url: `/v1/projects/${fixtureProjectId}/github/repo`,
+      method: "GET",
+      authorization: "Bearer synthetic-member-token"
+    }
+  ]);
 
   console.log(
     `OpenClaw native ESM runtime passed on ${process.version}: ${tools.size} tools, compressed scoped pagination/doctor, approval and fail-closed checks.`

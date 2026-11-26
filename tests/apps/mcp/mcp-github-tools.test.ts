@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createGitHubMcpTools, GITHUB_MCP_TOOL_NAMES } from "../../../apps/mcp/src/github-tools.js";
-import { GitHubManagementApiError } from "../../../packages/github-client/src/index.js";
+import {
+  createGitHubManagementApi,
+  GitHubManagementApiError
+} from "../../../packages/github-client/src/index.js";
 
 describe("mcp github tools", () => {
   it("declares github tool parity", () => {
@@ -70,6 +73,27 @@ describe("mcp github tools", () => {
     await expect(
       tools.remove_project_github_repo({ bearerToken: "dbundle_mem_x", projectId: "proj_1" })
     ).resolves.toEqual({ removed: true, project_id: "proj_1" });
+  });
+
+  it("returns a connected installation with no repository assigned", async () => {
+    const installation = {
+      id: "ghi_1",
+      installation_id: 123,
+      account_login: "debugbundle",
+      account_type: "Organization",
+      status: "active",
+      created_at: "2026-03-26T00:00:00.000Z",
+      updated_at: "2026-03-26T00:00:00.000Z"
+    };
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce({ status: 200, body: { installation } })
+      .mockResolvedValueOnce({ status: 200, body: { repo: null } });
+    const tools = createGitHubMcpTools(createGitHubManagementApi({ request }));
+
+    await expect(
+      tools.get_github_status({ bearerToken: "dbundle_mem_x", projectId: "proj_1" })
+    ).resolves.toEqual({ installation, repo: null });
   });
 
   it("maps api and unknown errors", async () => {

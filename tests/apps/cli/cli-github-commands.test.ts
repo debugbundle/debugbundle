@@ -120,6 +120,43 @@ describe("cli github commands", () => {
     });
   });
 
+  it.each([false, true])(
+    "reports an unconnected GitHub App successfully (json: %s)",
+    async (json) => {
+      const fetchImpl = vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(Response.json({ installation: null }))
+        .mockResolvedValueOnce(Response.json({ repo: null }));
+      const result = await getGitHubStatusWithAuthCommand(
+        { projectId: "proj_1", json },
+        {
+          readAuthState: vi.fn().mockResolvedValue({
+            bearer_token: "stored_member",
+            base_url: "https://example.test"
+          }),
+          fetchImpl
+        }
+      );
+
+      expect(result).toEqual({
+        exitCode: 0,
+        output: json
+          ? JSON.stringify({ installation: null })
+          : "No GitHub App installation connected."
+      });
+      expect(fetchImpl).toHaveBeenNthCalledWith(
+        1,
+        "https://example.test/v1/github/installation?project_id=proj_1",
+        expect.objectContaining({ method: "GET" })
+      );
+      expect(fetchImpl).toHaveBeenNthCalledWith(
+        2,
+        "https://example.test/v1/projects/proj_1/github/repo",
+        expect.objectContaining({ method: "GET" })
+      );
+    }
+  );
+
   it("renders repository list, repo set, and repo remove output", async () => {
     const listRepositories = vi.fn().mockResolvedValue([
       {

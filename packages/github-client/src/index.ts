@@ -74,7 +74,7 @@ export const GitHubDispatchDeliverySchema = z
 
 export const GitHubInstallationResponseSchema = z
   .object({
-    installation: GitHubInstallationSchema
+    installation: GitHubInstallationSchema.nullable()
   })
   .strict();
 
@@ -89,6 +89,10 @@ export const ProjectGitHubRepoResponseSchema = z
     repo: ProjectGitHubRepoSchema
   })
   .strict();
+
+const GetProjectGitHubRepoResponseSchema = ProjectGitHubRepoResponseSchema.extend({
+  repo: ProjectGitHubRepoSchema.nullable()
+});
 
 export const GitHubDispatchRulesResponseSchema = z
   .object({
@@ -164,7 +168,7 @@ function parseApiError(status: number, body: unknown): never {
 
 async function expectInstallation(
   responsePromise: Promise<HttpResponse>
-): Promise<GitHubInstallation> {
+): Promise<GitHubInstallation | null> {
   const response = await responsePromise;
   if (response.status < 200 || response.status >= 300) {
     parseApiError(response.status, response.body);
@@ -194,15 +198,16 @@ async function expectRepositories(
   return parsed.data.repositories;
 }
 
-async function expectProjectRepo(
-  responsePromise: Promise<HttpResponse>
-): Promise<ProjectGitHubRepo> {
+async function expectProjectRepo<Repo extends ProjectGitHubRepo | null>(
+  responsePromise: Promise<HttpResponse>,
+  schema: z.ZodType<{ repo: Repo }>
+): Promise<Repo> {
   const response = await responsePromise;
   if (response.status < 200 || response.status >= 300) {
     parseApiError(response.status, response.body);
   }
 
-  const parsed = ProjectGitHubRepoResponseSchema.safeParse(response.body);
+  const parsed = schema.safeParse(response.body);
   if (!parsed.success) {
     throw new GitHubManagementApiError(response.status, "invalid_response_shape");
   }
@@ -288,9 +293,15 @@ async function expectNoContent(responsePromise: Promise<HttpResponse>): Promise<
 
 export function createGitHubManagementApi(client: HttpClient): {
   disconnectInstallation(input: { bearerToken: string }): Promise<void>;
-  getInstallation(input: { bearerToken: string; projectId?: string }): Promise<GitHubInstallation>;
+  getInstallation(input: {
+    bearerToken: string;
+    projectId?: string;
+  }): Promise<GitHubInstallation | null>;
   listRepositories(input: { bearerToken: string; projectId?: string }): Promise<GitHubRepository[]>;
-  getProjectRepo(input: { bearerToken: string; projectId: string }): Promise<ProjectGitHubRepo>;
+  getProjectRepo(input: {
+    bearerToken: string;
+    projectId: string;
+  }): Promise<ProjectGitHubRepo | null>;
   listProjectDeliveries(input: {
     bearerToken: string;
     projectId: string;
@@ -387,7 +398,8 @@ export function createGitHubManagementApi(client: HttpClient): {
           method: "GET",
           path: `/v1/projects/${input.projectId}/github/repo`,
           bearerToken: input.bearerToken
-        })
+        }),
+        GetProjectGitHubRepoResponseSchema
       );
     },
 
@@ -498,7 +510,8 @@ export function createGitHubManagementApi(client: HttpClient): {
             owner: input.owner,
             repo: input.repo
           }
-        })
+        }),
+        ProjectGitHubRepoResponseSchema
       );
     },
 
